@@ -1,8 +1,9 @@
 # Agent instructions for SLAVA_dev
 
-Read `README.md` completely before changing this repository. It is the project
-handoff and contains the scientific objective, data contract, setup commands,
-current state, and non-negotiable decisions.
+Read `PROJECT_CONTEXT.md` completely before changing this repository. It is the
+project handoff and contains the scientific objective, current state, data
+contract, and non-negotiable decisions. Read `README.md` for the short project
+overview and deployment commands.
 
 Key invariants:
 
@@ -15,5 +16,6 @@ Key invariants:
   machine-specific `/workspace/...` paths into portable manifest fields.
 - Do not start Russian instruction authoring before the scene inventory,
   screenshot review, object lexicon, and selected-task manifest are approved.
-- Never download the large LIBERO HDF5 demonstrations for this inventory task;
-  BDDL, fixed init states, assets, and the simulator are sufficient.
+- LIBERO HDF5 demonstrations are not needed by the scene collectors, but
+  `scripts/bootstrap.sh` downloads them for later model and trajectory work.
+  Do not make inventory collection depend on those files.
