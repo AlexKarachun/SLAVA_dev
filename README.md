@@ -27,3 +27,11 @@ python scripts/generate_screenshot_sheet.py --mode full
 Результаты создаются в `data/screenshot_sheet_small.html` и
 `data/screenshot_sheet_full.html`.
 
+## Проверка inventory
+
+Все source и merged inventories используют строгую схему
+`schemas/task_inventory.schema.json`. Проверить их можно одной командой:
+
+```bash
+python scripts/validate_inventory.py
+```

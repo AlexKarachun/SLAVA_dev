@@ -265,8 +265,7 @@ LIBERO / SimplerEnv task + init state
 ```
 task_uid
 canonical_en
-bddl_file / env metadata
-init_state_id
+source metadata
 agentview image
 wrist image
 objects_raw
@@ -282,7 +281,7 @@ candidate target/reference/distractors
 
 ## D1 - `task_inventory.jsonl`
 
-Цель: ≥ **100 candidate-сцен**.
+Цель: **102 candidate-сцены**.
 
 Одна строка = одна сцена:
 
@@ -297,9 +296,14 @@ task × init_state
   "task_uid": "libero_spatial_003_seed000",
   "suite": "libero_spatial",
   "task_id": 3,
-  "init_state_id": 0,
   "canonical_en": "put the cream cheese in the bowl",
-  "bddl_file": "...",
+  "source": {
+    "environment": "LIBERO",
+    "commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+    "task_name": "put_the_cream_cheese_in_the_bowl",
+    "bddl_file": "libero/libero/bddl_files/libero_spatial/example.bddl",
+    "init_state_id": 0
+  },
   "images": {
     "agentview_rgb": "images/libero_spatial_003_seed000_agentview.png",
     "wrist_rgb": "images/libero_spatial_003_seed000_wrist.png"
@@ -313,6 +317,7 @@ task × init_state
       "visible_wrist": "visible_partial"
     }
   ],
+  "success_predicates": [],
   "candidate_slots": {
     "action": null,
     "target": null,
@@ -324,6 +329,11 @@ task × init_state
   "notes": ""
 }
 ```
+
+Это строгая схема v1.0 из `schemas/task_inventory.schema.json`: лишние поля на
+верхнем уровне и во вложенных объектах запрещены. Для SimplerEnv блок `source`
+содержит `environment`, `commit`, `task_name`, `gym_env_name`, `episode_id` и
+`reset_seed`.
 
 Допустимые значения `visible_agentview` и `visible_wrist`:
 

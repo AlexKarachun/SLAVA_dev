@@ -14,7 +14,8 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from slava_inventory.io_utils import append_jsonl, humanize_raw_name, load_jsonl  # noqa: E402
+from slava_inventory.io_utils import append_jsonl, load_jsonl  # noqa: E402
+from slava_inventory.schema import validate_inventory_record  # noqa: E402
 
 
 TASKS = (
@@ -31,20 +32,14 @@ def git_commit(repository: Path) -> str:
     ).strip()
 
 
-def actor_record(actor: Any, role: str, *, lexicon_eligible: bool = True) -> dict[str, Any]:
+def actor_record(actor: Any) -> dict[str, Any]:
     raw_name = str(actor.name)
     return {
         "sim_handle": raw_name,
-        "actor_id": int(actor.id),
         "raw_name": raw_name,
-        "category_en": humanize_raw_name(raw_name),
-        "kind": "actor",
-        "role_hint": role,
         "pose_xyz": np.asarray(actor.pose.p, dtype=float).tolist(),
-        "pose_quat_wxyz": np.asarray(actor.pose.q, dtype=float).tolist(),
         "visible_agentview": None,
         "visible_wrist": None,
-        "lexicon_eligible": lexicon_eligible,
     }
 
 
@@ -83,54 +78,34 @@ def collect(args: argparse.Namespace) -> None:
 
                     objects = []
                     for actor in unwrapped.episode_objs:
-                        role = "other"
-                        if actor is unwrapped.episode_source_obj:
-                            role = "target"
-                        elif actor is unwrapped.episode_target_obj:
-                            role = "destination"
-                        eligible = not str(actor.name).startswith("dummy_")
-                        objects.append(actor_record(actor, role, lexicon_eligible=eligible))
+                        objects.append(actor_record(actor))
                     if hasattr(unwrapped, "sink"):
-                        objects.append(actor_record(unwrapped.sink, "fixture"))
+                        objects.append(actor_record(unwrapped.sink))
 
                     record = {
                         "task_uid": uid,
-                        "source": {
-                            "environment": "SimplerEnv",
-                            "repository": "SimplerEnv",
-                            "repository_url": "https://github.com/simpler-env/SimplerEnv.git",
-                            "root_env_var": "SIMPLERENV_ROOT",
-                            "commit": commit,
-                        },
                         "suite": "simpler_bridge",
                         "task_id": TASKS.index(task_name),
-                        "task_name": task_name,
-                        "gym_env_name": gym_env_name,
-                        "episode_id": int(reset_info.get("episode_id", episode_id)),
-                        "reset_seed": args.reset_seed,
                         "canonical_en": unwrapped.get_language_instruction(),
-                        "env_metadata": {
-                            "prepackaged_config": True,
-                            "observation_camera": "3rd_view_camera",
+                        "source": {
+                            "environment": "SimplerEnv",
+                            "commit": commit,
+                            "task_name": task_name,
+                            "gym_env_name": gym_env_name,
+                            "episode_id": int(reset_info.get("episode_id", episode_id)),
+                            "reset_seed": args.reset_seed,
                         },
                         "images": {
                             "agentview_rgb": str(relative_agent),
                             "wrist_rgb": None,
-                            "agentview_camera": "3rd_view_camera",
-                            "wrist_camera": None,
                         },
                         "objects_raw": objects,
-                        "initial_predicates": [],
                         "success_predicates": [
                             {
                                 "type": "src_on_target",
                                 "source": str(unwrapped.episode_source_obj.name),
                                 "target": str(unwrapped.episode_target_obj.name),
                             }
-                        ],
-                        "obj_of_interest": [
-                            str(unwrapped.episode_source_obj.name),
-                            str(unwrapped.episode_target_obj.name),
                         ],
                         "candidate_slots": {
                             "action": "stack" if "stack" in task_name else "place",
@@ -140,11 +115,9 @@ def collect(args: argparse.Namespace) -> None:
                             "forbidden_candidates": [],
                         },
                         "usable_for_slava": None,
-                        "selected_for_v0": False,
-                        "review_status": "pending",
-                        "exclusion_reasons": [],
                         "notes": "",
                     }
+                    validate_inventory_record(record)
                     append_jsonl(record, manifest)
                     existing.add(uid)
                     print(f"[saved] {uid}", flush=True)

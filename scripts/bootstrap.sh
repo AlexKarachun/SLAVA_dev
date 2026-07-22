@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DEPS_DIR="${SLAVA_DEPS_DIR:-$(cd "${PROJECT_ROOT}/.." && pwd)}"
 RUN_SMOKE_TEST=1
+DOWNLOAD_LIBERO_DATASETS=1
 
 LIBERO_URL="https://github.com/Lifelong-Robot-Learning/LIBERO.git"
 LIBERO_COMMIT="8f1084e3132a39270c3a13ebe37270a43ece2a01"
@@ -12,7 +13,7 @@ SIMPLER_URL="https://github.com/simpler-env/SimplerEnv.git"
 SIMPLER_COMMIT="06accaca93535902d408da4855f21cece12bceb7"
 
 usage() {
-  echo "Usage: $0 [--deps-dir PATH] [--skip-smoke-test]"
+  echo "Usage: $0 [--deps-dir PATH] [--skip-libero-datasets] [--skip-smoke-test]"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -23,6 +24,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-smoke-test)
       RUN_SMOKE_TEST=0
+      shift
+      ;;
+    --skip-libero-datasets)
+      DOWNLOAD_LIBERO_DATASETS=0
       shift
       ;;
     -h|--help)
@@ -124,10 +129,65 @@ ensure_env slava-libero 3.8.13
   'torch==1.11.0+cu113' 'torchvision==0.12.0+cu113' 'torchaudio==0.11.0' \
   --extra-index-url https://download.pytorch.org/whl/cu113
 "${CONDA_BIN}" run -n slava-libero python -m pip install -e "${LIBERO_ROOT}"
+"${CONDA_BIN}" run -n slava-libero python -m pip install huggingface_hub
 
 LIBERO_CONFIG_DIR="${LIBERO_CONFIG_PATH:-${HOME}/.libero}"
 "${CONDA_BIN}" run -n slava-libero python "${PROJECT_ROOT}/scripts/configure_libero.py" \
   --repo "${LIBERO_ROOT}" --config-dir "${LIBERO_CONFIG_DIR}"
+
+LIBERO_DATASET_DIR="${LIBERO_ROOT}/libero/datasets"
+
+dataset_file_count() {
+  local directory="$1"
+  if [[ ! -d "${directory}" ]]; then
+    echo 0
+    return
+  fi
+  find "${directory}" -maxdepth 1 -type f -name '*.hdf5' -print | wc -l
+}
+
+libero_dataset_complete() {
+  local dataset="$1"
+  case "${dataset}" in
+    libero_object|libero_goal|libero_spatial)
+      [[ "$(dataset_file_count "${LIBERO_DATASET_DIR}/${dataset}")" -eq 10 ]]
+      ;;
+    libero_100)
+      [[ "$(dataset_file_count "${LIBERO_DATASET_DIR}/libero_10")" -eq 10 ]] &&
+        [[ "$(dataset_file_count "${LIBERO_DATASET_DIR}/libero_90")" -eq 90 ]]
+      ;;
+    *)
+      echo "Unknown LIBERO dataset: ${dataset}" >&2
+      return 2
+      ;;
+  esac
+}
+
+if [[ "${DOWNLOAD_LIBERO_DATASETS}" == "1" ]]; then
+  mkdir -p "${LIBERO_DATASET_DIR}"
+  for dataset in libero_object libero_goal libero_spatial libero_100; do
+    if libero_dataset_complete "${dataset}"; then
+      echo "LIBERO dataset already complete: ${dataset}"
+      continue
+    fi
+
+    echo "Downloading LIBERO dataset from Hugging Face: ${dataset}"
+    # The upstream downloader asks before replacing an incomplete directory.
+    # Supplying "y" keeps bootstrap non-interactive while allowing recovery.
+    printf 'y\n' | "${CONDA_BIN}" run --no-capture-output -n slava-libero \
+      python "${LIBERO_ROOT}/benchmark_scripts/download_libero_datasets.py" \
+        --download-dir "${LIBERO_DATASET_DIR}" \
+        --datasets "${dataset}" \
+        --use-huggingface
+
+    if ! libero_dataset_complete "${dataset}"; then
+      echo "LIBERO dataset download is incomplete: ${dataset}" >&2
+      exit 1
+    fi
+  done
+else
+  echo "Skipping LIBERO demonstration datasets."
+fi
 
 ensure_env slava-simpler 3.10
 "${CONDA_BIN}" run -n slava-simpler python -m pip install \
@@ -177,6 +237,9 @@ Bootstrap complete.
 Repositories:
   LIBERO_ROOT=${LIBERO_ROOT}
   SIMPLERENV_ROOT=${SIMPLER_ROOT}
+
+LIBERO demonstrations:
+  ${LIBERO_DATASET_DIR}
 
 VS Code Remote SSH:
   1. Open ${PROJECT_ROOT}

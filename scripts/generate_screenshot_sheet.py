@@ -7,28 +7,17 @@ import argparse
 import html
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = PROJECT_ROOT / "data" / "task_inventory.jsonl"
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-
-def load_jsonl(path: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"Invalid JSON at {path}:{line_number}: {exc}") from exc
-            if not isinstance(record, dict):
-                raise ValueError(f"Expected a JSON object at {path}:{line_number}")
-            records.append(record)
-    return records
+from slava_inventory.io_utils import load_jsonl  # noqa: E402
+from slava_inventory.schema import validate_inventory  # noqa: E402
 
 
 def display_value(value: Any) -> str:
@@ -248,12 +237,23 @@ def generate_html(records: list[dict[str, Any]], mode: str, input_path: Path, ou
     .notes {{ white-space:pre-wrap; }} .tree {{ border-left:1px solid var(--border); margin-left:7px; padding-left:10px; }}
     .tree-row {{ display:grid; grid-template-columns:minmax(130px, 28%) 1fr; gap:10px; padding:3px 0; }}
     .tree-key {{ color:#475569; font-weight:650; overflow-wrap:anywhere; }} .tree-value {{ overflow-wrap:anywhere; min-width:0; }}
+    body.mode-full {{ min-width:max-content; }}
+    body.mode-full header {{ min-width:2400px; }}
+    body.mode-full main {{ width:2440px; max-width:none; margin:0; }}
+    body.mode-full .scene {{ width:2400px; grid-template-columns:700px 1fr; }}
+    body.mode-full .tree-row {{ grid-template-columns:320px minmax(900px, 1fr); }}
+    body.mode-full .tree-key, body.mode-full .tree-value {{ overflow-wrap:normal; word-break:normal; }}
+    body.mode-full .tree-key {{ white-space:nowrap; }}
     .hidden {{ display:none; }}
-    @media (max-width:900px) {{ .scene {{ grid-template-columns:1fr; }} header {{ flex-wrap:wrap; }} header h1 {{ width:100%; }} }}
+    @media (max-width:900px) {{
+      body.mode-small .scene {{ grid-template-columns:1fr; }}
+      body.mode-small header {{ flex-wrap:wrap; }}
+      body.mode-small header h1 {{ width:100%; }}
+    }}
     @media print {{ header {{ position:static; }} .scene {{ box-shadow:none; }} }}
   </style>
 </head>
-<body>
+<body class="mode-{html.escape(mode, quote=True)}">
   <header>
     <h1>SLAVA inventory · {len(records)} scenes · {html.escape(mode)} mode</h1>
     <input id="search" type="search" placeholder="Search scenes…">
@@ -328,6 +328,7 @@ def main() -> None:
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     records = load_jsonl(input_path)
+    validate_inventory(records)
     document = generate_html(records, args.mode, input_path, output_path)
     output_path.write_text(document, encoding="utf-8")
     print(f"Wrote {len(records)} scenes to {output_path} ({args.mode} mode)")

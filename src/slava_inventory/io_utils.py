@@ -103,12 +103,13 @@ def build_object_lexicon(
     names: dict[str, str] = {}
     for record in records:
         for obj in record.get("objects_raw", []):
-            if obj.get("lexicon_eligible", True) is False:
-                continue
             raw_name = str(obj.get("raw_name") or "").strip()
+            sim_handle = str(obj.get("sim_handle") or "").strip()
             if not raw_name:
                 continue
-            names.setdefault(raw_name, str(obj.get("category_en") or humanize_raw_name(raw_name)))
+            if sim_handle == "main_table" or raw_name.startswith("dummy_"):
+                continue
+            names.setdefault(raw_name, humanize_raw_name(raw_name))
 
     rows = []
     for raw_name in sorted(names):

@@ -77,7 +77,7 @@ Candidate pool фиксирован:
 
 `task_id` — индекс исходной задачи внутри suite. Он не является уникальным
 идентификатором сцены. Полную сцену идентифицирует `task_uid` вместе с полями
-воспроизводимости.
+воспроизводимости внутри `source`.
 
 ## Неизменяемые решения
 
@@ -140,19 +140,27 @@ data/
     └── simpler/
 ```
 
-Ключевые поля `task_inventory.jsonl`:
+Все три inventory JSONL используют одну строгую схему v1.0:
+[`schemas/task_inventory.schema.json`](schemas/task_inventory.schema.json).
+Лишние поля запрещены. Верхний уровень каждой строки содержит ровно:
 
 - `task_uid`: стабильный уникальный идентификатор сцены;
-- `source.environment`, `source.commit`: среда и точная версия кода;
-- `suite`, `task_name`, `task_id`: исходная задача;
-- `bddl_file`, `init_state_id`: восстановление LIBERO-сцены;
-- `gym_env_name`, `episode_id`, `reset_seed`: восстановление SimplerEnv-сцены;
+- `suite`, `task_id`, `canonical_en`: исходная задача и инструкция;
+- `source`: среда, commit и source-specific metadata;
 - `images`: пути относительно `data/`;
-- `objects_raw`: реальные объекты, sim handles, poses и видимость;
-- `initial_predicates`, `success_predicates`: условия сцены и успеха;
+- `objects_raw`: sim handles, raw names, XYZ poses и видимость;
+- `success_predicates`: проверяемые условия успеха;
 - `candidate_slots`: будущие action/target/reference/relation;
-- `usable_for_slava`, `selected_for_v0`, `review_status`,
-  `exclusion_reasons`, `notes`: человеческая разметка.
+- `usable_for_slava`, `notes`: человеческая оценка.
+
+Для LIBERO `source` содержит `environment`, `commit`, `task_name`, `bddl_file`
+и `init_state_id`. Для SimplerEnv он содержит `environment`, `commit`,
+`task_name`, `gym_env_name`, `episode_id` и `reset_seed`.
+
+Каждый элемент `objects_raw` содержит только `sim_handle`, `raw_name`,
+`pose_xyz`, `visible_agentview` и `visible_wrist`. Выбор v0 и расширенная review
+metadata не добавляются в inventory: они должны жить в отдельном
+`selected_tasks_v0.jsonl`.
 
 Допустимые значения `visible_agentview` и `visible_wrist`:
 
@@ -164,6 +172,16 @@ data/
 Source inventories являются выходами collectors. `task_inventory.jsonl` — их
 объединение с сохраняемой человеческой разметкой.
 
+Проверка всех inventory:
+
+```bash
+python scripts/validate_inventory.py
+```
+
+Collectors валидируют каждую запись до сохранения; merge и notebook export
+валидируют весь набор. Поэтому legacy или случайные дополнительные поля не могут
+незаметно вернуться в данные.
+
 ## Основные компоненты
 
 - `scripts/bootstrap.sh`: установка сред и smoke tests;
@@ -171,13 +189,16 @@ Source inventories являются выходами collectors. `task_inventory
 - `scripts/collect_simpler.py`: сбор 12 SimplerEnv-сцен;
 - `scripts/configure_libero.py`: неинтерактивная настройка LIBERO paths;
 - `scripts/generate_screenshot_sheet.py`: HTML-визуализация inventory;
+- `scripts/validate_inventory.py`: строгая проверка всех inventory;
+- `src/slava_inventory/schema.py`: runtime validation и normalization;
 - `src/slava_inventory/io_utils.py`: безопасная работа с JSONL/CSV и merge;
 - `src/slava_inventory/notebook_ui.py`: формы visibility, scene и lexicon review;
 - `notebooks/01_collect_and_review_inventory.ipynb`: главная точка ручной работы.
 
 Collectors по умолчанию не перезаписывают существующие сцены. Не включайте
 `OVERWRITE_EXISTING`, если не требуется полный повторный рендер. При повторном
-merge human annotations должны сохраняться.
+merge сохраняются `usable_for_slava`, `notes`, `candidate_slots` и object
+visibility.
 
 ## Object lexicon и выбор v0
 
@@ -227,4 +248,3 @@ SimplerEnv. Финальный выбор делает пользователь 
 Особенно важно сохранять и отправлять в Git `data/task_inventory.jsonl`,
 `data/object_lexicon.csv` и `data/images`: локальные рендеры нельзя восстановить
 обычным `git clone`, пока они не закоммичены.
-

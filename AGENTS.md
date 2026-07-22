@@ -12,6 +12,8 @@ Key invariants:
 - LIBERO renders immediately after `set_init_state`; `settle_steps` must remain 0.
 - SimplerEnv WidowX has no wrist camera; `wrist_rgb` must remain null there.
 - Preserve human review fields when regenerating or merging collector outputs.
+- Every inventory row must pass the strict canonical v1 schema in
+  `schemas/task_inventory.schema.json`; do not add ad-hoc fields.
 - Store repository-relative runtime paths plus pinned commits; do not introduce
   machine-specific `/workspace/...` paths into portable manifest fields.
 - Do not start Russian instruction authoring before the scene inventory,
