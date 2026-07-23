@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alexkrachun.github.io/SLAVA_dev/schemas/task_inventory.schema.json",
+  "title": "SLAVA task inventory record v1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_uid", "suite", "task_id", "canonical_en", "source", "images",
+    "objects_raw", "success_predicates", "candidate_slots", "usable_for_slava", "notes"
+  ],
+  "properties": {
+    "task_uid": {"type": "string", "minLength": 1},
+    "suite": {"type": "string", "minLength": 1},
+    "task_id": {"type": "integer"},
+    "canonical_en": {"type": "string", "minLength": 1},
+    "source": {"oneOf": [{"$ref": "#/$defs/liberoSource"}, {"$ref": "#/$defs/simplerSource"}]},
+    "images": {"$ref": "#/$defs/images"},
+    "objects_raw": {"type": "array", "items": {"$ref": "#/$defs/object"}},
+    "success_predicates": {"type": "array"},
+    "candidate_slots": {"$ref": "#/$defs/candidateSlots"},
+    "usable_for_slava": {"type": ["boolean", "null"]},
+    "notes": {"type": "string"}
+  },
+  "$defs": {
+    "liberoSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "commit", "task_name", "bddl_file", "init_state_id"],
+      "properties": {
+        "environment": {"const": "LIBERO"},
+        "commit": {"type": "string", "minLength": 1},
+        "task_name": {"type": "string", "minLength": 1},
+        "bddl_file": {"type": "string", "minLength": 1},
+        "init_state_id": {"type": "integer"}
+      }
+    },
+    "simplerSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "commit", "task_name", "gym_env_name", "episode_id", "reset_seed"],
+      "properties": {
+        "environment": {"const": "SimplerEnv"},
+        "commit": {"type": "string", "minLength": 1},
+        "task_name": {"type": "string", "minLength": 1},
+        "gym_env_name": {"type": "string", "minLength": 1},
+        "episode_id": {"type": "integer"},
+        "reset_seed": {"type": "integer"}
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentview_rgb", "wrist_rgb"],
+      "properties": {
+        "agentview_rgb": {"type": "string", "minLength": 1},
+        "wrist_rgb": {"type": ["string", "null"]}
+      }
+    },
+    "visibility": {"enum": [true, false, "visible_partial", null]},
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sim_handle", "raw_name", "pose_xyz", "visible_agentview", "visible_wrist"],
+      "properties": {
+        "sim_handle": {"type": "string", "minLength": 1},
+        "raw_name": {"type": "string", "minLength": 1},
+        "pose_xyz": {
+          "type": "array", "minItems": 3, "maxItems": 3,
+          "items": {"type": "number"}
+        },
+        "visible_agentview": {"$ref": "#/$defs/visibility"},
+        "visible_wrist": {"$ref": "#/$defs/visibility"}
+      }
+    },
+    "candidateSlots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "target", "reference", "relation", "forbidden_candidates"],
+      "properties": {
+        "action": {"type": ["string", "null"]},
+        "target": {"type": ["string", "null"]},
+        "reference": {"type": ["string", "null"]},
+        "relation": {"type": ["string", "null"]},
+        "forbidden_candidates": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

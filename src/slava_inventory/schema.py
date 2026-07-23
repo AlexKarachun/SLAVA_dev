@@ -46,6 +46,13 @@ SLOT_FIELDS = {"action", "target", "reference", "relation", "forbidden_candidate
 VISIBILITY_VALUES = {None, True, False, "visible_partial"}
 
 
+def is_technical_object(sim_handle: Any, raw_name: Any) -> bool:
+    """Return true for simulator helpers that are not physical scene objects."""
+    return str(sim_handle or "").startswith("dummy_") or str(raw_name or "").startswith(
+        "dummy_"
+    )
+
+
 def _exact_fields(value: dict[str, Any], expected: set[str], path: str) -> None:
     missing = expected - set(value)
     extra = set(value) - expected
@@ -131,6 +138,8 @@ def validate_inventory_record(record: dict[str, Any]) -> None:
         _exact_fields(obj, OBJECT_FIELDS, path)
         _required_string(obj["sim_handle"], f"{path}.sim_handle")
         _required_string(obj["raw_name"], f"{path}.raw_name")
+        if is_technical_object(obj["sim_handle"], obj["raw_name"]):
+            raise ValueError(f"{path}: technical dummy objects are not allowed")
         if obj["sim_handle"] in handles:
             raise ValueError(f"{path}.sim_handle: duplicate {obj['sim_handle']!r}")
         handles.add(obj["sim_handle"])
@@ -154,10 +163,17 @@ def validate_inventory_record(record: dict[str, Any]) -> None:
     for key in ("action", "target", "reference", "relation"):
         if slots[key] is not None and not isinstance(slots[key], str):
             raise ValueError(f"candidate_slots.{key}: expected string or null")
+    for key in ("target", "reference"):
+        if slots[key] is not None and is_technical_object(slots[key], slots[key]):
+            raise ValueError(f"candidate_slots.{key}: technical dummy objects are not allowed")
     if not isinstance(slots["forbidden_candidates"], list) or not all(
         isinstance(value, str) for value in slots["forbidden_candidates"]
     ):
         raise ValueError("candidate_slots.forbidden_candidates: expected an array of strings")
+    if any(is_technical_object(value, value) for value in slots["forbidden_candidates"]):
+        raise ValueError(
+            "candidate_slots.forbidden_candidates: technical dummy objects are not allowed"
+        )
     if record["usable_for_slava"] not in (None, True, False):
         raise ValueError("usable_for_slava: expected true, false, or null")
     if not isinstance(record["notes"], str):
@@ -219,6 +235,8 @@ def normalize_inventory_record(record: dict[str, Any]) -> dict[str, Any]:
     images = record.get("images") or {}
     objects = []
     for obj in record.get("objects_raw") or []:
+        if is_technical_object(obj.get("sim_handle"), obj.get("raw_name")):
+            continue
         objects.append(
             {
                 "sim_handle": obj.get("sim_handle"),
@@ -229,6 +247,8 @@ def normalize_inventory_record(record: dict[str, Any]) -> dict[str, Any]:
             }
         )
     slots = record.get("candidate_slots") or {}
+    target = slots.get("target")
+    reference = slots.get("reference")
     normalized = {
         "task_uid": record.get("task_uid"),
         "suite": record.get("suite"),
@@ -243,10 +263,14 @@ def normalize_inventory_record(record: dict[str, Any]) -> dict[str, Any]:
         "success_predicates": record.get("success_predicates") or [],
         "candidate_slots": {
             "action": slots.get("action"),
-            "target": slots.get("target"),
-            "reference": slots.get("reference"),
+            "target": None if is_technical_object(target, target) else target,
+            "reference": None if is_technical_object(reference, reference) else reference,
             "relation": slots.get("relation"),
-            "forbidden_candidates": slots.get("forbidden_candidates") or [],
+            "forbidden_candidates": [
+                value
+                for value in (slots.get("forbidden_candidates") or [])
+                if not is_technical_object(value, value)
+            ],
         },
         "usable_for_slava": record.get("usable_for_slava"),
         "notes": record.get("notes") or "",

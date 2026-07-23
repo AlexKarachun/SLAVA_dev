@@ -20,8 +20,11 @@ bash scripts/bootstrap.sh
 ## Screenshot sheet
 
 ```bash
-python scripts/generate_screenshot_sheet.py --mode small
-python scripts/generate_screenshot_sheet.py --mode full
+python scripts/generate_screenshot_sheet.py --mode small\
+python scripts/generate_screenshot_sheet.py --mode full\
+python scripts/generate_screenshot_sheet.py \
+  --mode small \
+  --lexicon path/to/object_lexicon.csv
 ```
 
 Результаты создаются в `data/screenshot_sheet_small.html` и

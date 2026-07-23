@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import append_jsonl, load_jsonl  # noqa: E402
-from slava_inventory.schema import validate_inventory_record  # noqa: E402
+from slava_inventory.schema import is_technical_object, validate_inventory_record  # noqa: E402
 
 
 TASKS = (
@@ -78,10 +78,19 @@ def collect(args: argparse.Namespace) -> None:
 
                     objects = []
                     for actor in unwrapped.episode_objs:
+                        if is_technical_object(actor.name, actor.name):
+                            continue
                         objects.append(actor_record(actor))
                     if hasattr(unwrapped, "sink"):
                         objects.append(actor_record(unwrapped.sink))
 
+                    source_handle = str(unwrapped.episode_source_obj.name)
+                    destination_handle = str(unwrapped.episode_target_obj.name)
+                    language_reference = (
+                        None
+                        if is_technical_object(destination_handle, destination_handle)
+                        else destination_handle
+                    )
                     record = {
                         "task_uid": uid,
                         "suite": "simpler_bridge",
@@ -103,14 +112,14 @@ def collect(args: argparse.Namespace) -> None:
                         "success_predicates": [
                             {
                                 "type": "src_on_target",
-                                "source": str(unwrapped.episode_source_obj.name),
-                                "target": str(unwrapped.episode_target_obj.name),
+                                "source": source_handle,
+                                "target": destination_handle,
                             }
                         ],
                         "candidate_slots": {
                             "action": "stack" if "stack" in task_name else "place",
-                            "target": str(unwrapped.episode_source_obj.name),
-                            "reference": str(unwrapped.episode_target_obj.name),
+                            "target": source_handle,
+                            "reference": language_reference,
                             "relation": "on" if "basket" not in task_name else "in",
                             "forbidden_candidates": [],
                         },

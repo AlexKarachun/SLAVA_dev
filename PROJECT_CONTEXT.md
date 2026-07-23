@@ -47,13 +47,16 @@ task + init state
 → model rollouts
 ```
 
-Уже собраны 102 candidate-сцены и их изображения. Следующие обязательные шаги:
+Уже собраны 102 candidate-сцены и их изображения. D2 `object_lexicon.csv`
+заполнен для всех 27 нетехнических категорий: 23 отмечены `usable_v0=yes`, а
+`chocolate_pudding`, `cookies`, `cream_cheese` и
+`glazed_rim_porcelain_ramekin` — `no`.
+Следующие обязательные шаги:
 
 1. закончить полный human review сцен;
-2. заполнить `object_lexicon.csv`;
-3. выбрать 20 сцен: ориентир 16 LIBERO + 4 SimplerEnv;
-4. создать и утвердить `selected_tasks_v0.jsonl`;
-5. только затем размечать frames и писать языковые варианты.
+2. выбрать 20 сцен: ориентир 16 LIBERO + 4 SimplerEnv;
+3. создать и утвердить `selected_tasks_v0.jsonl`;
+4. только затем размечать frames и писать языковые варианты.
 
 ## Единица данных
 
@@ -199,6 +202,12 @@ Collectors по умолчанию не перезаписывают сущес�
 `OVERWRITE_EXISTING`, если не требуется полный повторный рендер. При повторном
 merge сохраняются `usable_for_slava`, `notes`, `candidate_slots` и object
 visibility.
+
+Small screenshot sheet объединяет inventory с `object_lexicon.csv`: показывает
+EN/RU names, colors, synonyms и `usable_v0` для каждого объекта, а также
+позволяет строго фильтровать сцены, где все элементы `objects_raw` разрешены для
+v0. Этот фильтр учитывает и фоновые объекты, поэтому служит диагностикой, а не
+единственным правилом выбора D3.
 
 ## Object lexicon и выбор v0
 

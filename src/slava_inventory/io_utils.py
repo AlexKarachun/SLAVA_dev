@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 from typing import Any, Iterable
 
+from .schema import is_technical_object
+
 
 LEXICON_COLUMNS = [
     "raw_name",
@@ -107,7 +109,7 @@ def build_object_lexicon(
             sim_handle = str(obj.get("sim_handle") or "").strip()
             if not raw_name:
                 continue
-            if sim_handle == "main_table" or raw_name.startswith("dummy_"):
+            if sim_handle == "main_table" or is_technical_object(sim_handle, raw_name):
                 continue
             names.setdefault(raw_name, humanize_raw_name(raw_name))
 
