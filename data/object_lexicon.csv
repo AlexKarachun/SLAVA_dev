@@ -11,13 +11,13 @@ bridge_spoon_generated_modified,spoon,ложка,green,зелёная,ложеч
 butter,butter package,пачка масла,red,красная,упаковка масла,yes,
 chocolate_pudding,chocolate pudding package,упаковка шоколадного пудинга,brown,коричневая,шоколадный пудинг,no,не очевидная форма
 cookies,cookie box,коробка печенья,red,красная,упаковка печенья,no,слишком многоцветная
-cream_cheese,cream cheese package,упаковка сливочного сыра,blue,синяя,брикет сливочного сыра,no,Не очевидная форма
+cream_cheese,cream cheese package,упаковка сливочного сыра,blue,синяя,брикет сливочного сыра,yes,
 eggplant,eggplant,баклажан,purple,фиолетовый,,yes,
 flat_stove,stove,плита,black,чёрная,варочная панель,yes,
 glazed_rim_porcelain_ramekin,ramekin,формочка,silver,серебристая,форма для запекания,yes,
 ketchup,ketchup bottle,бутылка кетчупа,red,красная,кетчуп,yes,
 milk,milk carton,пакет молока,red,красный,упаковка молока,yes,
-orange_juice,orange juice carton,пакет апельсинового сока,orange,оранжевый,упаковка апельсинового сока,no,слишком многоцветный
+orange_juice,orange juice carton,пакет апельсинового сока,orange,оранжевый,упаковка апельсинового сока,yes,
 plate,plate,тарелка,white,белая,блюдце,yes,
 salad_dressing,salad dressing bottle,бутылка заправки для салата,green,зеленая,салатная заправка,no,не очевидная форма
 sink,sink,раковина,light blue,голубая,мойка,yes,
