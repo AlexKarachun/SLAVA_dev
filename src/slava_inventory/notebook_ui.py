@@ -7,6 +7,7 @@ from typing import Any
 import ipywidgets as widgets
 import pandas as pd
 from IPython.display import display
+from ipyevents import Event
 
 from .io_utils import LEXICON_COLUMNS, build_object_lexicon, load_jsonl, save_jsonl, save_lexicon
 from .schema import normalize_inventory_record, validate_inventory
@@ -636,6 +637,307 @@ class LexiconReviewer:
         save_lexicon(self.df.to_dict(orient="records"), self.path)
         self._render()
         self.message.value = f"<span style='color:green'>Saved {html.escape(str(self.path))}.</span>"
+
+    def show(self) -> None:
+        display(self.widget)
+
+
+class TopSceneSelector:
+    """Checkbox dashboard for selecting up to 20 fully reviewed v0 scenes."""
+
+    MAX_SELECTED = 20
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        lexicon_df: pd.DataFrame,
+        data_dir: str | Path,
+    ):
+        if df.empty:
+            raise ValueError("Inventory is empty")
+        if lexicon_df.empty:
+            raise ValueError("Object lexicon is empty")
+
+        self.df = df.reset_index(drop=True)
+        self.data_dir = Path(data_dir)
+        self.lexicon = {
+            str(row["raw_name"]): row
+            for row in lexicon_df.fillna("").to_dict(orient="records")
+        }
+        self.checkboxes: dict[int, widgets.Checkbox] = {}
+        self.card_events: list[Event] = []
+        self._updating_checkbox = False
+
+        self.qualifying_indices = [
+            idx for idx in range(len(self.df)) if self._qualifies(self.df.loc[idx])
+        ]
+        self.summary = widgets.HTML()
+        self.message = widgets.HTML()
+        self.save_button = widgets.Button(
+            description="Save selection to task_inventory.jsonl",
+            button_style="success",
+            icon="save",
+            layout=widgets.Layout(width="330px"),
+        )
+        self.clear_button = widgets.Button(
+            description="Clear visible selection",
+            icon="eraser",
+            layout=widgets.Layout(width="210px"),
+        )
+        self.save_button.on_click(self._save_clicked)
+        self.clear_button.on_click(self._clear_clicked)
+
+        cards = [self._build_card(idx) for idx in self.qualifying_indices]
+        self.cards = widgets.GridBox(
+            cards,
+            layout=widgets.Layout(
+                width="100%",
+                grid_template_columns="repeat(auto-fit, minmax(620px, 1fr))",
+                grid_gap="16px",
+                align_items="flex-start",
+            ),
+        )
+        if not cards:
+            self.cards = widgets.GridBox(
+                [
+                    widgets.HTML(
+                        "<b>No scenes meet all three filters yet.</b> "
+                        "Finish visibility review and rerun this cell."
+                    )
+                ]
+            )
+
+        criteria = widgets.HTML(
+            "<h3>Top-20 scene selection</h3>"
+            "<p>Minimum annotated <code>visible_agentview = true</code> · "
+            "minimum annotated <code>visible_wrist ≥ visible_partial</code> when "
+            "a wrist camera exists · <code>object_lexicon.usable_v0 = yes</code> "
+            "for every object. Null visibility values are ignored, matching the "
+            "screenshot-sheet filters. SimplerEnv wrist visibility is treated as N/A.</p>"
+            "<p>The checkbox is stored in the canonical scene field "
+            "<code>usable_for_slava</code>. The object-level "
+            "<code>usable_v0</code> remains in <code>object_lexicon.csv</code>.</p>"
+        )
+        self.widget = widgets.VBox(
+            [
+                criteria,
+                self.summary,
+                widgets.HBox([self.save_button, self.clear_button]),
+                self.message,
+                self.cards,
+            ],
+            layout=widgets.Layout(width="100%"),
+        )
+        self._update_summary()
+
+    @staticmethod
+    def _visibility_rank(value: Any) -> int:
+        if value is True:
+            return 2
+        if value == "visible_partial":
+            return 1
+        return 0
+
+    def _qualifies(self, row: pd.Series) -> bool:
+        objects = list(row.get("objects_raw") or [])
+        if not objects:
+            return False
+        agent_ranks = [
+            self._visibility_rank(obj.get("visible_agentview"))
+            for obj in objects
+            if obj.get("visible_agentview") is not None
+        ]
+        if not agent_ranks or min(agent_ranks) < 2:
+            return False
+
+        wrist_available = bool((row.get("images") or {}).get("wrist_rgb"))
+        if wrist_available:
+            wrist_ranks = [
+                self._visibility_rank(obj.get("visible_wrist"))
+                for obj in objects
+                if obj.get("visible_wrist") is not None
+            ]
+            if not wrist_ranks or min(wrist_ranks) < 1:
+                return False
+
+        return all(
+            str(obj.get("raw_name")) in self.lexicon
+            and self.lexicon[str(obj.get("raw_name"))].get("usable_v0") == "yes"
+            for obj in objects
+        )
+
+    def _image_widget(self, relative_path: str | None, label: str) -> widgets.Widget:
+        if not relative_path:
+            return widgets.HTML(f"<b>{html.escape(label)}</b><br><i>N/A</i>")
+        path = self.data_dir / relative_path
+        if not path.is_file():
+            return widgets.HTML(
+                f"<b>{html.escape(label)}</b><br>"
+                f"<span style='color:#b91c1c'>Missing: {html.escape(str(relative_path))}</span>"
+            )
+        image = widgets.Image(
+            value=path.read_bytes(),
+            format=path.suffix.lstrip(".") or "png",
+            layout=widgets.Layout(width="100%", max_width="340px", height="auto"),
+        )
+        return widgets.VBox([widgets.HTML(f"<b>{html.escape(label)}</b>"), image])
+
+    def _lexicon_table(self, objects: list[dict[str, Any]]) -> widgets.HTML:
+        rows = []
+        for obj in objects:
+            raw_name = str(obj.get("raw_name") or "")
+            lexical = self.lexicon[raw_name]
+            cells = [
+                raw_name,
+                str(obj.get("sim_handle") or ""),
+                str(lexical.get("category_en") or ""),
+                str(lexical.get("category_ru") or ""),
+                str(lexical.get("color_en") or ""),
+                str(lexical.get("color_ru") or ""),
+                str(lexical.get("allowed_synonyms_ru") or ""),
+                str(lexical.get("usable_v0") or ""),
+            ]
+            rows.append(
+                "<tr>"
+                + "".join(f"<td>{html.escape(value)}</td>" for value in cells)
+                + "</tr>"
+            )
+        headers = [
+            "raw_name",
+            "sim_handle",
+            "category_en",
+            "category_ru",
+            "color_en",
+            "color_ru",
+            "allowed_synonyms_ru",
+            "usable_v0",
+        ]
+        return widgets.HTML(
+            "<div style='overflow-x:auto'>"
+            "<table style='border-collapse:collapse;width:100%;font-size:12px'>"
+            "<thead><tr>"
+            + "".join(
+                f"<th style='border:1px solid #cbd5e1;padding:4px;text-align:left'>"
+                f"{html.escape(field)}</th>"
+                for field in headers
+            )
+            + "</tr></thead><tbody>"
+            + "".join(rows).replace(
+                "<td>", "<td style='border:1px solid #cbd5e1;padding:4px'>"
+            )
+            + "</tbody></table></div>"
+        )
+
+    def _build_card(self, idx: int) -> widgets.Widget:
+        row = self.df.loc[idx]
+        checkbox = widgets.Checkbox(
+            value=row.get("usable_for_slava") is True,
+            description="Select for v0",
+            indent=False,
+            style={"description_width": "initial"},
+        )
+        checkbox.observe(self._selection_changed, names="value")
+        self.checkboxes[idx] = checkbox
+
+        source = row["source"]
+        state = (
+            f"init_state_id={source['init_state_id']}"
+            if source["environment"] == "LIBERO"
+            else f"episode_id={source['episode_id']} · reset_seed={source['reset_seed']}"
+        )
+        heading = widgets.HTML(
+            f"<h4 style='margin:0 0 4px'>{html.escape(str(row['canonical_en']))}</h4>"
+            f"<code>{html.escape(str(row['task_uid']))}</code><br>"
+            f"<small>suite={html.escape(str(row['suite']))} · "
+            f"{html.escape(state)}</small>"
+        )
+        images = row.get("images") or {}
+        image_row = widgets.HBox(
+            [
+                self._image_widget(images.get("agentview_rgb"), "agentview_rgb"),
+                self._image_widget(images.get("wrist_rgb"), "wrist_rgb"),
+            ],
+            layout=widgets.Layout(width="100%", gap="12px", align_items="flex-start"),
+        )
+        card = widgets.VBox(
+            [
+                widgets.HBox([checkbox]),
+                heading,
+                image_row,
+                self._lexicon_table(list(row.get("objects_raw") or [])),
+            ],
+            layout=widgets.Layout(
+                border="1px solid #cbd5e1",
+                padding="12px",
+                width="100%",
+                cursor="pointer",
+            ),
+        )
+        card_event = Event(source=card, watched_events=["click"])
+        card_event.on_dom_event(
+            lambda event, scene_checkbox=checkbox: self._card_clicked(
+                event, scene_checkbox
+            )
+        )
+        self.card_events.append(card_event)
+        return card
+
+    def _card_clicked(
+        self, event: dict[str, Any], checkbox: widgets.Checkbox
+    ) -> None:
+        target = event.get("target") or {}
+        if str(target.get("tagName") or "").upper() in {"INPUT", "LABEL"}:
+            return
+        checkbox.value = not checkbox.value
+
+    def _selected_indices(self) -> list[int]:
+        return [idx for idx, checkbox in self.checkboxes.items() if checkbox.value]
+
+    def _selection_changed(self, change: dict[str, Any]) -> None:
+        if self._updating_checkbox:
+            return
+        if change["new"] and len(self._selected_indices()) > self.MAX_SELECTED:
+            self._updating_checkbox = True
+            change["owner"].value = False
+            self._updating_checkbox = False
+            self.message.value = (
+                f"<span style='color:#b91c1c'>Maximum {self.MAX_SELECTED} scenes.</span>"
+            )
+        else:
+            self.message.value = ""
+        self._update_summary()
+
+    def _update_summary(self) -> None:
+        selected = self._selected_indices()
+        suites = {
+            suite: sum(self.df.at[idx, "suite"] == suite for idx in selected)
+            for suite in sorted({str(self.df.at[idx, "suite"]) for idx in selected})
+        }
+        suite_text = " · ".join(f"{suite}: {count}" for suite, count in suites.items())
+        self.summary.value = (
+            f"<b>Qualifying scenes: {len(self.qualifying_indices)} · "
+            f"selected: {len(selected)}/{self.MAX_SELECTED}</b>"
+            + (f"<br>{html.escape(suite_text)}" if suite_text else "")
+        )
+
+    def _clear_clicked(self, button: widgets.Button) -> None:
+        self._updating_checkbox = True
+        for checkbox in self.checkboxes.values():
+            checkbox.value = False
+        self._updating_checkbox = False
+        self.message.value = "<span>Visible selection cleared; click Save to persist.</span>"
+        self._update_summary()
+
+    def _save_clicked(self, button: widgets.Button) -> None:
+        for idx, checkbox in self.checkboxes.items():
+            self.df.at[idx, "usable_for_slava"] = bool(checkbox.value)
+        path = self.data_dir / "task_inventory.jsonl"
+        export_inventory_dataframe(self.df, path)
+        self.message.value = (
+            f"<span style='color:green'>Saved {len(self._selected_indices())} selected "
+            f"qualifying scenes to {html.escape(str(path))}.</span>"
+        )
+        self._update_summary()
 
     def show(self) -> None:
         display(self.widget)

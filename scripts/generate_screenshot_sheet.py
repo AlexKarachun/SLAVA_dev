@@ -301,6 +301,7 @@ def render_card(
     objects = record.get("objects_raw") or []
     agent_min = minimum_visibility_rank(objects, "visible_agentview")
     wrist_min = minimum_visibility_rank(objects, "visible_wrist")
+    wrist_na = not bool((record.get("images") or {}).get("wrist_rgb"))
     v0_status, _ = scene_v0_status(objects, lexicon)
     if mode == "small":
         body = render_small(record, lexicon)
@@ -318,6 +319,7 @@ def render_card(
     return f"""
     <article class="scene" data-suite="{html.escape(suite, quote=True)}"
              data-agent-min="{agent_min}" data-wrist-min="{wrist_min}"
+             data-wrist-na="{str(wrist_na).lower()}"
              data-v0-objects="{html.escape(v0_status, quote=True)}"
              data-search="{html.escape(searchable, quote=True)}">
       <div class="scene-identity">
@@ -436,7 +438,7 @@ def generate_html(
       <option value="1">Agent: partial+</option>
       <option value="2">Agent: visible</option>
     </select>
-    <select id="wrist-threshold" title="Every object must meet this Wrist view visibility">
+    <select id="wrist-threshold" title="Every annotated object must meet this Wrist view visibility; scenes without a wrist camera pass as N/A">
       <option value="0">Wrist: any</option>
       <option value="1">Wrist: partial+</option>
       <option value="2">Wrist: visible</option>
@@ -465,7 +467,7 @@ def generate_html(
         const visible = (!query || card.dataset.search.includes(query)) &&
           (!suite.value || card.dataset.suite === suite.value) &&
           Number(card.dataset.agentMin) >= agentMin &&
-          Number(card.dataset.wristMin) >= wristMin &&
+          (card.dataset.wristNa === 'true' || Number(card.dataset.wristMin) >= wristMin) &&
           (!v0Objects.value || card.dataset.v0Objects === v0Objects.value);
         card.classList.toggle('hidden', !visible);
         if (visible) count++;
