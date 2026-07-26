@@ -38,3 +38,16 @@ python scripts/generate_screenshot_sheet.py \
 ```bash
 python scripts/validate_inventory.py
 ```
+
+## Отобранные сцены
+
+Страница строится из строк `task_inventory.jsonl` с
+`usable_for_slava=true` и данных `object_lexicon.csv`:
+
+```bash
+python scripts/generate_selected_scenes.py
+```
+
+Результат сохраняется в `docs/index.html` вместе с изображениями выбранных сцен
+и публикуется через GitHub Pages:
+<https://alexkarachun.github.io/SLAVA_dev/docs/>.
