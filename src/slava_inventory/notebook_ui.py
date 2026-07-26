@@ -643,9 +643,9 @@ class LexiconReviewer:
 
 
 class TopSceneSelector:
-    """Checkbox dashboard for selecting up to 20 fully reviewed v0 scenes."""
+    """Dashboard that keeps qualifying scenes unless the reviewer excludes them."""
 
-    MAX_SELECTED = 20
+    TARGET_REMAINING = 20
 
     def __init__(
         self,
@@ -665,7 +665,9 @@ class TopSceneSelector:
             for row in lexicon_df.fillna("").to_dict(orient="records")
         }
         self.checkboxes: dict[int, widgets.Checkbox] = {}
+        self.card_widgets: dict[int, widgets.Widget] = {}
         self.card_events: list[Event] = []
+        self.exclusion_stack: list[int] = []
         self._updating_checkbox = False
 
         self.qualifying_indices = [
@@ -674,22 +676,26 @@ class TopSceneSelector:
         self.summary = widgets.HTML()
         self.message = widgets.HTML()
         self.save_button = widgets.Button(
-            description="Save selection to task_inventory.jsonl",
+            description="Сохранить оставшиеся сцены",
             button_style="success",
             icon="save",
-            layout=widgets.Layout(width="330px"),
+            layout=widgets.Layout(width="280px"),
         )
-        self.clear_button = widgets.Button(
-            description="Clear visible selection",
-            icon="eraser",
-            layout=widgets.Layout(width="210px"),
+        self.undo_button = widgets.Button(
+            description="← Вернуть последнюю",
+            icon="undo",
+            layout=widgets.Layout(width="220px"),
         )
         self.save_button.on_click(self._save_clicked)
-        self.clear_button.on_click(self._clear_clicked)
+        self.undo_button.on_click(self._undo_clicked)
 
-        cards = [self._build_card(idx) for idx in self.qualifying_indices]
+        for idx in self.qualifying_indices:
+            self.card_widgets[idx] = self._build_card(idx)
+        self.exclusion_stack = [
+            idx for idx in self.qualifying_indices if self.checkboxes[idx].value
+        ]
         self.cards = widgets.GridBox(
-            cards,
+            [],
             layout=widgets.Layout(
                 width="100%",
                 grid_template_columns="repeat(auto-fit, minmax(620px, 1fr))",
@@ -697,33 +703,29 @@ class TopSceneSelector:
                 align_items="flex-start",
             ),
         )
-        if not cards:
-            self.cards = widgets.GridBox(
-                [
-                    widgets.HTML(
-                        "<b>No scenes meet all three filters yet.</b> "
-                        "Finish visibility review and rerun this cell."
-                    )
-                ]
-            )
+        self.empty_state = widgets.HTML()
+        self._refresh_cards()
 
         criteria = widgets.HTML(
-            "<h3>Top-20 scene selection</h3>"
+            "<h3>Отбор сцен через исключение неудачных</h3>"
             "<p>Minimum annotated <code>visible_agentview = true</code> · "
             "minimum annotated <code>visible_wrist ≥ visible_partial</code> when "
             "a wrist camera exists · <code>object_lexicon.usable_v0 = yes</code> "
             "for every object. Null visibility values are ignored, matching the "
             "screenshot-sheet filters. SimplerEnv wrist visibility is treated as N/A.</p>"
-            "<p>The checkbox is stored in the canonical scene field "
-            "<code>usable_for_slava</code>. The object-level "
-            "<code>usable_v0</code> remains in <code>object_lexicon.csv</code>.</p>"
+            "<p>Все показанные сцены по умолчанию остаются. Отметьте галочкой только "
+            "неудачные сцены, которые нужно исключить: отмеченная карточка сразу "
+            "исчезнет. Кнопка «← Вернуть последнюю» отменяет последнее исключение. "
+            "При сохранении оставшиеся получат <code>usable_for_slava=true</code>, "
+            "исключенные — <code>usable_for_slava=false</code>.</p>"
         )
         self.widget = widgets.VBox(
             [
                 criteria,
                 self.summary,
-                widgets.HBox([self.save_button, self.clear_button]),
+                widgets.HBox([self.save_button, self.undo_button]),
                 self.message,
+                self.empty_state,
                 self.cards,
             ],
             layout=widgets.Layout(width="100%"),
@@ -831,12 +833,15 @@ class TopSceneSelector:
     def _build_card(self, idx: int) -> widgets.Widget:
         row = self.df.loc[idx]
         checkbox = widgets.Checkbox(
-            value=row.get("usable_for_slava") is True,
-            description="Select for v0",
+            value=row.get("usable_for_slava") is False,
+            description="Исключить сцену",
             indent=False,
             style={"description_width": "initial"},
         )
-        checkbox.observe(self._selection_changed, names="value")
+        checkbox.observe(
+            lambda change, scene_idx=idx: self._exclusion_changed(scene_idx, change),
+            names="value",
+        )
         self.checkboxes[idx] = checkbox
 
         source = row["source"]
@@ -890,52 +895,94 @@ class TopSceneSelector:
             return
         checkbox.value = not checkbox.value
 
-    def _selected_indices(self) -> list[int]:
+    def _excluded_indices(self) -> list[int]:
         return [idx for idx, checkbox in self.checkboxes.items() if checkbox.value]
 
-    def _selection_changed(self, change: dict[str, Any]) -> None:
+    def _kept_indices(self) -> list[int]:
+        excluded = set(self._excluded_indices())
+        return [idx for idx in self.qualifying_indices if idx not in excluded]
+
+    def _exclusion_changed(self, idx: int, change: dict[str, Any]) -> None:
         if self._updating_checkbox:
             return
-        if change["new"] and len(self._selected_indices()) > self.MAX_SELECTED:
-            self._updating_checkbox = True
-            change["owner"].value = False
-            self._updating_checkbox = False
-            self.message.value = (
-                f"<span style='color:#b91c1c'>Maximum {self.MAX_SELECTED} scenes.</span>"
-            )
+        if change["new"]:
+            if idx not in self.exclusion_stack:
+                self.exclusion_stack.append(idx)
         else:
-            self.message.value = ""
+            self.exclusion_stack = [
+                excluded_idx
+                for excluded_idx in self.exclusion_stack
+                if excluded_idx != idx
+            ]
+        self.message.value = ""
+        self._refresh_cards()
         self._update_summary()
 
+    def _refresh_cards(self) -> None:
+        visible_indices = [
+            idx for idx in self.qualifying_indices if not self.checkboxes[idx].value
+        ]
+        self.cards.children = tuple(self.card_widgets[idx] for idx in visible_indices)
+        if not self.qualifying_indices:
+            self.empty_state.value = (
+                "<b>No scenes meet all three filters yet.</b> "
+                "Finish visibility review and rerun this cell."
+            )
+        elif not visible_indices:
+            self.empty_state.value = (
+                "<b>Все подходящие сцены исключены.</b> "
+                "Нажмите «← Вернуть последнюю», чтобы отменить последнее исключение."
+            )
+        else:
+            self.empty_state.value = ""
+        self.undo_button.disabled = not self.exclusion_stack
+
     def _update_summary(self) -> None:
-        selected = self._selected_indices()
+        kept = self._kept_indices()
+        excluded = self._excluded_indices()
         suites = {
-            suite: sum(self.df.at[idx, "suite"] == suite for idx in selected)
-            for suite in sorted({str(self.df.at[idx, "suite"]) for idx in selected})
+            suite: sum(self.df.at[idx, "suite"] == suite for idx in kept)
+            for suite in sorted({str(self.df.at[idx, "suite"]) for idx in kept})
         }
         suite_text = " · ".join(f"{suite}: {count}" for suite, count in suites.items())
+        target_delta = len(kept) - self.TARGET_REMAINING
+        if target_delta > 0:
+            target_text = f"До ориентира 20 нужно исключить еще {target_delta}."
+        elif target_delta < 0:
+            target_text = f"Осталось на {-target_delta} меньше ориентира 20."
+        else:
+            target_text = "Ориентир 20 сцен достигнут."
         self.summary.value = (
-            f"<b>Qualifying scenes: {len(self.qualifying_indices)} · "
-            f"selected: {len(selected)}/{self.MAX_SELECTED}</b>"
+            f"<b>Кандидатов: {len(self.qualifying_indices)} · "
+            f"останется: {len(kept)} · исключено: {len(excluded)}</b>"
+            f"<br>{html.escape(target_text)}"
             + (f"<br>{html.escape(suite_text)}" if suite_text else "")
         )
 
-    def _clear_clicked(self, button: widgets.Button) -> None:
+    def _undo_clicked(self, button: widgets.Button) -> None:
+        if not self.exclusion_stack:
+            self.message.value = "<span>Нет исключенных сцен для возврата.</span>"
+            return
+        idx = self.exclusion_stack.pop()
         self._updating_checkbox = True
-        for checkbox in self.checkboxes.values():
-            checkbox.value = False
+        self.checkboxes[idx].value = False
         self._updating_checkbox = False
-        self.message.value = "<span>Visible selection cleared; click Save to persist.</span>"
+        self.message.value = (
+            f"<span>Возвращена сцена <code>"
+            f"{html.escape(str(self.df.at[idx, 'task_uid']))}</code>.</span>"
+        )
+        self._refresh_cards()
         self._update_summary()
 
     def _save_clicked(self, button: widgets.Button) -> None:
         for idx, checkbox in self.checkboxes.items():
-            self.df.at[idx, "usable_for_slava"] = bool(checkbox.value)
+            self.df.at[idx, "usable_for_slava"] = not bool(checkbox.value)
         path = self.data_dir / "task_inventory.jsonl"
         export_inventory_dataframe(self.df, path)
         self.message.value = (
-            f"<span style='color:green'>Saved {len(self._selected_indices())} selected "
-            f"qualifying scenes to {html.escape(str(path))}.</span>"
+            f"<span style='color:green'>Сохранено: {len(self._kept_indices())} удачных, "
+            f"{len(self._excluded_indices())} исключенных сцен · "
+            f"{html.escape(str(path))}.</span>"
         )
         self._update_summary()
 

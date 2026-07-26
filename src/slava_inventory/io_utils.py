@@ -138,7 +138,11 @@ def save_lexicon(rows: Iterable[dict[str, Any]], path: str | Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(path.suffix + ".tmp")
     with temp_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=LEXICON_COLUMNS)
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=LEXICON_COLUMNS,
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({column: row.get(column, "") for column in LEXICON_COLUMNS})

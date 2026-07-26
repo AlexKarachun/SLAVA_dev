@@ -1,6 +1,6 @@
 raw_name,category_en,category_ru,color_en,color_ru,allowed_synonyms_ru,usable_v0,notes
 akita_black_bowl,bowl,миска,black,черная,пиала,yes,
-alphabet_soup,soup can,банка супа,blue,синяя,банка супа с макаронами-буквами,no,неоднозначное русское название — в сцене есть другие консервные банки
+alphabet_soup,soup can,банка супа,blue,синяя,банка супа с макаронами-буквами,yes,
 baked_green_cube_3cm,cube,кубик,green,зеленый,куб,yes,
 baked_yellow_cube_3cm,cube,кубик,yellow,желтый,куб,yes,
 basket,basket,корзина,beige,бежевая,корзинка,yes,
@@ -9,7 +9,7 @@ bridge_carrot_generated_modified,carrot,морковь,orange,оранжевая
 bridge_plate_objaverse_larger,plate,тарелка,yellow,желтая,столовая тарелка,yes,
 bridge_spoon_generated_modified,spoon,ложка,green,зеленая,ложечка,yes,
 butter,butter package,пачка масла,red,красная,упаковка масла,yes,
-chocolate_pudding,chocolate pudding package,упаковка шоколадного пудинга,brown,коричневая,пачка шоколадного пудинга,no,неочевидная форма
+chocolate_pudding,chocolate pudding package,упаковка шоколадного пудинга,brown,коричневая,пачка шоколадного пудинга,yes,
 cookies,cookie box,коробка печенья,red,красная,упаковка печенья,no,слишком многоцветная
 cream_cheese,cream cheese package,упаковка сливочного сыра,blue,синяя,пачка сливочного сыра,yes,
 eggplant,eggplant,баклажан,purple,фиолетовый,баклажанчик,yes,
@@ -22,7 +22,7 @@ plate,plate,тарелка,white,белая,столовая тарелка,yes,
 salad_dressing,salad dressing bottle,бутылка заправки для салата,green,зеленая,бутылка с салатной заправкой,no,неочевидная форма
 sink,sink,раковина,light blue,голубая,мойка,yes,
 table_cloth_generated_shorter,towel,полотенце,light blue,голубое,кухонное полотенце,yes,
-tomato_sauce,tomato sauce can,банка томатного соуса,red,красная,консервная банка с томатным соусом,no,неочевидная форма и много цветов
+tomato_sauce,tomato sauce can,банка томатного соуса,red,красная,консервная банка с томатным соусом,yes,
 wine_bottle,wine bottle,бутылка вина,black,черная,винная бутылка,yes,
 wine_rack,wine rack,подставка для бутылок,brown,коричневая,винная стойка,yes,
 wooden_cabinet,cabinet,шкафчик,black,черный,небольшой шкаф,yes,
