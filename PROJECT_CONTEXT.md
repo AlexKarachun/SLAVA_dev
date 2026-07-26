@@ -1,37 +1,48 @@
 # Контекст проекта SLAVA для LLM-агентов
 
-Этот документ — основной handoff для работы с репозиторием. Перед изменениями
-прочитайте его полностью, затем `AGENTS.md` и проверьте `git status`.
+Этот файл — устойчивый handoff по проекту. Перед изменениями также прочитайте
+[`AGENTS.md`](AGENTS.md), проверьте `git status` и не перезаписывайте
+пользовательскую разметку.
+
+Изменяемые данные и текущий статус не дублируются здесь. Их источники истины:
+
+- candidate scenes: [`data/task_inventory.jsonl`](data/task_inventory.jsonl);
+- object names и пригодность для v0:
+  [`data/object_lexicon.csv`](data/object_lexicon.csv);
+- визуальная проверка:
+  [`data/screenshot_sheet_small.html`](data/screenshot_sheet_small.html) и
+  [`data/screenshot_sheet_full.html`](data/screenshot_sheet_full.html);
+- строгий data contract:
+  [`schemas/task_inventory.schema.json`](schemas/task_inventory.schema.json);
+- подробный исследовательский и benchmark-план: [`task.md`](task.md).
 
 ## Научная цель
 
-SLAVA расшифровывается как *Slot-Level Attribution for VLA*. Проект исследует
-падение качества Vision-Language-Action моделей на неанглийских, в первую
-очередь русских, инструкциях.
+SLAVA (*Slot-Level Attribution for VLA*) исследует падение качества
+Vision-Language-Action моделей на неанглийских, прежде всего русских,
+инструкциях.
 
-Главная гипотеза: action fine-tuning может не уничтожать понимание русского
-языка полностью. Семантические слоты инструкции могут оставаться декодируемыми
-во внутренних состояниях модели, но переставать причинно влиять на action head.
-Это явление мы называем cross-lingual action-binding collapse.
+Главная гипотеза — *cross-lingual action-binding collapse*: после action
+fine-tuning семантические слоты русской инструкции могут оставаться
+декодируемыми во внутренних состояниях модели, но перестать причинно влиять на
+action head.
 
-Основные альтернативные объяснения:
+Проверяются три объяснения:
 
 - `H-understanding`: модель не извлекает смысл русской инструкции;
-- `H-grounding`: смысл извлечён, но не связан с объектами и отношениями сцены;
-- `H-binding`: смысл извлечён и заземлён, но action head его не использует.
+- `H-grounding`: смысл извлечен, но не связан с объектами и отношениями сцены;
+- `H-binding`: смысл извлечен и заземлен, но action head его не использует.
 
-Будущий экспериментальный план включает контролируемые EN/RU/code-switch
-минимальные пары, behavioral evaluation, slot probes, oracle recovery curves,
-pointing-vs-action comparisons, base-to-VLA causal patching и targeted repair.
+Экспериментальный дизайн и критерии перехода между гипотезами описаны в
+[`task.md`](task.md).
 
-## Текущий этап
+## Текущий этап и порядок работы
 
-Сейчас проект находится на environment-first этапе построения benchmark.
-Сначала должны быть проверены реальные сцены симуляторов, изображения, объекты и
-лексикон. Русские инструкции нельзя начинать до утверждения scene inventory,
-screenshot review, object lexicon и selected-task manifest.
+Проект строит environment-first benchmark. Фактическую готовность этапов
+определяйте по наличию и содержимому артефактов в [`data/`](data), а не по
+текстовому статусу в документации.
 
-Правильный порядок работы:
+Обязательный порядок:
 
 ```text
 task + init state
@@ -39,221 +50,123 @@ task + init state
 → реальные sim objects, handles и poses
 → ручная проверка видимости
 → object lexicon
-→ отбор сцен
+→ отбор сцен и selected-task manifest
 → grounded semantic frames
 → EN/RU/code-switch variants
 → schema validation и native check
-→ freeze v0
+→ freeze
 → model rollouts
 ```
 
-Уже собраны 102 candidate-сцены и их изображения. D2 `object_lexicon.csv`
-заполнен для всех 27 нетехнических категорий: 23 отмечены `usable_v0=yes`, а
-`chocolate_pudding`, `cookies`, `cream_cheese` и
-`glazed_rim_porcelain_ramekin` — `no`.
-Следующие обязательные шаги:
-
-1. закончить полный human review сцен;
-2. выбрать 20 сцен: ориентир 16 LIBERO + 4 SimplerEnv;
-3. создать и утвердить `selected_tasks_v0.jsonl`;
-4. только затем размечать frames и писать языковые варианты.
+Русские инструкции нельзя начинать до утверждения scene inventory, screenshot
+review, object lexicon и selected-task manifest. Требования к отбору, языковым
+вариантам и QA находятся в [`task.md`](task.md).
 
 ## Единица данных
 
-Не смешивайте три разных сущности:
+Не смешивайте:
 
-- `task` — исходная задача benchmark;
+- `task` — исходную задачу benchmark;
 - `scene` — конкретный `task × init state`;
 - `trajectory` или `rollout` — последовательность действий в сцене.
 
-Одна строка inventory — одна воспроизводимая сцена, не траектория.
-
-Candidate pool фиксирован:
-
-| Источник | Задачи | Варианты | Сцен |
-|---|---:|---:|---:|
-| `libero_spatial` | 10 | init states `0, 17, 34` | 30 |
-| `libero_object` | 10 | init states `0, 17, 34` | 30 |
-| `libero_goal` | 10 | init states `0, 17, 34` | 30 |
-| SimplerEnv Bridge | 4 | episode ids `0, 8, 16` | 12 |
-| Всего | 34 | — | 102 |
-
-`task_id` — индекс исходной задачи внутри suite. Он не является уникальным
-идентификатором сцены. Полную сцену идентифицирует `task_uid` вместе с полями
-воспроизводимости внутри `source`.
+Одна строка inventory — одна воспроизводимая сцена, не траектория. `task_id`
+индексирует исходную задачу внутри suite и сам по себе не идентифицирует сцену.
+Стабильный идентификатор сцены — `task_uid` вместе с metadata воспроизводимости
+в `source`.
 
 ## Неизменяемые решения
 
-- Candidate inventory содержит ровно 102 сцены: 90 LIBERO + 12 SimplerEnv.
-- LIBERO использует только suites spatial/object/goal и init ids `0,17,34`.
-- SimplerEnv использует четыре закреплённые `widowx_*` задачи и episode ids
-  `0,8,16` при `reset_seed=0`.
-- LIBERO рендерится сразу после `set_init_state`; `settle_steps` всегда равен 0.
-- У используемого SimplerEnv WidowX нет wrist camera; `wrist_rgb` всегда `null`.
-- При merge и regeneration нужно сохранять human review fields.
-- Portable manifest не должен содержать машинно-зависимые пути вроде
-  `/workspace/...`.
-- Нельзя молча менять pinned commits или состав candidate pool.
-- LIBERO HDF5 demonstrations не нужны collectors. Bootstrap загружает их только
-  для будущей работы с моделями и траекториями.
+- Candidate inventory содержит 102 сцены: 90 LIBERO и 12 SimplerEnv.
+- LIBERO использует suites spatial/object/goal и init ids `0, 17, 34`.
+- SimplerEnv использует закрепленные `widowx_*` задачи и episode ids
+  `0, 8, 16` при `reset_seed=0`.
+- LIBERO рендерится сразу после `set_init_state`; `settle_steps` остается 0.
+- У используемого SimplerEnv WidowX нет wrist camera; `wrist_rgb` остается
+  `null`.
+- При merge и regeneration сохраняются human review fields.
+- Portable manifest хранит repository-relative runtime paths и pinned commits,
+  но не машинно-зависимые пути вроде `/workspace/...`.
+- Pinned commits и состав candidate pool нельзя менять молча. Актуальные
+  commits установки заданы в [`scripts/bootstrap.sh`](scripts/bootstrap.sh), а
+  commits конкретных записей хранятся в `source.commit` inventory.
+- LIBERO HDF5 demonstrations не нужны scene collectors. Их загрузка в
+  [`scripts/bootstrap.sh`](scripts/bootstrap.sh) предназначена для будущей
+  model/trajectory работы.
 
-## Воспроизводимость сред
+## Data contract
 
-Закреплённые внешние репозитории:
-
-- LIBERO: `8f1084e3132a39270c3a13ebe37270a43ece2a01`;
-- SimplerEnv: `06accaca93535902d408da4855f21cece12bceb7`.
-
-Стандартная структура:
-
-```text
-parent-directory/
-├── SLAVA_dev/
-├── LIBERO/
-└── SimplerEnv/
-```
-
-При другом расположении используется `SLAVA_DEPS_DIR`. Корни отдельных сред
-можно задать через `LIBERO_ROOT` и `SIMPLERENV_ROOT`.
-
-Три Conda-окружения намеренно разделены из-за несовместимых зависимостей:
-
-| Окружение | Назначение | Python |
-|---|---|---:|
-| `slava-notebook` | notebook, pandas, widgets, JSONL/CSV | 3.11 |
-| `slava-libero` | LIBERO, robosuite, MuJoCo | 3.8.13 |
-| `slava-simpler` | SimplerEnv, SAPIEN | 3.10 |
-
-Notebook запускает collectors через `conda run`; менять kernel между
-симуляторами не нужно.
-
-## Структура данных
-
-```text
-data/
-├── libero_inventory.jsonl
-├── simpler_inventory.jsonl
-├── task_inventory.jsonl
-├── object_lexicon.csv
-├── screenshot_sheet_small.html
-├── screenshot_sheet_full.html
-├── collection_errors.jsonl       # только если были ошибки
-└── images/
-    ├── libero/
-    └── simpler/
-```
-
-Все три inventory JSONL используют одну строгую схему v1.0:
+Все source и merged inventories обязаны проходить
 [`schemas/task_inventory.schema.json`](schemas/task_inventory.schema.json).
-Лишние поля запрещены. Верхний уровень каждой строки содержит ровно:
+Лишние поля запрещены.
 
-- `task_uid`: стабильный уникальный идентификатор сцены;
-- `suite`, `task_id`, `canonical_en`: исходная задача и инструкция;
-- `source`: среда, commit и source-specific metadata;
-- `images`: пути относительно `data/`;
-- `objects_raw`: sim handles, raw names, XYZ poses и видимость;
-- `success_predicates`: проверяемые условия успеха;
-- `candidate_slots`: будущие action/target/reference/relation;
-- `usable_for_slava`, `notes`: человеческая оценка.
+Верхний уровень записи:
 
-Для LIBERO `source` содержит `environment`, `commit`, `task_name`, `bddl_file`
-и `init_state_id`. Для SimplerEnv он содержит `environment`, `commit`,
-`task_name`, `gym_env_name`, `episode_id` и `reset_seed`.
+- `task_uid`;
+- `suite`, `task_id`, `canonical_en`;
+- `source`;
+- `images`;
+- `objects_raw`;
+- `success_predicates`;
+- `candidate_slots`;
+- `usable_for_slava`, `notes`.
 
-Каждый элемент `objects_raw` содержит только `sim_handle`, `raw_name`,
-`pose_xyz`, `visible_agentview` и `visible_wrist`. Выбор v0 и расширенная review
-metadata не добавляются в inventory: они должны жить в отдельном
-`selected_tasks_v0.jsonl`.
+Каждый `objects_raw` содержит только `sim_handle`, `raw_name`, `pose_xyz`,
+`visible_agentview` и `visible_wrist`. Допустимая visibility:
 
-Допустимые значения `visible_agentview` и `visible_wrist`:
+- `true` — уверенно виден;
+- `"visible_partial"` — частично виден, но распознаваем;
+- `false` — не виден или не распознаваем;
+- `null` — не проверен либо камеры нет.
 
-- `true`: объект уверенно виден;
-- `"visible_partial"`: виден частично, но распознаваем;
-- `false`: не виден или не распознаваем;
-- `null`: ещё не проверен либо соответствующей камеры нет.
+Выбор v0 и расширенная review metadata не добавляются в inventory: они должны
+жить в отдельном selected-task manifest согласно [`task.md`](task.md).
 
-Source inventories являются выходами collectors. `task_inventory.jsonl` — их
-объединение с сохраняемой человеческой разметкой.
-
-Проверка всех inventory:
+Проверка:
 
 ```bash
 python scripts/validate_inventory.py
 ```
 
-Collectors валидируют каждую запись до сохранения; merge и notebook export
-валидируют весь набор. Поэтому legacy или случайные дополнительные поля не могут
-незаметно вернуться в данные.
+Collectors валидируют записи до сохранения. При повторном сборе не включайте
+`OVERWRITE_EXISTING` без необходимости полного ререндера; merge должен сохранять
+`usable_for_slava`, `notes`, `candidate_slots` и object visibility.
 
-## Основные компоненты
+## Object lexicon
 
-- `scripts/bootstrap.sh`: установка сред и smoke tests;
-- `scripts/collect_libero.py`: сбор 90 LIBERO-сцен;
-- `scripts/collect_simpler.py`: сбор 12 SimplerEnv-сцен;
-- `scripts/configure_libero.py`: неинтерактивная настройка LIBERO paths;
-- `scripts/generate_screenshot_sheet.py`: HTML-визуализация inventory;
-- `scripts/validate_inventory.py`: строгая проверка всех inventory;
-- `src/slava_inventory/schema.py`: runtime validation и normalization;
-- `src/slava_inventory/io_utils.py`: безопасная работа с JSONL/CSV и merge;
-- `src/slava_inventory/notebook_ui.py`: формы visibility, scene и lexicon review;
-- `notebooks/01_collect_and_review_inventory.ipynb`: главная точка ручной работы.
+[`data/object_lexicon.csv`](data/object_lexicon.csv) связывает `raw_name` ассета
+с каноническими EN/RU-названиями, цветом, допустимым русским синонимом и
+`usable_v0`.
 
-Collectors по умолчанию не перезаписывают существующие сцены. Не включайте
-`OVERWRITE_EXISTING`, если не требуется полный повторный рендер. При повторном
-merge сохраняются `usable_for_slava`, `notes`, `candidate_slots` и object
-visibility.
+Правила:
 
-Small screenshot sheet объединяет inventory с `object_lexicon.csv`: показывает
-EN/RU names, colors, synonyms и `usable_v0` для каждого объекта, а также
-позволяет строго фильтровать сцены, где все элементы `objects_raw` разрешены для
-v0. Этот фильтр учитывает и фоновые объекты, поэтому служит диагностикой, а не
-единственным правилом выбора D3.
+- `category_ru` — основное имя для авторинга;
+- `color_ru` согласуется с `category_ru`;
+- `allowed_synonyms_ru` обозначает тот же физический объект, а не его содержимое
+  или более широкую категорию;
+- синоним нельзя механически соединять с `color_ru`, если у него другой род;
+- в русских полях лексикона используется `е`, а не `ё`;
+- похожий перевод не является основанием объединять разные физические категории.
 
-## Object lexicon и выбор v0
+Small screenshot sheet объединяет inventory и lexicon. Его фильтр
+`usable_v0` учитывает все `objects_raw`, включая фоновые объекты, поэтому это
+диагностика, а не единственное правило отбора сцены.
 
-`object_lexicon.csv` связывает сырые имена ассетов с английскими и русскими
-названиями, цветами, синонимами и флагом `usable_v0`. Разные физические категории
-нельзя объединять только из-за похожего перевода.
+## Основные точки входа
 
-Сцена подходит для v0, если объекты хорошо видны, естественно называются
-по-русски, имеют ясные target/reference и проверяемый success predicate. Наличие
-distractors желательно для измерения wrong-object и negation failures.
+- развертывание и pinned dependencies:
+  [`scripts/bootstrap.sh`](scripts/bootstrap.sh);
+- collectors: [`scripts/collect_libero.py`](scripts/collect_libero.py) и
+  [`scripts/collect_simpler.py`](scripts/collect_simpler.py);
+- merge, review и lexicon UI:
+  [`notebooks/01_collect_and_review_inventory.ipynb`](notebooks/01_collect_and_review_inventory.ipynb);
+- HTML review:
+  [`scripts/generate_screenshot_sheet.py`](scripts/generate_screenshot_sheet.py);
+- validation: [`scripts/validate_inventory.py`](scripts/validate_inventory.py),
+  [`src/slava_inventory/schema.py`](src/slava_inventory/schema.py);
+- safe JSONL/CSV merge:
+  [`src/slava_inventory/io_utils.py`](src/slava_inventory/io_utils.py).
 
-Пилотный selected set должен содержать около 20 сцен: 16 LIBERO и 4
-SimplerEnv. Финальный выбор делает пользователь после screenshot review.
-
-## Следующие артефакты после отбора
-
-После утверждения `selected_tasks_v0.jsonl` планируются:
-
-- `frames_v0.jsonl` с grounded semantic slots;
-- Tier-1 variants: `en_canonical`, `en_paraphrase`, `mt_russian`, `ru_literal`,
-  `ru_free_order`, `ru_case_swap`, `ru_negation`, `code_switch`;
-- `axis_na` с причиной для неприменимых осей;
-- `validate_frames.py`;
-- native check naturalness/equivalence/ambiguity;
-- `export_prompts.py`;
-- rollout logger и behavioral metrics.
-
-Основная behavioral метрика будущего пилота:
-
-```text
-Δlang = gap(RU axis) − gap(EN paraphrase)
-```
-
-Она отделяет собственно языковой эффект от общей хрупкости к непривычной строке
-инструкции.
-
-## Правила работы агента
-
-Перед изменениями:
-
-1. прочитайте этот файл и `AGENTS.md`;
-2. выполните `git status`;
-3. учитывайте, что рабочее дерево может содержать изменения пользователя;
-4. не уничтожайте и не сбрасывайте human annotations;
-5. после изменений выполняйте проверки, пропорциональные риску.
-
-Особенно важно сохранять и отправлять в Git `data/task_inventory.jsonl`,
-`data/object_lexicon.csv` и `data/images`: локальные рендеры нельзя восстановить
-обычным `git clone`, пока они не закоммичены.
+После изменений выполняйте проверки, пропорциональные риску. Особенно берегите
+`data/task_inventory.jsonl`, `data/object_lexicon.csv` и `data/images`: human
+annotations и локальные рендеры нельзя восстанавливать ценой их перезаписи.
