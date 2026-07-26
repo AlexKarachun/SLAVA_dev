@@ -173,7 +173,6 @@ def render_scene(
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>{scene_number}</dd></div>
         <div><dt>suite</dt><dd>{html.escape(str(record["suite"]))}</dd></div>
         <div><dt>state</dt><dd>{html.escape(state)}</dd></div>
       </dl>
@@ -222,8 +221,9 @@ def generate_document(
     .scene {{ margin:0 0 24px; padding:20px; overflow:hidden; background:var(--paper);
       border:1px solid var(--line); border-radius:14px; box-shadow:0 4px 14px #33415512; }}
     .scene-head {{ display:flex; gap:14px; align-items:flex-start; margin-bottom:14px; }}
-    .scene-number {{ display:grid; place-items:center; flex:0 0 48px; height:48px;
-      color:#fff; background:var(--accent); border-radius:12px; font-size:22px; font-weight:800; }}
+    .scene-number {{ display:grid; place-items:center; flex:0 0 34px; height:34px;
+      color:#64748b; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:999px;
+      font-size:14px; font-weight:750; }}
     h2 {{ margin:0 0 4px; font-size:21px; }} h3 {{ margin:18px 0 8px; font-size:14px; }}
     code {{ color:#475569; overflow-wrap:anywhere; }}
     .metadata {{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }}

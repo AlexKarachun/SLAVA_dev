@@ -20,8 +20,9 @@
     .scene { margin:0 0 24px; padding:20px; overflow:hidden; background:var(--paper);
       border:1px solid var(--line); border-radius:14px; box-shadow:0 4px 14px #33415512; }
     .scene-head { display:flex; gap:14px; align-items:flex-start; margin-bottom:14px; }
-    .scene-number { display:grid; place-items:center; flex:0 0 48px; height:48px;
-      color:#fff; background:var(--accent); border-radius:12px; font-size:22px; font-weight:800; }
+    .scene-number { display:grid; place-items:center; flex:0 0 34px; height:34px;
+      color:#64748b; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:999px;
+      font-size:14px; font-weight:750; }
     h2 { margin:0 0 4px; font-size:21px; } h3 { margin:18px 0 8px; font-size:14px; }
     code { color:#475569; overflow-wrap:anywhere; }
     .metadata { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
@@ -50,9 +51,9 @@
 <body>
   <header>
     <h1>SLAVA selected scenes</h1>
-    <p>25 scenes · libero_goal: 18 · simpler_bridge: 7</p>
+    <p>32 scenes · libero_goal: 18 · libero_object: 7 · simpler_bridge: 7</p>
     <input id="search" type="search" placeholder="Search number, task, object…">
-    <span id="shown">25 shown</span>
+    <span id="shown">32 shown</span>
   </header>
   <main>
     <article class="scene" id="scene-1" data-search="{&quot;scene_number&quot;: 1, &quot;task_uid&quot;: &quot;libero_goal__open_the_middle_drawer_of_the_cabinet__init034&quot;, &quot;suite&quot;: &quot;libero_goal&quot;, &quot;canonical_en&quot;: &quot;open the middle drawer of the cabinet&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;akita_black_bowl_1&quot;, &quot;raw_name&quot;: &quot;akita_black_bowl&quot;, &quot;pose_xyz&quot;: [-0.09019090797198857, -0.012614391490754969, 0.97], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;cream_cheese_1&quot;, &quot;raw_name&quot;: &quot;cream_cheese&quot;, &quot;pose_xyz&quot;: [-0.03763697376890886, 0.12788029837993725, 0.935], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;wine_bottle_1&quot;, &quot;raw_name&quot;: &quot;wine_bottle&quot;, &quot;pose_xyz&quot;: [-0.21480453557254242, -0.053921802341616934, 0.97], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;plate_1&quot;, &quot;raw_name&quot;: &quot;plate&quot;, &quot;pose_xyz&quot;: [0.05560003013084838, -0.030074625532415022, 0.97], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;wooden_cabinet_1&quot;, &quot;raw_name&quot;: &quot;wooden_cabinet&quot;, &quot;pose_xyz&quot;: [0.03957236684465528, -0.23401682871566554, 0.905], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;flat_stove_1&quot;, &quot;raw_name&quot;: &quot;flat_stove&quot;, &quot;pose_xyz&quot;: [-0.4043894164742709, 0.20236548851737868, 0.905], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;wine_rack_1&quot;, &quot;raw_name&quot;: &quot;wine_rack&quot;, &quot;pose_xyz&quot;: [-0.2671329342518191, -0.2511066216590083, 0.9199999999999999], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
@@ -64,7 +65,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>1</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -85,7 +85,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>2</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=17</dd></div>
       </dl>
@@ -106,7 +105,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>3</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -127,7 +125,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>4</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=0</dd></div>
       </dl>
@@ -148,7 +145,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>5</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=17</dd></div>
       </dl>
@@ -169,7 +165,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>6</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -190,7 +185,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>7</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=0</dd></div>
       </dl>
@@ -211,7 +205,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>8</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=17</dd></div>
       </dl>
@@ -232,7 +225,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>9</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -253,7 +245,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>10</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=0</dd></div>
       </dl>
@@ -274,7 +265,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>11</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=17</dd></div>
       </dl>
@@ -295,7 +285,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>12</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -316,7 +305,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>13</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=0</dd></div>
       </dl>
@@ -337,7 +325,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>14</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=17</dd></div>
       </dl>
@@ -358,7 +345,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>15</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -379,7 +365,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>16</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=0</dd></div>
       </dl>
@@ -400,7 +385,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>17</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=17</dd></div>
       </dl>
@@ -421,7 +405,6 @@
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>18</dd></div>
         <div><dt>suite</dt><dd>libero_goal</dd></div>
         <div><dt>state</dt><dd>init_state_id=34</dd></div>
       </dl>
@@ -433,147 +416,280 @@
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>akita_black_bowl</td><td>akita_black_bowl_1</td><td>bowl</td><td>миска</td><td>black</td><td>черная</td><td>пиала</td><td>yes</td></tr><tr><td>cream_cheese</td><td>cream_cheese_1</td><td>cream cheese package</td><td>упаковка сливочного сыра</td><td>blue</td><td>синяя</td><td>пачка сливочного сыра</td><td>yes</td></tr><tr><td>wine_bottle</td><td>wine_bottle_1</td><td>wine bottle</td><td>бутылка вина</td><td>black</td><td>черная</td><td>винная бутылка</td><td>yes</td></tr><tr><td>plate</td><td>plate_1</td><td>plate</td><td>тарелка</td><td>white</td><td>белая</td><td>столовая тарелка</td><td>yes</td></tr><tr><td>wooden_cabinet</td><td>wooden_cabinet_1</td><td>cabinet</td><td>шкафчик</td><td>black</td><td>черный</td><td>небольшой шкаф</td><td>yes</td></tr><tr><td>flat_stove</td><td>flat_stove_1</td><td>stove</td><td>плита</td><td>black</td><td>черная</td><td>варочная панель</td><td>yes</td></tr><tr><td>wine_rack</td><td>wine_rack_1</td><td>wine rack</td><td>подставка для бутылок</td><td>brown</td><td>коричневая</td><td>винная стойка</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-19" data-search="{&quot;scene_number&quot;: 19, &quot;task_uid&quot;: &quot;simpler__widowx_carrot_on_plate__episode008__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put carrot on plate&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.2365449070930481, 0.07499852776527405, 0.8875283598899841], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;raw_name&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;pose_xyz&quot;: [-0.08500001579523087, -0.07500044256448746, 0.8695315718650818], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-19" data-search="{&quot;scene_number&quot;: 19, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_butter_and_place_it_in_the_basket__init000&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the butter and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [-0.11958883265960131, -0.24435764560581766, -0.005000000000000001], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: true}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [0.011779952026856754, 0.2641880950434251, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [0.05, -0.1, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [-0.15, 0.05999999999999999, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;chocolate_pudding_1&quot;, &quot;raw_name&quot;: &quot;chocolate_pudding&quot;, &quot;pose_xyz&quot;: [0.1, -0.2, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bbq_sauce_1&quot;, &quot;raw_name&quot;: &quot;bbq_sauce&quot;, &quot;pose_xyz&quot;: [0.15464776943492775, 0.028393481979132287, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;ketchup_1&quot;, &quot;raw_name&quot;: &quot;ketchup&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
         <span class="scene-number">19</span>
+        <div>
+          <h2>pick up the butter and place it in the basket</h2>
+          <code>libero_object__pick_up_the_butter_and_place_it_in_the_basket__init000</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=0</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/19_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/19_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/19_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/19_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr><tr><td>chocolate_pudding</td><td>chocolate_pudding_1</td><td>chocolate pudding package</td><td>упаковка шоколадного пудинга</td><td>brown</td><td>коричневая</td><td>пачка шоколадного пудинга</td><td>yes</td></tr><tr><td>bbq_sauce</td><td>bbq_sauce_1</td><td>barbecue sauce bottle</td><td>бутылка соуса барбекю</td><td>orange</td><td>оранжевая</td><td>бутылка с соусом барбекю</td><td>yes</td></tr><tr><td>ketchup</td><td>ketchup_1</td><td>ketchup bottle</td><td>бутылка кетчупа</td><td>red</td><td>красная</td><td>бутылка с кетчупом</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-20" data-search="{&quot;scene_number&quot;: 20, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_butter_and_place_it_in_the_basket__init017&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the butter and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [-0.11966466488909598, -0.24228617017046727, -0.005000000000000001], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: true}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [0.0063542374725101495, 0.2598737502821082, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [0.05000000000000001, -0.1, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [-0.15, 0.05999999999999999, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;chocolate_pudding_1&quot;, &quot;raw_name&quot;: &quot;chocolate_pudding&quot;, &quot;pose_xyz&quot;: [0.1, -0.2, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bbq_sauce_1&quot;, &quot;raw_name&quot;: &quot;bbq_sauce&quot;, &quot;pose_xyz&quot;: [0.1561111096408417, 0.028419961725770236, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;ketchup_1&quot;, &quot;raw_name&quot;: &quot;ketchup&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">20</span>
+        <div>
+          <h2>pick up the butter and place it in the basket</h2>
+          <code>libero_object__pick_up_the_butter_and_place_it_in_the_basket__init017</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=17</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/20_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/20_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/20_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/20_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr><tr><td>chocolate_pudding</td><td>chocolate_pudding_1</td><td>chocolate pudding package</td><td>упаковка шоколадного пудинга</td><td>brown</td><td>коричневая</td><td>пачка шоколадного пудинга</td><td>yes</td></tr><tr><td>bbq_sauce</td><td>bbq_sauce_1</td><td>barbecue sauce bottle</td><td>бутылка соуса барбекю</td><td>orange</td><td>оранжевая</td><td>бутылка с соусом барбекю</td><td>yes</td></tr><tr><td>ketchup</td><td>ketchup_1</td><td>ketchup bottle</td><td>бутылка кетчупа</td><td>red</td><td>красная</td><td>бутылка с кетчупом</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-21" data-search="{&quot;scene_number&quot;: 21, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_butter_and_place_it_in_the_basket__init034&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the butter and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [-0.12130210608972997, -0.24362190059841135, -0.005000000000000001], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [0.012077638569755026, 0.2687570978425132, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [0.05, -0.1, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [-0.15, 0.06, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;chocolate_pudding_1&quot;, &quot;raw_name&quot;: &quot;chocolate_pudding&quot;, &quot;pose_xyz&quot;: [0.1, -0.2, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bbq_sauce_1&quot;, &quot;raw_name&quot;: &quot;bbq_sauce&quot;, &quot;pose_xyz&quot;: [0.1474072821025095, 0.027284012065424645, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;ketchup_1&quot;, &quot;raw_name&quot;: &quot;ketchup&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08000000000000002, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">21</span>
+        <div>
+          <h2>pick up the butter and place it in the basket</h2>
+          <code>libero_object__pick_up_the_butter_and_place_it_in_the_basket__init034</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=34</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/21_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/21_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/21_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/21_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr><tr><td>chocolate_pudding</td><td>chocolate_pudding_1</td><td>chocolate pudding package</td><td>упаковка шоколадного пудинга</td><td>brown</td><td>коричневая</td><td>пачка шоколадного пудинга</td><td>yes</td></tr><tr><td>bbq_sauce</td><td>bbq_sauce_1</td><td>barbecue sauce bottle</td><td>бутылка соуса барбекю</td><td>orange</td><td>оранжевая</td><td>бутылка с соусом барбекю</td><td>yes</td></tr><tr><td>ketchup</td><td>ketchup_1</td><td>ketchup bottle</td><td>бутылка кетчупа</td><td>red</td><td>красная</td><td>бутылка с кетчупом</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-22" data-search="{&quot;scene_number&quot;: 22, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init000&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the cream cheese and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;cream_cheese_1&quot;, &quot;raw_name&quot;: &quot;cream_cheese&quot;, &quot;pose_xyz&quot;: [0.04607199348123641, -0.10264932772423524, 0.0], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: true}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [-0.008780921605762436, 0.2672733804567752, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;alphabet_soup_1&quot;, &quot;raw_name&quot;: &quot;alphabet_soup&quot;, &quot;pose_xyz&quot;: [-0.12, -0.24, 0.015], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;milk_1&quot;, &quot;raw_name&quot;: &quot;milk&quot;, &quot;pose_xyz&quot;: [-0.1480165350212605, 0.06462729098139346, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [0.1, -0.2, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [0.15254404024063978, 0.02760219478357431, -0.005000000000000001], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">22</span>
+        <div>
+          <h2>pick up the cream cheese and place it in the basket</h2>
+          <code>libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init000</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=0</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/22_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/22_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/22_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/22_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>cream_cheese</td><td>cream_cheese_1</td><td>cream cheese package</td><td>упаковка сливочного сыра</td><td>blue</td><td>синяя</td><td>пачка сливочного сыра</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>alphabet_soup</td><td>alphabet_soup_1</td><td>soup can</td><td>банка супа</td><td>blue</td><td>синяя</td><td>банка супа с макаронами-буквами</td><td>yes</td></tr><tr><td>milk</td><td>milk_1</td><td>milk carton</td><td>пакет молока</td><td>red</td><td>красный</td><td>картонный пакет молока</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-23" data-search="{&quot;scene_number&quot;: 23, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init017&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the cream cheese and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;cream_cheese_1&quot;, &quot;raw_name&quot;: &quot;cream_cheese&quot;, &quot;pose_xyz&quot;: [0.04739617457579642, -0.0964801965935048, 0.0], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: true}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [-0.00922301053547278, 0.2566019001142468, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;alphabet_soup_1&quot;, &quot;raw_name&quot;: &quot;alphabet_soup&quot;, &quot;pose_xyz&quot;: [-0.12, -0.24000000000000002, 0.015], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;milk_1&quot;, &quot;raw_name&quot;: &quot;milk&quot;, &quot;pose_xyz&quot;: [-0.14950354435623267, 0.06150762799191147, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [0.1, -0.2, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [0.15003353128410205, 0.029835555926374793, -0.005000000000000001], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">23</span>
+        <div>
+          <h2>pick up the cream cheese and place it in the basket</h2>
+          <code>libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init017</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=17</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/23_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/23_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/23_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/23_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>cream_cheese</td><td>cream_cheese_1</td><td>cream cheese package</td><td>упаковка сливочного сыра</td><td>blue</td><td>синяя</td><td>пачка сливочного сыра</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>alphabet_soup</td><td>alphabet_soup_1</td><td>soup can</td><td>банка супа</td><td>blue</td><td>синяя</td><td>банка супа с макаронами-буквами</td><td>yes</td></tr><tr><td>milk</td><td>milk_1</td><td>milk carton</td><td>пакет молока</td><td>red</td><td>красный</td><td>картонный пакет молока</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-24" data-search="{&quot;scene_number&quot;: 24, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init034&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the cream cheese and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;cream_cheese_1&quot;, &quot;raw_name&quot;: &quot;cream_cheese&quot;, &quot;pose_xyz&quot;: [0.050039379175609106, -0.10479256459405546, 0.0], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: true}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [-0.0033223910250537395, 0.26127886634297226, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;alphabet_soup_1&quot;, &quot;raw_name&quot;: &quot;alphabet_soup&quot;, &quot;pose_xyz&quot;: [-0.12, -0.24000000000000002, 0.015], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;milk_1&quot;, &quot;raw_name&quot;: &quot;milk&quot;, &quot;pose_xyz&quot;: [-0.1471838912645594, 0.06331513106127425, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [0.1, -0.2, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [0.1517755631420011, 0.02796881117986663, -0.005000000000000001], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">24</span>
+        <div>
+          <h2>pick up the cream cheese and place it in the basket</h2>
+          <code>libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init034</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=34</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/24_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/24_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/24_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/24_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>cream_cheese</td><td>cream_cheese_1</td><td>cream cheese package</td><td>упаковка сливочного сыра</td><td>blue</td><td>синяя</td><td>пачка сливочного сыра</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>alphabet_soup</td><td>alphabet_soup_1</td><td>soup can</td><td>банка супа</td><td>blue</td><td>синяя</td><td>банка супа с макаронами-буквами</td><td>yes</td></tr><tr><td>milk</td><td>milk_1</td><td>milk carton</td><td>пакет молока</td><td>red</td><td>красный</td><td>картонный пакет молока</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-25" data-search="{&quot;scene_number&quot;: 25, &quot;task_uid&quot;: &quot;libero_object__pick_up_the_milk_and_place_it_in_the_basket__init017&quot;, &quot;suite&quot;: &quot;libero_object&quot;, &quot;canonical_en&quot;: &quot;pick up the milk and place it in the basket&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;milk_1&quot;, &quot;raw_name&quot;: &quot;milk&quot;, &quot;pose_xyz&quot;: [-0.11534628246019243, -0.2368619766876635, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;basket_1&quot;, &quot;raw_name&quot;: &quot;basket&quot;, &quot;pose_xyz&quot;: [0.01268596304300641, 0.2693665042820757, 0.034999999999999996], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: &quot;visible_partial&quot;}, {&quot;sim_handle&quot;: &quot;cream_cheese_1&quot;, &quot;raw_name&quot;: &quot;cream_cheese&quot;, &quot;pose_xyz&quot;: [0.049767693172395835, -0.10255731938322636, 0.0], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;tomato_sauce_1&quot;, &quot;raw_name&quot;: &quot;tomato_sauce&quot;, &quot;pose_xyz&quot;: [-0.15, 0.06, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;butter_1&quot;, &quot;raw_name&quot;: &quot;butter&quot;, &quot;pose_xyz&quot;: [0.09622911407336197, -0.19723900289295465, -0.005000000000000001], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;orange_juice_1&quot;, &quot;raw_name&quot;: &quot;orange_juice&quot;, &quot;pose_xyz&quot;: [0.15, 0.03, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;chocolate_pudding_1&quot;, &quot;raw_name&quot;: &quot;chocolate_pudding&quot;, &quot;pose_xyz&quot;: [-0.2, -0.08, 0.034999999999999996], &quot;visible_agentview&quot;: null, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">25</span>
+        <div>
+          <h2>pick up the milk and place it in the basket</h2>
+          <code>libero_object__pick_up_the_milk_and_place_it_in_the_basket__init017</code>
+        </div>
+      </div>
+      <dl class="metadata">
+        <div><dt>suite</dt><dd>libero_object</dd></div>
+        <div><dt>state</dt><dd>init_state_id=17</dd></div>
+      </dl>
+      <div class="images">
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/25_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/25_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>wrist_rgb</figcaption><a href="assets/selected_scenes/25_wrist_rgb.png" target="_blank"><img src="assets/selected_scenes/25_wrist_rgb.png" alt="wrist_rgb" loading="lazy"></a></figure>
+      </div>
+      <h3>objects_raw × object_lexicon.csv</h3>
+      <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>milk</td><td>milk_1</td><td>milk carton</td><td>пакет молока</td><td>red</td><td>красный</td><td>картонный пакет молока</td><td>yes</td></tr><tr><td>basket</td><td>basket_1</td><td>basket</td><td>корзина</td><td>beige</td><td>бежевая</td><td>корзинка</td><td>yes</td></tr><tr><td>cream_cheese</td><td>cream_cheese_1</td><td>cream cheese package</td><td>упаковка сливочного сыра</td><td>blue</td><td>синяя</td><td>пачка сливочного сыра</td><td>yes</td></tr><tr><td>tomato_sauce</td><td>tomato_sauce_1</td><td>tomato sauce can</td><td>банка томатного соуса</td><td>red</td><td>красная</td><td>консервная банка с томатным соусом</td><td>yes</td></tr><tr><td>butter</td><td>butter_1</td><td>butter package</td><td>пачка масла</td><td>red</td><td>красная</td><td>упаковка масла</td><td>yes</td></tr><tr><td>orange_juice</td><td>orange_juice_1</td><td>orange juice carton</td><td>пакет апельсинового сока</td><td>orange</td><td>оранжевый</td><td>картонный пакет апельсинового сока</td><td>yes</td></tr><tr><td>chocolate_pudding</td><td>chocolate_pudding_1</td><td>chocolate pudding package</td><td>упаковка шоколадного пудинга</td><td>brown</td><td>коричневая</td><td>пачка шоколадного пудинга</td><td>yes</td></tr></tbody></table></div>
+    </article>
+    
+    <article class="scene" id="scene-26" data-search="{&quot;scene_number&quot;: 26, &quot;task_uid&quot;: &quot;simpler__widowx_carrot_on_plate__episode008__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put carrot on plate&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.2365449070930481, 0.07499852776527405, 0.8875283598899841], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;raw_name&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;pose_xyz&quot;: [-0.08500001579523087, -0.07500044256448746, 0.8695315718650818], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+      <div class="scene-head">
+        <span class="scene-number">26</span>
         <div>
           <h2>put carrot on plate</h2>
           <code>simpler__widowx_carrot_on_plate__episode008__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>19</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=8 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/19_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/19_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/26_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/26_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>bridge_carrot_generated_modified</td><td>bridge_carrot_generated_modified</td><td>carrot</td><td>морковь</td><td>orange</td><td>оранжевая</td><td>морковка</td><td>yes</td></tr><tr><td>bridge_plate_objaverse_larger</td><td>bridge_plate_objaverse_larger</td><td>plate</td><td>тарелка</td><td>yellow</td><td>желтая</td><td>столовая тарелка</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-20" data-search="{&quot;scene_number&quot;: 20, &quot;task_uid&quot;: &quot;simpler__widowx_carrot_on_plate__episode016__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put carrot on plate&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.08654855191707611, -0.07499997317790985, 0.8875284194946289], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;raw_name&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;pose_xyz&quot;: [-0.08500000089406967, 0.07499999552965164, 0.8695316314697266], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-27" data-search="{&quot;scene_number&quot;: 27, &quot;task_uid&quot;: &quot;simpler__widowx_carrot_on_plate__episode016__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put carrot on plate&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_carrot_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.08654855191707611, -0.07499997317790985, 0.8875284194946289], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;raw_name&quot;: &quot;bridge_plate_objaverse_larger&quot;, &quot;pose_xyz&quot;: [-0.08500000089406967, 0.07499999552965164, 0.8695316314697266], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
-        <span class="scene-number">20</span>
+        <span class="scene-number">27</span>
         <div>
           <h2>put carrot on plate</h2>
           <code>simpler__widowx_carrot_on_plate__episode016__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>20</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=16 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/20_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/20_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/27_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/27_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>bridge_carrot_generated_modified</td><td>bridge_carrot_generated_modified</td><td>carrot</td><td>морковь</td><td>orange</td><td>оранжевая</td><td>морковка</td><td>yes</td></tr><tr><td>bridge_plate_objaverse_larger</td><td>bridge_plate_objaverse_larger</td><td>plate</td><td>тарелка</td><td>yellow</td><td>желтая</td><td>столовая тарелка</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-21" data-search="{&quot;scene_number&quot;: 21, &quot;task_uid&quot;: &quot;simpler__widowx_spoon_on_towel__episode008__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put the spoon on the towel&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.2354510873556137, 0.0748227909207344, 0.8799376487731934], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;raw_name&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;pose_xyz&quot;: [-0.08499988168478012, -0.0750071257352829, 0.874413251876831], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-28" data-search="{&quot;scene_number&quot;: 28, &quot;task_uid&quot;: &quot;simpler__widowx_spoon_on_towel__episode008__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put the spoon on the towel&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.2354510873556137, 0.0748227909207344, 0.8799376487731934], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;raw_name&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;pose_xyz&quot;: [-0.08499988168478012, -0.0750071257352829, 0.874413251876831], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
-        <span class="scene-number">21</span>
+        <span class="scene-number">28</span>
         <div>
           <h2>put the spoon on the towel</h2>
           <code>simpler__widowx_spoon_on_towel__episode008__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>21</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=8 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/21_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/21_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/28_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/28_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>bridge_spoon_generated_modified</td><td>bridge_spoon_generated_modified</td><td>spoon</td><td>ложка</td><td>green</td><td>зеленая</td><td>ложечка</td><td>yes</td></tr><tr><td>table_cloth_generated_shorter</td><td>table_cloth_generated_shorter</td><td>towel</td><td>полотенце</td><td>light blue</td><td>голубое</td><td>кухонное полотенце</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-22" data-search="{&quot;scene_number&quot;: 22, &quot;task_uid&quot;: &quot;simpler__widowx_spoon_on_towel__episode016__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put the spoon on the towel&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.08545023947954178, -0.07517464458942413, 0.8799378275871277], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;raw_name&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;pose_xyz&quot;: [-0.08500007539987564, 0.07499296218156815, 0.8744134902954102], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-29" data-search="{&quot;scene_number&quot;: 29, &quot;task_uid&quot;: &quot;simpler__widowx_spoon_on_towel__episode016__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;put the spoon on the towel&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;raw_name&quot;: &quot;bridge_spoon_generated_modified&quot;, &quot;pose_xyz&quot;: [-0.08545023947954178, -0.07517464458942413, 0.8799378275871277], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;raw_name&quot;: &quot;table_cloth_generated_shorter&quot;, &quot;pose_xyz&quot;: [-0.08500007539987564, 0.07499296218156815, 0.8744134902954102], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
-        <span class="scene-number">22</span>
+        <span class="scene-number">29</span>
         <div>
           <h2>put the spoon on the towel</h2>
           <code>simpler__widowx_spoon_on_towel__episode016__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>22</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=16 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/22_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/22_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/29_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/29_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>bridge_spoon_generated_modified</td><td>bridge_spoon_generated_modified</td><td>spoon</td><td>ложка</td><td>green</td><td>зеленая</td><td>ложечка</td><td>yes</td></tr><tr><td>table_cloth_generated_shorter</td><td>table_cloth_generated_shorter</td><td>towel</td><td>полотенце</td><td>light blue</td><td>голубое</td><td>кухонное полотенце</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-23" data-search="{&quot;scene_number&quot;: 23, &quot;task_uid&quot;: &quot;simpler__widowx_stack_cube__episode000__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;stack the green block on the yellow block&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;baked_green_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_green_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.21002741158008575, -0.04995546489953995, 0.8845313787460327], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.2099844515323639, 0.04999389499425888, 0.8845313787460327], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-30" data-search="{&quot;scene_number&quot;: 30, &quot;task_uid&quot;: &quot;simpler__widowx_stack_cube__episode000__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;stack the green block on the yellow block&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;baked_green_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_green_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.21002741158008575, -0.04995546489953995, 0.8845313787460327], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.2099844515323639, 0.04999389499425888, 0.8845313787460327], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
-        <span class="scene-number">23</span>
+        <span class="scene-number">30</span>
         <div>
           <h2>stack the green block on the yellow block</h2>
           <code>simpler__widowx_stack_cube__episode000__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>23</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=0 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/23_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/23_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/30_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/30_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>baked_green_cube_3cm</td><td>baked_green_cube_3cm</td><td>cube</td><td>кубик</td><td>green</td><td>зеленый</td><td>куб</td><td>yes</td></tr><tr><td>baked_yellow_cube_3cm</td><td>baked_yellow_cube_3cm</td><td>cube</td><td>кубик</td><td>yellow</td><td>желтый</td><td>куб</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-24" data-search="{&quot;scene_number&quot;: 24, &quot;task_uid&quot;: &quot;simpler__widowx_stack_cube__episode008__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;stack the green block on the yellow block&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;baked_green_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_green_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.11002781987190247, -0.049955859780311584, 0.8845314979553223], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.11002776026725769, 0.05004538595676422, 0.8845314979553223], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-31" data-search="{&quot;scene_number&quot;: 31, &quot;task_uid&quot;: &quot;simpler__widowx_stack_cube__episode008__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;stack the green block on the yellow block&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;baked_green_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_green_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.11002781987190247, -0.049955859780311584, 0.8845314979553223], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.11002776026725769, 0.05004538595676422, 0.8845314979553223], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
-        <span class="scene-number">24</span>
+        <span class="scene-number">31</span>
         <div>
           <h2>stack the green block on the yellow block</h2>
           <code>simpler__widowx_stack_cube__episode008__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>24</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=8 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/24_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/24_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/31_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/31_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
       <div class="table-wrap"><table><thead><tr><th>raw_name</th><th>sim_handle</th><th>category_en</th><th>category_ru</th><th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th></tr></thead><tbody><tr><td>baked_green_cube_3cm</td><td>baked_green_cube_3cm</td><td>cube</td><td>кубик</td><td>green</td><td>зеленый</td><td>куб</td><td>yes</td></tr><tr><td>baked_yellow_cube_3cm</td><td>baked_yellow_cube_3cm</td><td>cube</td><td>кубик</td><td>yellow</td><td>желтый</td><td>куб</td><td>yes</td></tr></tbody></table></div>
     </article>
     
-    <article class="scene" id="scene-25" data-search="{&quot;scene_number&quot;: 25, &quot;task_uid&quot;: &quot;simpler__widowx_stack_cube__episode016__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;stack the green block on the yellow block&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;baked_green_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_green_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.26002782583236694, 0.10004457086324692, 0.8845314383506775], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.06002768501639366, -0.0999557226896286, 0.884531557559967], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
+    <article class="scene" id="scene-32" data-search="{&quot;scene_number&quot;: 32, &quot;task_uid&quot;: &quot;simpler__widowx_stack_cube__episode016__seed000&quot;, &quot;suite&quot;: &quot;simpler_bridge&quot;, &quot;canonical_en&quot;: &quot;stack the green block on the yellow block&quot;, &quot;objects&quot;: [{&quot;sim_handle&quot;: &quot;baked_green_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_green_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.26002782583236694, 0.10004457086324692, 0.8845314383506775], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}, {&quot;sim_handle&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;raw_name&quot;: &quot;baked_yellow_cube_3cm&quot;, &quot;pose_xyz&quot;: [-0.06002768501639366, -0.0999557226896286, 0.884531557559967], &quot;visible_agentview&quot;: true, &quot;visible_wrist&quot;: null}]}">
       <div class="scene-head">
-        <span class="scene-number">25</span>
+        <span class="scene-number">32</span>
         <div>
           <h2>stack the green block on the yellow block</h2>
           <code>simpler__widowx_stack_cube__episode016__seed000</code>
         </div>
       </div>
       <dl class="metadata">
-        <div><dt>scene_number</dt><dd>25</dd></div>
         <div><dt>suite</dt><dd>simpler_bridge</dd></div>
         <div><dt>state</dt><dd>episode_id=16 · reset_seed=0</dd></div>
       </dl>
       <div class="images">
-        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/25_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/25_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
+        <figure><figcaption>agentview_rgb</figcaption><a href="assets/selected_scenes/32_agentview_rgb.png" target="_blank"><img src="assets/selected_scenes/32_agentview_rgb.png" alt="agentview_rgb" loading="lazy"></a></figure>
         <figure><figcaption>wrist_rgb</figcaption><div class="image-na">N/A</div></figure>
       </div>
       <h3>objects_raw × object_lexicon.csv</h3>
