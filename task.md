@@ -119,13 +119,15 @@ MT-перевод инструкций + code-switching, LIBERO+SimplerEnv, ср
 
 Метод: один основной repair vs translation / Dong-style shift / MPCA-proxy
 
+- RQ5. Can we just translate russian instructions into english?
+
 ### Наш сore
 
 1. **SLAVA** - контролируемые минимальные пары, наш бенч
 2. **Slot-level атрибуция**: first-contact, forbidden-touch, spatial predicates, conditional execution, action divergence от EN-роллаута
 3. **Oracle recovery curves** (translation → slot → visual grounding → relation → action primitive)
 4. **Pointing-vs-action диссоциация на GreenVLA.** Например, **** VLM-голова модели отвечает на укажи на красную кружку по-русски, а мы сравниваем точность pointing'а с тем, что экшен голова реально трогает первой на той же сцене. Внутримодельное, беспатчинговое доказательство H-binding, уникально для GreenVLA (наследие их стадии L1?)
-5. **Base→VLA пробинг**: layerwise slot probes, cross-lingual probe transfer (train EN → test RU), Language-Neutrality Score по слоям; четыре публичные стадии curriculum'а Qwen3-VL base → Qwen3-VL-action → GreenVLA-R0 → R1-bridge
+5. **Base→VLA пробинг**: layerwise slot probes, cross-lingual probe transfer (train EN → test RU), Language-Neutrality Score по слоям; четыре публичные стадии curriculum'а Qwen3-VL base → Qwen3-VL-action → GreenVLA-R0 → R1-bridge → R2-bridge
 6. **Каузальный patching**: layer-level EN→RU; slot-swap (перекл. target-слота меняет действие на EN, но не на RU?); action-head-input patching. Attention-head-гранулярность
 7. **Один repair**: Repair 1a/1b на общей каузальной маске
 
@@ -265,7 +267,8 @@ LIBERO / SimplerEnv task + init state
 ```
 task_uid
 canonical_en
-source metadata
+bddl_file / env metadata
+init_state_id
 agentview image
 wrist image
 objects_raw
@@ -281,7 +284,7 @@ candidate target/reference/distractors
 
 ## D1 - `task_inventory.jsonl`
 
-Цель: **102 candidate-сцены**.
+Цель: ≥ **100 candidate-сцен**.
 
 Одна строка = одна сцена:
 
@@ -292,6 +295,7 @@ task × init_state
 Формат:
 
 ```json
+upd
 {
   "task_uid": "libero_spatial_003_seed000",
   "suite": "libero_spatial",
@@ -328,20 +332,38 @@ task × init_state
   "usable_for_slava": null,
   "notes": ""
 }
-```
 
-Это строгая схема v1.0 из `schemas/task_inventory.schema.json`: лишние поля на
-верхнем уровне и во вложенных объектах запрещены. Для SimplerEnv блок `source`
-содержит `environment`, `commit`, `task_name`, `gym_env_name`, `episode_id` и
-`reset_seed`.
-
-Допустимые значения `visible_agentview` и `visible_wrist`:
-
-```text
-true              объект уверенно виден и распознаваем
-"visible_partial" объект виден частично, но остаётся распознаваемым
-false             объект не виден или не может быть уверенно распознан
-null              ещё не проверено либо соответствующей камеры нет
+old:
+{
+  "task_uid": "libero_spatial_003_seed000",
+  "suite": "libero_spatial",
+  "task_id": 3,
+  "init_state_id": 0,
+  "canonical_en": "put the cream cheese in the bowl",
+  "bddl_file": "...",
+  "images": {
+    "agentview_rgb": "images/libero_spatial_003_seed000_agentview.png",
+    "wrist_rgb": "images/libero_spatial_003_seed000_wrist.png"
+  },
+  "objects_raw": [
+    {
+      "sim_handle": "...",
+      "raw_name": "...",
+      "pose_xyz": [0.0, 0.0, 0.0],
+      "visible_agentview": true,
+      "visible_wrist": false
+    }
+  ],
+  "candidate_slots": {
+    "action": null,
+    "target": null,
+    "reference": null,
+    "relation": null,
+    "forbidden_candidates": []
+  },
+  "usable_for_slava": null,
+  "notes": ""
+}
 ```
 
 Плюс нужен **screenshot sheet**: HTML или PDF-простыня по всем кандидатам:
@@ -422,6 +444,7 @@ alphabet_soup,soup can,банка супа,"no",неестественно по-
 5. Есть проверяемый success predicate.
 6. Желательно есть distractor.
 7. Можно написать естественные RU / code-switch variants.
+8. Объекты не летают и не в текстурах
 ```
 
 Пример хорошей сцены:

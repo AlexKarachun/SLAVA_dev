@@ -188,8 +188,8 @@ def render_lexicon(lexicon: dict[str, dict[str, str]]) -> str:
         f'<span class="v0-badge v0-review">review {counts["review"]}</span>'
         "</div></div>"
         '<div class="lexicon-wrap"><table class="lexicon-table"><thead><tr>'
-        "<th>Raw object</th><th>EN</th><th>RU</th><th>Color EN</th>"
-        "<th>Color RU</th><th>RU synonyms</th><th>V0</th><th>Notes</th>"
+        "<th>raw_name</th><th>category_en</th><th>category_ru</th><th>color_en</th>"
+        "<th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th><th>notes</th>"
         f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
         "</section>"
     )
@@ -221,15 +221,16 @@ def render_objects(
         handle = obj.get("sim_handle")
         lexical = lexicon[str(name)]
         usable = lexical["usable_v0"]
-        handle_suffix = "" if not handle or handle == name else f" · {html.escape(str(handle))}"
         rows.append(
             f'<tr class="v0-{html.escape(usable, quote=True)}">'
-            f"<td>{html.escape(str(name))}<span class=\"muted\">{handle_suffix}</span></td>"
+            f"<td>{html.escape(str(name))}</td>"
+            f"<td>{display_value(handle)}</td>"
             f"<td>{html.escape(visibility_label(obj.get('visible_agentview')))}</td>"
             f"<td>{html.escape(visibility_label(obj.get('visible_wrist')))}</td>"
             f"<td>{lexicon_value(lexical['category_en'])}</td>"
             f"<td>{lexicon_value(lexical['category_ru'])}</td>"
-            f"<td>{lexicon_value(lexical['color_en'])}<br>{lexicon_value(lexical['color_ru'])}</td>"
+            f"<td>{lexicon_value(lexical['color_en'])}</td>"
+            f"<td>{lexicon_value(lexical['color_ru'])}</td>"
             f"<td>{lexicon_value(lexical['allowed_synonyms_ru'])}</td>"
             f'<td><span class="v0-badge v0-{html.escape(usable, quote=True)}">'
             f"{html.escape(usable)}</span></td>"
@@ -238,8 +239,10 @@ def render_objects(
         )
     return (
         '<div class="objects-wrap"><table class="objects"><thead><tr>'
-        "<th>Raw object</th><th>Agent</th><th>Wrist</th><th>EN</th><th>RU</th>"
-        "<th>Color EN / RU</th><th>RU synonyms</th><th>V0</th><th>Lexicon notes</th>"
+        "<th>raw_name</th><th>sim_handle</th><th>visible_agentview</th>"
+        "<th>visible_wrist</th><th>category_en</th><th>category_ru</th>"
+        "<th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th>"
+        "<th>usable_v0</th><th>notes</th>"
         f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
     )
 
