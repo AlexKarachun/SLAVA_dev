@@ -29,6 +29,17 @@ QUOTA_LABELS = {
     "ru_case_swap": "ru_case_swap / role-stress",
     "ru_negation": "ru_negation",
 }
+QUOTA_MINIMUMS = {
+    "spatial_relation": 8,
+    "pick_with_distractors": 5,
+    "container": 4,
+    "surface": 3,
+    "has_distractor": 10,
+    "same_category_distractor": 5,
+    "same_color_distractor": 5,
+    "ru_case_swap": 6,
+    "ru_negation": 12,
+}
 
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -168,6 +179,43 @@ def render_quota_eligibility(values: dict[str, bool | None]) -> str:
     return f'<div class="quotas"><b>quota_eligibility</b>{content}</div>'
 
 
+def render_quota_summary(selected: list[dict[str, Any]]) -> str:
+    rows = []
+    for field, label in QUOTA_LABELS.items():
+        actual = sum(
+            record["quota_eligibility"].get(field) is True for record in selected
+        )
+        pending = sum(
+            record["quota_eligibility"].get(field) is None for record in selected
+        )
+        minimum = QUOTA_MINIMUMS[field]
+        met = actual >= minimum
+        status_class = "summary-met" if met else "summary-missing"
+        status = "enough candidates" if met else f"need {minimum - actual} more"
+        rows.append(
+            "<tr>"
+            f"<td><code>{html.escape(field)}</code></td>"
+            f"<td>{html.escape(label)}</td>"
+            f"<td>{minimum} / 20</td>"
+            f"<td>{actual} / {len(selected)}</td>"
+            f"<td>{pending}</td>"
+            f'<td><span class="{status_class}">{html.escape(status)}</span></td>'
+            "</tr>"
+        )
+    return (
+        '<section class="quota-summary">'
+        "<h2>v0 quota coverage</h2>"
+        "<p>Minimums apply to the final 20-task set. Actual counts show eligible "
+        "scenes in the current <code>usable_for_slava=true</code> candidate pool.</p>"
+        '<div class="table-wrap"><table class="summary-table"><thead><tr>'
+        "<th>Field</th><th>Quota</th><th>Minimum</th><th>Eligible candidates</th>"
+        "<th>Pending review</th><th>Status</th>"
+        "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div></section>"
+    )
+
+
 def render_scene(
     record: dict[str, Any],
     scene_number: int,
@@ -231,6 +279,7 @@ def generate_document(
         render_scene(record, number, lexicon, image_sources)
         for number, record in enumerate(selected, 1)
     )
+    quota_summary = render_quota_summary(selected)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -250,6 +299,15 @@ def generate_document(
     header p {{ margin:0 auto 0 0; color:#cbd5e1; }}
     #search {{ width:min(360px,35vw); padding:9px 12px; border:0; border-radius:8px; }}
     main {{ width:min(1500px,100%); margin:auto; padding:24px; }}
+    .quota-summary {{ margin:0 0 24px; padding:20px; overflow:hidden; background:var(--paper);
+      border:1px solid var(--line); border-radius:14px; box-shadow:0 4px 14px #33415512; }}
+    .quota-summary h2 {{ margin:0 0 6px; }}
+    .quota-summary p {{ margin:0 0 14px; color:var(--muted); }}
+    .summary-table {{ min-width:820px; }}
+    .summary-met,.summary-missing {{ display:inline-block; padding:3px 7px;
+      border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }}
+    .summary-met {{ color:#166534; background:#dcfce7; border:1px solid #86efac; }}
+    .summary-missing {{ color:#991b1b; background:#fee2e2; border:1px solid #fca5a5; }}
     .scene {{ margin:0 0 24px; padding:20px; overflow:hidden; background:var(--paper);
       border:1px solid var(--line); border-radius:14px; box-shadow:0 4px 14px #33415512; }}
     .scene-head {{ display:flex; gap:14px; align-items:flex-start; margin-bottom:14px; }}
@@ -294,7 +352,7 @@ def generate_document(
     <input id="search" type="search" placeholder="Search number, task, object…">
     <span id="shown">{len(selected)} shown</span>
   </header>
-  <main>{cards}</main>
+  <main>{quota_summary}{cards}</main>
   <script>
     const scenes = [...document.querySelectorAll('.scene')];
     const search = document.querySelector('#search');
