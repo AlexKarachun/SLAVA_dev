@@ -18,20 +18,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = PROJECT_ROOT / "data" / "task_inventory.jsonl"
 DEFAULT_LEXICON = PROJECT_ROOT / "data" / "object_lexicon.csv"
 DEFAULT_OUTPUT = PROJECT_ROOT / "docs" / "index.html"
-LEXICON_FIELDS = (
-    "raw_name",
-    "category_en",
-    "category_ru",
-    "color_en",
-    "color_ru",
-    "allowed_synonyms_ru",
-    "usable_v0",
-    "notes",
-)
+QUOTA_LABELS = {
+    "spatial_relation": "Spatial relation",
+    "pick_with_distractors": "Pick / object selection",
+    "container": "Container",
+    "surface": "Surface",
+    "has_distractor": "Has distractor",
+    "same_category_distractor": "Same-category distractor",
+    "same_color_distractor": "Same-color distractor",
+    "ru_case_swap": "ru_case_swap / role-stress",
+    "ru_negation": "ru_negation",
+}
 
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from slava_inventory.io_utils import LEXICON_COLUMNS, load_jsonl  # noqa: E402
+from slava_inventory.io_utils import (  # noqa: E402
+    LEXICON_COLUMNS,
+    load_jsonl,
+    validate_lexicon_row,
+)
 from slava_inventory.schema import validate_inventory  # noqa: E402
 
 
@@ -53,6 +58,7 @@ def load_lexicon(path: Path) -> dict[str, dict[str, str]]:
             raise ValueError(f"{path}:{line_number}: raw_name is empty")
         if raw_name in lexicon:
             raise ValueError(f"{path}:{line_number}: duplicate raw_name {raw_name!r}")
+        validate_lexicon_row(row, location=f"{path}:{line_number}")
         lexicon[raw_name] = {
             column: str(row.get(column) or "").strip() for column in LEXICON_COLUMNS
         }
@@ -93,7 +99,15 @@ def render_lexicon_table(
     objects: list[dict[str, Any]],
     lexicon: dict[str, dict[str, str]],
 ) -> str:
-    headers = ("raw_name", "sim_handle", *LEXICON_FIELDS[1:-1])
+    headers = (
+        "raw_name",
+        "sim_handle",
+        *[
+            field
+            for field in LEXICON_COLUMNS
+            if field not in {"raw_name", "notes"}
+        ],
+    )
     rows = []
     for obj in objects:
         raw_name = str(obj["raw_name"])
@@ -138,6 +152,22 @@ def render_image(path: str | None, label: str) -> str:
     )
 
 
+def render_quota_eligibility(values: dict[str, bool | None]) -> str:
+    eligible = [
+        f'<span class="quota">{html.escape(label)}</span>'
+        for field, label in QUOTA_LABELS.items()
+        if values.get(field) is True
+    ]
+    pending = sum(values.get(field) is None for field in QUOTA_LABELS)
+    if eligible:
+        content = "".join(eligible)
+    else:
+        content = '<span class="quota-empty">No eligible quotas marked</span>'
+    if pending:
+        content += f'<span class="quota-pending">{pending} pending</span>'
+    return f'<div class="quotas"><b>quota_eligibility</b>{content}</div>'
+
+
 def render_scene(
     record: dict[str, Any],
     scene_number: int,
@@ -160,6 +190,7 @@ def render_scene(
             "suite": record["suite"],
             "canonical_en": record["canonical_en"],
             "objects": record["objects_raw"],
+            "quota_eligibility": record["quota_eligibility"],
         },
         ensure_ascii=False,
     ).lower()
@@ -176,6 +207,7 @@ def render_scene(
         <div><dt>suite</dt><dd>{html.escape(str(record["suite"]))}</dd></div>
         <div><dt>state</dt><dd>{html.escape(state)}</dd></div>
       </dl>
+      {render_quota_eligibility(record["quota_eligibility"])}
       <div class="images">
         {render_image(image_sources[(uid, "agentview_rgb")], "agentview_rgb")}
         {render_image(image_sources[(uid, "wrist_rgb")], "wrist_rgb")}
@@ -183,7 +215,7 @@ def render_scene(
       <h3>objects_raw × object_lexicon.csv</h3>
       {render_lexicon_table(list(record["objects_raw"]), lexicon)}
     </article>
-    """
+"""
 
 
 def generate_document(
@@ -230,6 +262,12 @@ def generate_document(
     .metadata div {{ padding:7px 10px; background:#f8fafc; border:1px solid var(--line); border-radius:8px; }}
     dt {{ display:inline; color:var(--muted); font-size:12px; font-weight:700; }}
     dd {{ display:inline; margin:0 0 0 7px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }}
+    .quotas {{ display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin:0 0 16px; }}
+    .quotas b {{ margin-right:3px; font-size:12px; }}
+    .quota,.quota-pending,.quota-empty {{ padding:4px 8px; border-radius:999px; font-size:12px; }}
+    .quota {{ color:#166534; background:#dcfce7; border:1px solid #86efac; }}
+    .quota-pending {{ color:#92400e; background:#fef3c7; border:1px solid #fcd34d; }}
+    .quota-empty {{ color:var(--muted); background:#f1f5f9; border:1px solid #cbd5e1; }}
     .images {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }}
     figure {{ margin:0; }} figcaption {{ margin-bottom:6px; font-weight:750; }}
     img {{ display:block; width:100%; height:auto; border-radius:10px; background:#e2e8f0; }}
