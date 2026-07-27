@@ -17,7 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = PROJECT_ROOT / "data" / "task_inventory.jsonl"
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from slava_inventory.io_utils import LEXICON_COLUMNS, load_jsonl  # noqa: E402
+from slava_inventory.io_utils import (  # noqa: E402
+    LEXICON_COLUMNS,
+    load_jsonl,
+    validate_lexicon_row,
+)
 from slava_inventory.schema import validate_inventory  # noqa: E402
 
 
@@ -45,6 +49,7 @@ def load_lexicon(path: Path) -> dict[str, dict[str, str]]:
             raise ValueError(
                 f"{path}:{line_number}: usable_v0 must be yes, no, or review"
             )
+        validate_lexicon_row(row, location=f"{path}:{line_number}")
         lexicon[raw_name] = {column: row[column].strip() for column in LEXICON_COLUMNS}
     return lexicon
 
@@ -163,19 +168,19 @@ def render_lexicon(lexicon: dict[str, dict[str, str]]) -> str:
     for raw_name, lexical in lexicon.items():
         usable = lexical["usable_v0"]
         counts[usable] += 1
-        rows.append(
-            "<tr>"
-            f"<td><code>{html.escape(raw_name)}</code></td>"
-            f"<td>{lexicon_value(lexical['category_en'])}</td>"
-            f"<td>{lexicon_value(lexical['category_ru'])}</td>"
-            f"<td>{lexicon_value(lexical['color_en'])}</td>"
-            f"<td>{lexicon_value(lexical['color_ru'])}</td>"
-            f"<td>{lexicon_value(lexical['allowed_synonyms_ru'])}</td>"
-            f'<td><span class="v0-badge v0-{html.escape(usable, quote=True)}">'
-            f"{html.escape(usable)}</span></td>"
-            f"<td>{lexicon_value(lexical['notes'])}</td>"
-            "</tr>"
-        )
+        cells = []
+        for field in LEXICON_COLUMNS:
+            value = lexical[field]
+            if field == "raw_name":
+                cells.append(f"<td><code>{html.escape(raw_name)}</code></td>")
+            elif field == "usable_v0":
+                cells.append(
+                    f'<td><span class="v0-badge v0-{html.escape(usable, quote=True)}">'
+                    f"{html.escape(usable)}</span></td>"
+                )
+            else:
+                cells.append(f"<td>{lexicon_value(value)}</td>")
+        rows.append("<tr>" + "".join(cells) + "</tr>")
     return (
         '<section class="lexicon-overview">'
         '<div class="lexicon-heading"><div>'
@@ -188,9 +193,8 @@ def render_lexicon(lexicon: dict[str, dict[str, str]]) -> str:
         f'<span class="v0-badge v0-review">review {counts["review"]}</span>'
         "</div></div>"
         '<div class="lexicon-wrap"><table class="lexicon-table"><thead><tr>'
-        "<th>raw_name</th><th>category_en</th><th>category_ru</th><th>color_en</th>"
-        "<th>color_ru</th><th>allowed_synonyms_ru</th><th>usable_v0</th><th>notes</th>"
-        f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+        + "".join(f"<th>{html.escape(field)}</th>" for field in LEXICON_COLUMNS)
+        + f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
         "</section>"
     )
 
@@ -221,29 +225,37 @@ def render_objects(
         handle = obj.get("sim_handle")
         lexical = lexicon[str(name)]
         usable = lexical["usable_v0"]
+        lexicon_cells = []
+        for field in LEXICON_COLUMNS:
+            if field == "raw_name":
+                continue
+            value = lexical[field]
+            if field == "usable_v0":
+                lexicon_cells.append(
+                    f'<td><span class="v0-badge v0-{html.escape(usable, quote=True)}">'
+                    f"{html.escape(usable)}</span></td>"
+                )
+            else:
+                lexicon_cells.append(f"<td>{lexicon_value(value)}</td>")
         rows.append(
             f'<tr class="v0-{html.escape(usable, quote=True)}">'
             f"<td>{html.escape(str(name))}</td>"
             f"<td>{display_value(handle)}</td>"
             f"<td>{html.escape(visibility_label(obj.get('visible_agentview')))}</td>"
             f"<td>{html.escape(visibility_label(obj.get('visible_wrist')))}</td>"
-            f"<td>{lexicon_value(lexical['category_en'])}</td>"
-            f"<td>{lexicon_value(lexical['category_ru'])}</td>"
-            f"<td>{lexicon_value(lexical['color_en'])}</td>"
-            f"<td>{lexicon_value(lexical['color_ru'])}</td>"
-            f"<td>{lexicon_value(lexical['allowed_synonyms_ru'])}</td>"
-            f'<td><span class="v0-badge v0-{html.escape(usable, quote=True)}">'
-            f"{html.escape(usable)}</span></td>"
-            f"<td>{lexicon_value(lexical['notes'])}</td>"
-            "</tr>"
+            + "".join(lexicon_cells)
+            + "</tr>"
         )
     return (
         '<div class="objects-wrap"><table class="objects"><thead><tr>'
         "<th>raw_name</th><th>sim_handle</th><th>visible_agentview</th>"
-        "<th>visible_wrist</th><th>category_en</th><th>category_ru</th>"
-        "<th>color_en</th><th>color_ru</th><th>allowed_synonyms_ru</th>"
-        "<th>usable_v0</th><th>notes</th>"
-        f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+        "<th>visible_wrist</th>"
+        + "".join(
+            f"<th>{html.escape(field)}</th>"
+            for field in LEXICON_COLUMNS
+            if field != "raw_name"
+        )
+        + f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
     )
 
 
@@ -352,7 +364,7 @@ def generate_html(
         f'<option value="{html.escape(suite, quote=True)}">{html.escape(suite)}</option>'
         for suite in suites
     )
-    lexicon_overview = render_lexicon(lexicon) if mode == "small" else ""
+    lexicon_overview = render_lexicon(lexicon)
     return f"""<!doctype html>
 <html lang="en">
 <head>

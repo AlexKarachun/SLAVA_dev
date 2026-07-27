@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://alexkrachun.github.io/SLAVA_dev/schemas/task_inventory.schema.json",
-  "title": "SLAVA task inventory record v1.0",
+  "title": "SLAVA task inventory record v1.1",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "task_uid", "suite", "task_id", "canonical_en", "source", "images",
-    "objects_raw", "success_predicates", "candidate_slots", "usable_for_slava", "notes"
+    "objects_raw", "success_predicates", "candidate_slots", "quota_eligibility",
+    "usable_for_slava", "notes"
   ],
   "properties": {
     "task_uid": {"type": "string", "minLength": 1},
@@ -18,6 +19,7 @@
     "objects_raw": {"type": "array", "items": {"$ref": "#/$defs/object"}},
     "success_predicates": {"type": "array"},
     "candidate_slots": {"$ref": "#/$defs/candidateSlots"},
+    "quota_eligibility": {"$ref": "#/$defs/quotaEligibility"},
     "usable_for_slava": {"type": ["boolean", "null"]},
     "notes": {"type": "string"}
   },
@@ -82,6 +84,26 @@
         "reference": {"type": ["string", "null"]},
         "relation": {"type": ["string", "null"]},
         "forbidden_candidates": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "quotaEligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_relation", "pick_with_distractors", "container", "surface",
+        "has_distractor", "same_category_distractor", "same_color_distractor",
+        "ru_case_swap", "ru_negation"
+      ],
+      "properties": {
+        "spatial_relation": {"type": ["boolean", "null"]},
+        "pick_with_distractors": {"type": ["boolean", "null"]},
+        "container": {"type": ["boolean", "null"]},
+        "surface": {"type": ["boolean", "null"]},
+        "has_distractor": {"type": ["boolean", "null"]},
+        "same_category_distractor": {"type": ["boolean", "null"]},
+        "same_color_distractor": {"type": ["boolean", "null"]},
+        "ru_case_swap": {"type": ["boolean", "null"]},
+        "ru_negation": {"type": ["boolean", "null"]}
       }
     }
   }

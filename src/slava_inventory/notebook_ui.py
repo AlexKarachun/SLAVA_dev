@@ -9,15 +9,46 @@ import pandas as pd
 from IPython.display import display
 from ipyevents import Event
 
-from .io_utils import LEXICON_COLUMNS, build_object_lexicon, load_jsonl, save_jsonl, save_lexicon
-from .schema import normalize_inventory_record, validate_inventory
+from .io_utils import (
+    LEXICON_COLUMNS,
+    build_object_lexicon,
+    load_jsonl,
+    save_jsonl,
+    save_lexicon,
+    validate_lexicon_row,
+)
+from .schema import QUOTA_FIELDS, normalize_inventory_record, validate_inventory
 
 
 REVIEW_FIELDS = (
     "usable_for_slava",
     "notes",
     "candidate_slots",
+    "quota_eligibility",
 )
+
+QUOTA_LABELS = {
+    "spatial_relation": "Spatial relation: left/right/on/next_to",
+    "pick_with_distractors": "Pick / object selection среди distractors",
+    "container": "Container: put X in drawer/bowl/basket/sink",
+    "surface": "Surface: put X on plate/tray/table",
+    "has_distractor": "Есть distractor",
+    "same_category_distractor": "Same-category distractor",
+    "same_color_distractor": "Same-color distractor",
+    "ru_case_swap": "ru_case_swap / role-stress",
+    "ru_negation": "ru_negation",
+}
+QUOTA_REQUIREMENTS = {
+    "spatial_relation": 8,
+    "pick_with_distractors": 5,
+    "container": 4,
+    "surface": 3,
+    "has_distractor": 10,
+    "same_category_distractor": 5,
+    "same_color_distractor": 5,
+    "ru_case_swap": 6,
+    "ru_negation": 12,
+}
 
 
 def merge_inventories(data_dir: str | Path) -> pd.DataFrame:
@@ -78,6 +109,28 @@ def create_or_update_lexicon(data_dir: str | Path, df: pd.DataFrame) -> pd.DataF
     rows = build_object_lexicon(df.to_dict(orient="records"), lexicon_path)
     save_lexicon(rows, lexicon_path)
     return pd.DataFrame(rows, columns=LEXICON_COLUMNS)
+
+
+def load_lexicon_dataframe(path: str | Path) -> pd.DataFrame:
+    """Load the current canonical lexicon instead of reusing stale notebook state."""
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Object lexicon not found: {path}")
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    actual_columns = list(df.columns)
+    if actual_columns != LEXICON_COLUMNS:
+        raise ValueError(
+            f"{path}: expected columns {LEXICON_COLUMNS}, got {actual_columns}. "
+            "Rerun section 6 to migrate object_lexicon.csv."
+        )
+    if df.empty:
+        raise ValueError(f"{path}: lexicon is empty")
+    duplicates = df.loc[df["raw_name"].duplicated(), "raw_name"].tolist()
+    if duplicates:
+        raise ValueError(f"{path}: duplicate raw_name values: {duplicates}")
+    for line_number, row in enumerate(df.to_dict(orient="records"), 2):
+        validate_lexicon_row(row, location=f"{path}:{line_number}")
+    return df
 
 
 def _visibility_to_widget(value: Any) -> str:
@@ -562,6 +615,12 @@ class LexiconReviewer:
     def __init__(self, df: pd.DataFrame, path: str | Path):
         if df.empty:
             raise ValueError("Lexicon is empty")
+        actual_columns = list(df.columns)
+        if actual_columns != LEXICON_COLUMNS:
+            raise ValueError(
+                f"Lexicon DataFrame has stale columns {actual_columns}; "
+                f"expected {LEXICON_COLUMNS}. Reload object_lexicon.csv from disk."
+            )
         self.df = df.reset_index(drop=True)
         self.path = Path(path)
         self.position = 0
@@ -569,6 +628,25 @@ class LexiconReviewer:
         self.raw_name = widgets.Text(description="Raw name", disabled=True, layout=widgets.Layout(width="90%"))
         self.category_en = widgets.Text(description="EN category", layout=widgets.Layout(width="90%"))
         self.category_ru = widgets.Text(description="RU category", layout=widgets.Layout(width="90%"))
+        self.semantic_subtype_en = widgets.Text(description="EN subtype", layout=widgets.Layout(width="90%"))
+        self.semantic_subtype_ru = widgets.Text(description="RU subtype", layout=widgets.Layout(width="90%"))
+        self.canonical_name_en = widgets.Text(description="EN canonical", layout=widgets.Layout(width="90%"))
+        self.canonical_name_ru = widgets.Text(description="RU canonical", layout=widgets.Layout(width="90%"))
+        self.visual_attributes_en = widgets.Textarea(
+            description="EN visual", layout=widgets.Layout(width="90%")
+        )
+        self.visual_attributes_ru = widgets.Textarea(
+            description="RU visual", layout=widgets.Layout(width="90%")
+        )
+        self.semantic_recoverable = widgets.Dropdown(
+            options=[
+                ("Review", "review"),
+                ("Yes", "yes"),
+                ("No", "no"),
+            ],
+            description="Semantic visible",
+            style={"description_width": "initial"},
+        )
         self.color_en = widgets.Text(description="EN color", layout=widgets.Layout(width="90%"))
         self.color_ru = widgets.Text(description="RU color", layout=widgets.Layout(width="90%"))
         self.synonyms = widgets.Text(description="RU synonyms", layout=widgets.Layout(width="90%"))
@@ -587,6 +665,13 @@ class LexiconReviewer:
                 self.raw_name,
                 self.category_en,
                 self.category_ru,
+                self.semantic_subtype_en,
+                self.semantic_subtype_ru,
+                self.canonical_name_en,
+                self.canonical_name_ru,
+                self.visual_attributes_en,
+                self.visual_attributes_ru,
+                self.semantic_recoverable,
                 self.color_en,
                 self.color_ru,
                 self.synonyms,
@@ -605,6 +690,15 @@ class LexiconReviewer:
         self.raw_name.value = str(row["raw_name"])
         self.category_en.value = str(row["category_en"] or "")
         self.category_ru.value = str(row["category_ru"] or "")
+        self.semantic_subtype_en.value = str(row["semantic_subtype_en"] or "")
+        self.semantic_subtype_ru.value = str(row["semantic_subtype_ru"] or "")
+        self.canonical_name_en.value = str(row["canonical_name_en"] or "")
+        self.canonical_name_ru.value = str(row["canonical_name_ru"] or "")
+        self.visual_attributes_en.value = str(row["visual_attributes_en"] or "")
+        self.visual_attributes_ru.value = str(row["visual_attributes_ru"] or "")
+        self.semantic_recoverable.value = str(
+            row["semantic_identity_visually_recoverable"] or "review"
+        )
         self.color_en.value = str(row["color_en"] or "")
         self.color_ru.value = str(row["color_ru"] or "")
         self.synonyms.value = str(row["allowed_synonyms_ru"] or "")
@@ -616,6 +710,15 @@ class LexiconReviewer:
         idx = self.position
         self.df.at[idx, "category_en"] = self.category_en.value.strip()
         self.df.at[idx, "category_ru"] = self.category_ru.value.strip()
+        self.df.at[idx, "semantic_subtype_en"] = self.semantic_subtype_en.value.strip()
+        self.df.at[idx, "semantic_subtype_ru"] = self.semantic_subtype_ru.value.strip()
+        self.df.at[idx, "canonical_name_en"] = self.canonical_name_en.value.strip()
+        self.df.at[idx, "canonical_name_ru"] = self.canonical_name_ru.value.strip()
+        self.df.at[idx, "visual_attributes_en"] = self.visual_attributes_en.value.strip()
+        self.df.at[idx, "visual_attributes_ru"] = self.visual_attributes_ru.value.strip()
+        self.df.at[idx, "semantic_identity_visually_recoverable"] = (
+            self.semantic_recoverable.value
+        )
         self.df.at[idx, "color_en"] = self.color_en.value.strip()
         self.df.at[idx, "color_ru"] = self.color_ru.value.strip()
         self.df.at[idx, "allowed_synonyms_ru"] = self.synonyms.value.strip()
@@ -657,6 +760,12 @@ class TopSceneSelector:
             raise ValueError("Inventory is empty")
         if lexicon_df.empty:
             raise ValueError("Object lexicon is empty")
+        actual_columns = list(lexicon_df.columns)
+        if actual_columns != LEXICON_COLUMNS:
+            raise ValueError(
+                f"Object lexicon has stale columns {actual_columns}; "
+                f"expected {LEXICON_COLUMNS}. Reload object_lexicon.csv from disk."
+            )
 
         self.df = df.reset_index(drop=True)
         self.data_dir = Path(data_dir)
@@ -792,12 +901,11 @@ class TopSceneSelector:
             cells = [
                 raw_name,
                 str(obj.get("sim_handle") or ""),
-                str(lexical.get("category_en") or ""),
-                str(lexical.get("category_ru") or ""),
-                str(lexical.get("color_en") or ""),
-                str(lexical.get("color_ru") or ""),
-                str(lexical.get("allowed_synonyms_ru") or ""),
-                str(lexical.get("usable_v0") or ""),
+                *[
+                    str(lexical.get(field) or "")
+                    for field in LEXICON_COLUMNS
+                    if field not in {"raw_name", "notes"}
+                ],
             ]
             rows.append(
                 "<tr>"
@@ -807,12 +915,7 @@ class TopSceneSelector:
         headers = [
             "raw_name",
             "sim_handle",
-            "category_en",
-            "category_ru",
-            "color_en",
-            "color_ru",
-            "allowed_synonyms_ru",
-            "usable_v0",
+            *[field for field in LEXICON_COLUMNS if field not in {"raw_name", "notes"}],
         ]
         return widgets.HTML(
             "<div style='overflow-x:auto'>"
@@ -833,7 +936,10 @@ class TopSceneSelector:
     def _build_card(self, idx: int) -> widgets.Widget:
         row = self.df.loc[idx]
         checkbox = widgets.Checkbox(
-            value=row.get("usable_for_slava") is False,
+            value=(
+                row.get("usable_for_slava") is not None
+                and not bool(row.get("usable_for_slava"))
+            ),
             description="Исключить сцену",
             indent=False,
             style={"description_width": "initial"},
@@ -975,6 +1081,10 @@ class TopSceneSelector:
         self._update_summary()
 
     def _save_clicked(self, button: widgets.Button) -> None:
+        qualifying = set(self.qualifying_indices)
+        for idx in range(len(self.df)):
+            if idx not in qualifying:
+                self.df.at[idx, "usable_for_slava"] = None
         for idx, checkbox in self.checkboxes.items():
             self.df.at[idx, "usable_for_slava"] = not bool(checkbox.value)
         path = self.data_dir / "task_inventory.jsonl"
@@ -988,3 +1098,395 @@ class TopSceneSelector:
 
     def show(self) -> None:
         display(self.widget)
+
+
+class QuotaEligibilityReviewer:
+    """Scene-by-scene quota annotation for usable_for_slava=true records."""
+
+    def __init__(self, df: pd.DataFrame, data_dir: str | Path):
+        self.df = df.reset_index(drop=True)
+        self.data_dir = Path(data_dir)
+        self.indices = [
+            idx
+            for idx in range(len(self.df))
+            if self.df.at[idx, "usable_for_slava"] is not None
+            and bool(self.df.at[idx, "usable_for_slava"])
+        ]
+        if not self.indices:
+            raise ValueError("No scenes have usable_for_slava=true")
+        self.position = 0
+        self.quota_widgets: dict[str, widgets.ToggleButtons] = {}
+
+        self.prev_button = widgets.Button(description="← Previous")
+        self.save_next_button = widgets.Button(
+            description="Save + next →", button_style="success", icon="check"
+        )
+        self.export_button = widgets.Button(
+            description="Save all to task_inventory.jsonl", button_style="info", icon="save"
+        )
+        self.progress = widgets.HTML()
+        self.title = widgets.HTML()
+        self.metadata = widgets.HTML()
+        self.defaults_info = widgets.HTML()
+        self.message = widgets.HTML()
+        self.agent_image = widgets.Image(
+            format="png", layout=widgets.Layout(width="100%", max_width="560px")
+        )
+        self.wrist_image = widgets.Image(
+            format="png", layout=widgets.Layout(width="100%", max_width="420px")
+        )
+        self.wrist_placeholder = widgets.HTML()
+        self.quota_box = widgets.VBox()
+
+        self.prev_button.on_click(self._previous)
+        self.save_next_button.on_click(self._save_next)
+        self.export_button.on_click(self._export)
+
+        self.widget = widgets.VBox(
+            [
+                widgets.HTML(
+                    "<h3>Quota eligibility review</h3>"
+                    "<p>Для каждой допущенной сцены отметьте, подходит ли она под "
+                    "каждую квоту. <b>Нет</b> означает проверенное несоответствие, "
+                    "<b>?</b> — еще не размечено. Незаполненные значения по умолчанию "
+                    "становятся <b>Нет</b>; для следующего init/episode той же задачи "
+                    "сначала копируются ответы предыдущей сцены.</p>"
+                ),
+                widgets.HBox(
+                    [self.prev_button, self.save_next_button, self.export_button]
+                ),
+                self.progress,
+                self.title,
+                self.metadata,
+                self.defaults_info,
+                widgets.HBox(
+                    [
+                        widgets.VBox(
+                            [widgets.HTML("<b>agentview_rgb</b>"), self.agent_image]
+                        ),
+                        widgets.VBox(
+                            [
+                                widgets.HTML("<b>wrist_rgb</b>"),
+                                self.wrist_image,
+                                self.wrist_placeholder,
+                            ]
+                        ),
+                    ],
+                    layout=widgets.Layout(gap="12px", align_items="flex-start"),
+                ),
+                self.quota_box,
+                self.message,
+            ],
+            layout=widgets.Layout(width="100%"),
+        )
+        self._render()
+
+    @staticmethod
+    def _widget_value(value: Any) -> str:
+        if value is True:
+            return "yes"
+        return "no"
+
+    @staticmethod
+    def _quota_value(value: str) -> bool | None:
+        return {"yes": True, "no": False, "pending": None}[value]
+
+    def _current_index(self) -> int:
+        return self.indices[self.position]
+
+    def _load_image(self, relative_path: str | None, target: widgets.Image) -> bool:
+        if relative_path is None:
+            target.value = b""
+            return False
+        path = self.data_dir / relative_path
+        if not path.is_file():
+            target.value = b""
+            return False
+        target.value = path.read_bytes()
+        return True
+
+    def _scene_complete(self, idx: int) -> bool:
+        values = self.df.at[idx, "quota_eligibility"]
+        return all(values.get(field) in (True, False) for field in QUOTA_FIELDS)
+
+    @staticmethod
+    def _scene_key(row: pd.Series) -> tuple[str, int, str]:
+        source = row["source"]
+        return (
+            str(row["suite"]),
+            int(row["task_id"]),
+            str(source["task_name"]),
+        )
+
+    def _effective_values(
+        self, idx: int
+    ) -> tuple[dict[str, bool], int | None, list[str]]:
+        current = self.df.at[idx, "quota_eligibility"] or {}
+        previous_idx: int | None = None
+        if self.position > 0:
+            candidate_idx = self.indices[self.position - 1]
+            if self._scene_key(self.df.loc[candidate_idx]) == self._scene_key(
+                self.df.loc[idx]
+            ):
+                previous_idx = candidate_idx
+        previous = (
+            self.df.at[previous_idx, "quota_eligibility"] or {}
+            if previous_idx is not None
+            else {}
+        )
+        inherited_fields = []
+        effective: dict[str, bool] = {}
+        for field in sorted(QUOTA_FIELDS):
+            if current.get(field) in (True, False):
+                effective[field] = current[field]
+            elif previous.get(field) in (True, False):
+                effective[field] = previous[field]
+                inherited_fields.append(field)
+            else:
+                effective[field] = False
+        return effective, previous_idx, inherited_fields
+
+    def _render(self) -> None:
+        idx = self._current_index()
+        row = self.df.loc[idx]
+        complete = sum(self._scene_complete(scene_idx) for scene_idx in self.indices)
+        self.progress.value = (
+            f"<b>Scene {self.position + 1}/{len(self.indices)} · "
+            f"fully annotated {complete}/{len(self.indices)}</b>"
+        )
+        self.title.value = (
+            f"<h4>{html.escape(str(row['canonical_en']))}</h4>"
+            f"<code>{html.escape(str(row['task_uid']))}</code>"
+        )
+        source = row["source"]
+        state = (
+            f"init_state_id={source['init_state_id']}"
+            if source["environment"] == "LIBERO"
+            else f"episode_id={source['episode_id']} · reset_seed={source['reset_seed']}"
+        )
+        self.metadata.value = (
+            f"<b>suite:</b> {html.escape(str(row['suite']))} · {html.escape(state)}"
+        )
+        images = row["images"]
+        self._load_image(images.get("agentview_rgb"), self.agent_image)
+        wrist_available = self._load_image(images.get("wrist_rgb"), self.wrist_image)
+        self.wrist_placeholder.value = "" if wrist_available else "<i>N/A</i>"
+
+        values, previous_idx, inherited_fields = self._effective_values(idx)
+        if previous_idx is not None and inherited_fields:
+            previous_uid = html.escape(str(self.df.at[previous_idx, "task_uid"]))
+            self.defaults_info.value = (
+                "<p style='color:#475569'>Незаполненные значения перенесены из "
+                f"предыдущего init/episode той же задачи: <code>{previous_uid}</code>. "
+                "Остальные <code>null</code> по умолчанию показаны как "
+                "<b>Не подходит</b>.</p>"
+            )
+        else:
+            self.defaults_info.value = (
+                "<p style='color:#475569'>Все <code>null</code> по умолчанию "
+                "показаны как <b>Не подходит</b>.</p>"
+            )
+        quota_rows = []
+        self.quota_widgets = {}
+        for field in QUOTA_LABELS:
+            toggle = widgets.ToggleButtons(
+                options=[("?", "pending"), ("Подходит", "yes"), ("Не подходит", "no")],
+                value=self._widget_value(values.get(field)),
+                style={"button_width": "115px"},
+                layout=widgets.Layout(width="390px"),
+            )
+            label = widgets.HTML(
+                f"<code>{html.escape(field)}</code><br>"
+                f"<small>{html.escape(QUOTA_LABELS[field])} · "
+                f"minimum {QUOTA_REQUIREMENTS[field]}/20</small>",
+                layout=widgets.Layout(width="520px"),
+            )
+            quota_rows.append(widgets.HBox([label, toggle]))
+            self.quota_widgets[field] = toggle
+        self.quota_box.children = tuple(quota_rows)
+        self.message.value = ""
+
+    def save_current(self) -> None:
+        idx = self._current_index()
+        self.df.at[idx, "quota_eligibility"] = {
+            field: self._quota_value(self.quota_widgets[field].value)
+            for field in sorted(QUOTA_FIELDS)
+        }
+
+    def _previous(self, button: widgets.Button) -> None:
+        self.save_current()
+        self.position = max(0, self.position - 1)
+        self._render()
+
+    def _save_next(self, button: widgets.Button) -> None:
+        self.save_current()
+        export_inventory_dataframe(self.df, self.data_dir / "task_inventory.jsonl")
+        self.position = min(self.position + 1, len(self.indices) - 1)
+        self._render()
+        self.message.value = "<span style='color:green'>Saved to task_inventory.jsonl.</span>"
+
+    def _export(self, button: widgets.Button) -> None:
+        self.save_current()
+        export_inventory_dataframe(self.df, self.data_dir / "task_inventory.jsonl")
+        self.message.value = (
+            "<span style='color:green'>All current quota annotations saved.</span>"
+        )
+
+    def show(self) -> None:
+        display(self.widget)
+
+
+def evaluate_quota_feasibility(
+    df: pd.DataFrame, target_size: int = 20
+) -> dict[str, Any]:
+    """Find an exact target-size subset satisfying every quota minimum."""
+    selected = [
+        (idx, df.loc[idx])
+        for idx in range(len(df))
+        if df.at[idx, "usable_for_slava"] is not None
+        and bool(df.at[idx, "usable_for_slava"])
+    ]
+    counts = {
+        field: sum(row["quota_eligibility"].get(field) is True for _, row in selected)
+        for field in QUOTA_REQUIREMENTS
+    }
+    pending = {
+        field: sum(row["quota_eligibility"].get(field) is None for _, row in selected)
+        for field in QUOTA_REQUIREMENTS
+    }
+    incomplete_scenes = [
+        str(row["task_uid"])
+        for _, row in selected
+        if any(row["quota_eligibility"].get(field) is None for field in QUOTA_REQUIREMENTS)
+    ]
+    result: dict[str, Any] = {
+        "target_size": target_size,
+        "selected_pool_size": len(selected),
+        "counts": counts,
+        "pending": pending,
+        "incomplete_task_uids": incomplete_scenes,
+        "feasible": None,
+        "witness_task_uids": [],
+        "witness_simpler_count": None,
+    }
+    if incomplete_scenes:
+        return result
+    if len(selected) < target_size:
+        result["feasible"] = False
+        return result
+
+    if any(counts[field] < minimum for field, minimum in QUOTA_REQUIREMENTS.items()):
+        result["feasible"] = False
+        return result
+
+    fields = tuple(QUOTA_REQUIREMENTS)
+    exclusion_target = len(selected) - target_size
+    exclusion_allowance = tuple(
+        counts[field] - QUOTA_REQUIREMENTS[field] for field in fields
+    )
+    ordered = sorted(
+        selected,
+        key=lambda item: (
+            item[1]["source"]["environment"] != "SimplerEnv",
+            sum(item[1]["quota_eligibility"][field] is True for field in fields),
+        ),
+    )
+    simpler_total = sum(
+        row["source"]["environment"] == "SimplerEnv" for _, row in selected
+    )
+    simpler_suffix = [0] * (len(ordered) + 1)
+    for position in range(len(ordered) - 1, -1, -1):
+        simpler_suffix[position] = simpler_suffix[position + 1] + int(
+            ordered[position][1]["source"]["environment"] == "SimplerEnv"
+        )
+
+    def search_with_minimum_simpler_exclusions(
+        minimum_simpler_exclusions: int,
+    ) -> tuple[int, ...] | None:
+        memo: set[tuple[int, int, tuple[int, ...], int]] = set()
+
+        def find_exclusions(
+            position: int,
+            remaining_to_exclude: int,
+            excluded_counts: tuple[int, ...],
+            simpler_excluded: int,
+        ) -> tuple[int, ...] | None:
+            if remaining_to_exclude == 0:
+                return () if simpler_excluded >= minimum_simpler_exclusions else None
+            if len(ordered) - position < remaining_to_exclude:
+                return None
+            if (
+                simpler_excluded + simpler_suffix[position]
+                < minimum_simpler_exclusions
+            ):
+                return None
+            state = (
+                position,
+                remaining_to_exclude,
+                excluded_counts,
+                simpler_excluded,
+            )
+            if state in memo:
+                return None
+            memo.add(state)
+
+            idx, row = ordered[position]
+            next_counts = tuple(
+                excluded_counts[field_index]
+                + int(row["quota_eligibility"][field] is True)
+                for field_index, field in enumerate(fields)
+            )
+            if all(
+                next_counts[field_index] <= exclusion_allowance[field_index]
+                for field_index in range(len(fields))
+            ):
+                next_simpler_excluded = simpler_excluded + int(
+                    row["source"]["environment"] == "SimplerEnv"
+                )
+                tail = find_exclusions(
+                    position + 1,
+                    remaining_to_exclude - 1,
+                    next_counts,
+                    next_simpler_excluded,
+                )
+                if tail is not None:
+                    return (idx, *tail)
+
+            return find_exclusions(
+                position + 1,
+                remaining_to_exclude,
+                excluded_counts,
+                simpler_excluded,
+            )
+
+        return find_exclusions(
+            0,
+            exclusion_target,
+            (0,) * len(fields),
+            0,
+        )
+
+    excluded = None
+    maximum_possible_simpler_exclusions = min(simpler_total, exclusion_target)
+    for required_simpler_exclusions in range(
+        maximum_possible_simpler_exclusions, -1, -1
+    ):
+        excluded = search_with_minimum_simpler_exclusions(
+            required_simpler_exclusions
+        )
+        if excluded is not None:
+            break
+    if excluded is None:
+        result["feasible"] = False
+        return result
+    excluded_set = set(excluded)
+    result["feasible"] = True
+    result["witness_task_uids"] = [
+        str(row["task_uid"]) for idx, row in selected if idx not in excluded_set
+    ]
+    result["witness_simpler_count"] = sum(
+        row["source"]["environment"] == "SimplerEnv"
+        for idx, row in selected
+        if idx not in excluded_set
+    )
+    return result

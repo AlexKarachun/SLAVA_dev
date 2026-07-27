@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import append_jsonl, load_jsonl  # noqa: E402
-from slava_inventory.schema import validate_inventory_record  # noqa: E402
+from slava_inventory.schema import empty_quota_eligibility, validate_inventory_record  # noqa: E402
 
 
 SUITES = ("libero_spatial", "libero_object", "libero_goal")
@@ -120,6 +120,7 @@ def collect(args: argparse.Namespace) -> None:
                             "relation": None,
                             "forbidden_candidates": [],
                         },
+                        "quota_eligibility": empty_quota_eligibility(),
                         "usable_for_slava": None,
                         "notes": "",
                     }

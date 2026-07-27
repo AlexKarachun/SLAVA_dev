@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 RECORD_FIELDS = {
     "task_uid",
@@ -16,6 +16,7 @@ RECORD_FIELDS = {
     "objects_raw",
     "success_predicates",
     "candidate_slots",
+    "quota_eligibility",
     "usable_for_slava",
     "notes",
 }
@@ -43,7 +44,23 @@ OBJECT_FIELDS = {
     "visible_wrist",
 }
 SLOT_FIELDS = {"action", "target", "reference", "relation", "forbidden_candidates"}
+QUOTA_FIELDS = {
+    "spatial_relation",
+    "pick_with_distractors",
+    "container",
+    "surface",
+    "has_distractor",
+    "same_category_distractor",
+    "same_color_distractor",
+    "ru_case_swap",
+    "ru_negation",
+}
 VISIBILITY_VALUES = {None, True, False, "visible_partial"}
+
+
+def empty_quota_eligibility() -> dict[str, None]:
+    """Return an unreviewed canonical quota-eligibility object."""
+    return {field: None for field in sorted(QUOTA_FIELDS)}
 
 
 def is_technical_object(sim_handle: Any, raw_name: Any) -> bool:
@@ -174,6 +191,13 @@ def validate_inventory_record(record: dict[str, Any]) -> None:
         raise ValueError(
             "candidate_slots.forbidden_candidates: technical dummy objects are not allowed"
         )
+    quota_eligibility = record["quota_eligibility"]
+    if not isinstance(quota_eligibility, dict):
+        raise ValueError("quota_eligibility: expected an object")
+    _exact_fields(quota_eligibility, QUOTA_FIELDS, "quota_eligibility")
+    for key, value in quota_eligibility.items():
+        if value not in (None, True, False):
+            raise ValueError(f"quota_eligibility.{key}: expected true, false, or null")
     if record["usable_for_slava"] not in (None, True, False):
         raise ValueError("usable_for_slava: expected true, false, or null")
     if not isinstance(record["notes"], str):
@@ -247,6 +271,7 @@ def normalize_inventory_record(record: dict[str, Any]) -> dict[str, Any]:
             }
         )
     slots = record.get("candidate_slots") or {}
+    quota_eligibility = record.get("quota_eligibility") or {}
     target = slots.get("target")
     reference = slots.get("reference")
     normalized = {
@@ -271,6 +296,9 @@ def normalize_inventory_record(record: dict[str, Any]) -> dict[str, Any]:
                 for value in (slots.get("forbidden_candidates") or [])
                 if not is_technical_object(value, value)
             ],
+        },
+        "quota_eligibility": {
+            field: quota_eligibility.get(field) for field in sorted(QUOTA_FIELDS)
         },
         "usable_for_slava": record.get("usable_for_slava"),
         "notes": record.get("notes") or "",

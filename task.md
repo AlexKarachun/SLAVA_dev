@@ -295,7 +295,6 @@ task × init_state
 Формат:
 
 ```json
-upd
 {
   "task_uid": "libero_spatial_003_seed000",
   "suite": "libero_spatial",
@@ -329,42 +328,30 @@ upd
     "relation": null,
     "forbidden_candidates": []
   },
-  "usable_for_slava": null,
-  "notes": ""
-}
-
-old:
-{
-  "task_uid": "libero_spatial_003_seed000",
-  "suite": "libero_spatial",
-  "task_id": 3,
-  "init_state_id": 0,
-  "canonical_en": "put the cream cheese in the bowl",
-  "bddl_file": "...",
-  "images": {
-    "agentview_rgb": "images/libero_spatial_003_seed000_agentview.png",
-    "wrist_rgb": "images/libero_spatial_003_seed000_wrist.png"
-  },
-  "objects_raw": [
-    {
-      "sim_handle": "...",
-      "raw_name": "...",
-      "pose_xyz": [0.0, 0.0, 0.0],
-      "visible_agentview": true,
-      "visible_wrist": false
-    }
-  ],
-  "candidate_slots": {
-    "action": null,
-    "target": null,
-    "reference": null,
-    "relation": null,
-    "forbidden_candidates": []
+  "quota_eligibility": {
+    "spatial_relation": null,
+    "pick_with_distractors": null,
+    "container": null,
+    "surface": null,
+    "has_distractor": null,
+    "same_category_distractor": null,
+    "same_color_distractor": null,
+    "ru_case_swap": null,
+    "ru_negation": null
   },
   "usable_for_slava": null,
   "notes": ""
 }
 ```
+
+`quota_eligibility` фиксирует применимость сцены к квотам v0:
+
+- `true` — сцена подходит под квоту;
+- `false` — проверена и не подходит;
+- `null` — применимость ещё не размечена.
+
+`usable_for_slava` относится к сцене целиком: `true` означает, что сцена
+допущена в selected pool, `false` — исключена, `null` — решение ещё не принято.
 
 Плюс нужен **screenshot sheet**: HTML или PDF-простыня по всем кандидатам:
 
@@ -385,14 +372,24 @@ notes
 
 Формат csv:
 
-```json
-raw_name,category_en,category_ru,color_en,color_ru,allowed_synonyms_ru,usable_v0,notes
-red_mug,mug,кружка,red,красная,"чашка",yes,
-blue_bowl,bowl,миска,blue,синяя,"чаша",yes,
-green_sponge,sponge,губка,green,зелёная,"",yes,
-cream_cheese,cream cheese,сливочный сыр,white,белый,"сыр",no,визуально неочевиден; оставить для hard lexical v1.0
-alphabet_soup,soup can,банка супа,"no",неестественно по-русски
+```csv
+raw_name,category_en,category_ru,semantic_subtype_en,semantic_subtype_ru,canonical_name_en,canonical_name_ru,visual_attributes_en,visual_attributes_ru,semantic_identity_visually_recoverable,color_en,color_ru,allowed_synonyms_ru,usable_v0,notes
+tomato_sauce,can,банка,tomato sauce,томатный соус,tomato sauce can,банка томатного соуса,red cylindrical can with a tomato label,красная цилиндрическая банка с этикеткой с помидором,no,red,красная,консервная банка с томатным соусом,yes,
 ```
+
+Смысл полей:
+
+- `category_*` — общий класс или форм-фактор объекта;
+- `semantic_subtype_*` — конкретный тип или содержимое из metadata;
+- `canonical_name_*` — естественное полное название для инструкций;
+- `visual_attributes_*` — наблюдаемые признаки, не зависящие от чтения
+  semantic subtype;
+- `semantic_identity_visually_recoverable` — можно ли надежно определить
+  semantic subtype по внешнему виду ассета (`yes/no/review`).
+
+Для каждой будущей инструкции отдельно хранится
+`referring_strategy: semantic_subtype | visual_attributes`. Стратегия относится
+к инструкции в конкретной сцене, поэтому в object lexicon ее нет.
 
 Правило:
 

@@ -15,7 +15,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import append_jsonl, load_jsonl  # noqa: E402
-from slava_inventory.schema import is_technical_object, validate_inventory_record  # noqa: E402
+from slava_inventory.schema import (  # noqa: E402
+    empty_quota_eligibility,
+    is_technical_object,
+    validate_inventory_record,
+)
 
 
 TASKS = (
@@ -24,6 +28,14 @@ TASKS = (
     "widowx_stack_cube",
     "widowx_put_eggplant_in_basket",
 )
+BASE_EPISODE_IDS = (0, 8, 16)
+EXTRA_QUOTA_EPISODE_IDS = (1, 4, 12, 20, 23)
+DEFAULT_EPISODE_IDS_BY_TASK = {
+    "widowx_spoon_on_towel": BASE_EPISODE_IDS,
+    "widowx_carrot_on_plate": BASE_EPISODE_IDS + EXTRA_QUOTA_EPISODE_IDS,
+    "widowx_stack_cube": BASE_EPISODE_IDS + EXTRA_QUOTA_EPISODE_IDS,
+    "widowx_put_eggplant_in_basket": BASE_EPISODE_IDS,
+}
 
 
 def git_commit(repository: Path) -> str:
@@ -60,7 +72,12 @@ def collect(args: argparse.Namespace) -> None:
         try:
             env = simpler_env.make(task_name)
             gym_env_name = simpler_env.ENVIRONMENT_MAP[task_name][0]
-            for episode_id in args.episode_ids:
+            episode_ids = (
+                tuple(args.episode_ids)
+                if args.episode_ids is not None
+                else DEFAULT_EPISODE_IDS_BY_TASK[task_name]
+            )
+            for episode_id in episode_ids:
                 uid = f"simpler__{task_name}__episode{episode_id:03d}__seed{args.reset_seed:03d}"
                 if uid in existing:
                     print(f"[skip] {uid}", flush=True)
@@ -123,6 +140,7 @@ def collect(args: argparse.Namespace) -> None:
                             "relation": "on" if "basket" not in task_name else "in",
                             "forbidden_candidates": [],
                         },
+                        "quota_eligibility": empty_quota_eligibility(),
                         "usable_for_slava": None,
                         "notes": "",
                     }
@@ -157,7 +175,17 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-root", type=Path, default=PROJECT_ROOT / "data")
     parser.add_argument("--tasks", nargs="+", choices=TASKS, default=list(TASKS))
-    parser.add_argument("--episode-ids", type=int, nargs="+", default=[0, 8, 16])
+    parser.add_argument(
+        "--episode-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help=(
+            "Override episode IDs for every selected task. By default, use the "
+            "task-specific candidate plan: 0/8/16 for all tasks plus "
+            "1/4/12/20/23 for carrot-on-plate and stack-cube."
+        ),
+    )
     parser.add_argument("--reset-seed", type=int, default=0)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")

@@ -13,12 +13,56 @@ LEXICON_COLUMNS = [
     "raw_name",
     "category_en",
     "category_ru",
+    "semantic_subtype_en",
+    "semantic_subtype_ru",
+    "canonical_name_en",
+    "canonical_name_ru",
+    "visual_attributes_en",
+    "visual_attributes_ru",
+    "semantic_identity_visually_recoverable",
     "color_en",
     "color_ru",
     "allowed_synonyms_ru",
     "usable_v0",
     "notes",
 ]
+LEXICON_REQUIRED_TEXT_COLUMNS = [
+    "raw_name",
+    "category_en",
+    "category_ru",
+    "semantic_subtype_en",
+    "semantic_subtype_ru",
+    "canonical_name_en",
+    "canonical_name_ru",
+    "visual_attributes_en",
+    "visual_attributes_ru",
+]
+
+
+def validate_lexicon_row(
+    row: dict[str, Any], *, location: str = "object_lexicon.csv"
+) -> None:
+    missing = [column for column in LEXICON_COLUMNS if column not in row]
+    if missing:
+        raise ValueError(f"{location}: missing columns {missing}")
+    blank = [
+        column
+        for column in LEXICON_REQUIRED_TEXT_COLUMNS
+        if not str(row.get(column) or "").strip()
+    ]
+    if blank:
+        raise ValueError(f"{location}: empty required fields {blank}")
+    if row["semantic_identity_visually_recoverable"] not in {
+        "yes",
+        "no",
+        "review",
+    }:
+        raise ValueError(
+            f"{location}: semantic_identity_visually_recoverable must be "
+            "yes, no, or review"
+        )
+    if row["usable_v0"] not in {"yes", "no", "review"}:
+        raise ValueError(f"{location}: usable_v0 must be yes, no, or review")
 
 
 def _json_safe(value: Any) -> Any:
@@ -123,6 +167,13 @@ def build_object_lexicon(
                 "raw_name": raw_name,
                 "category_en": names[raw_name],
                 "category_ru": "",
+                "semantic_subtype_en": "",
+                "semantic_subtype_ru": "",
+                "canonical_name_en": names[raw_name],
+                "canonical_name_ru": "",
+                "visual_attributes_en": "",
+                "visual_attributes_ru": "",
+                "semantic_identity_visually_recoverable": "review",
                 "color_en": "",
                 "color_ru": "",
                 "allowed_synonyms_ru": "",
@@ -144,6 +195,7 @@ def save_lexicon(rows: Iterable[dict[str, Any]], path: str | Path) -> None:
             lineterminator="\n",
         )
         writer.writeheader()
-        for row in rows:
+        for line_number, row in enumerate(rows, 2):
+            validate_lexicon_row(row, location=f"{path}:{line_number}")
             writer.writerow({column: row.get(column, "") for column in LEXICON_COLUMNS})
     temp_path.replace(path)
