@@ -225,6 +225,8 @@ def render_scene(
     scene_number: int,
     lexicon: dict[str, dict[str, str]],
     image_sources: dict[tuple[str, str], str | None],
+    *,
+    show_lexicon: bool,
 ) -> str:
     uid = str(record["task_uid"])
     source = record["source"]
@@ -246,6 +248,12 @@ def render_scene(
         },
         ensure_ascii=False,
     ).lower()
+    lexicon_section = ""
+    if show_lexicon:
+        lexicon_section = (
+            "<h3>objects_raw × object_lexicon.csv</h3>"
+            + render_lexicon_table(list(record["objects_raw"]), lexicon)
+        )
     return f"""
     <article class="scene" id="scene-{scene_number}" data-search="{html.escape(search, quote=True)}">
       <div class="scene-head">
@@ -264,8 +272,7 @@ def render_scene(
         {render_image(image_sources[(uid, "agentview_rgb")], "agentview_rgb")}
         {render_image(image_sources[(uid, "wrist_rgb")], "wrist_rgb")}
       </div>
-      <h3>objects_raw × object_lexicon.csv</h3>
-      {render_lexicon_table(list(record["objects_raw"]), lexicon)}
+{lexicon_section}
     </article>
 """
 
@@ -279,13 +286,20 @@ def generate_document(
     heading: str,
     pool_note: str,
     candidates_header: str,
+    show_lexicon: bool = True,
 ) -> str:
     suite_counts = Counter(str(record["suite"]) for record in selected)
     suite_summary = " · ".join(
         f"{html.escape(suite)}: {count}" for suite, count in sorted(suite_counts.items())
     )
     cards = "".join(
-        render_scene(record, number, lexicon, image_sources)
+        render_scene(
+            record,
+            number,
+            lexicon,
+            image_sources,
+            show_lexicon=show_lexicon,
+        )
         for number, record in enumerate(selected, 1)
     )
     quota_summary = render_quota_summary(
@@ -445,6 +459,7 @@ def main() -> None:
         heading=heading,
         pool_note=pool_note,
         candidates_header=candidates_header,
+        show_lexicon=not args.frozen_set,
     )
     output_path.write_text(document, encoding="utf-8")
     if not args.frozen_set:

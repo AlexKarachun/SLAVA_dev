@@ -63,9 +63,9 @@ python scripts/generate_selected_scenes.py
 ```
 
 Это широкая галерея по всем `usable_for_slava=true` кандидатам
-(`docs/index.html`, GitHub Pages). Отдельный лист именно по замороженным 20
-задачам D3 (`data/selected_tasks_v0.jsonl`), с теми же карточками, квотами и
-сводной таблицей заполненности квот:
+(`docs/index.html`, GitHub Pages). Отдельный компактный лист по замороженным 20
+задачам D3 (`data/selected_tasks_v0.jsonl`) содержит изображения, квоты и
+сводную таблицу заполненности квот, но не выводит lexicon-таблицы под сценами:
 
 ```bash
 python scripts/generate_selected_scenes.py \
