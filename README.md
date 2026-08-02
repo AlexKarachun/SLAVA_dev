@@ -61,3 +61,33 @@ python scripts/validate_inventory.py
 ```bash
 python scripts/generate_selected_scenes.py
 ```
+
+Это широкая галерея по всем `usable_for_slava=true` кандидатам
+(`docs/index.html`, GitHub Pages). Отдельный лист именно по замороженным 20
+задачам D3 (`data/selected_tasks_v0.jsonl`), с теми же карточками, квотами и
+сводной таблицей заполненности квот:
+
+```bash
+python scripts/generate_selected_scenes.py \
+  --input data/selected_tasks_v0.jsonl \
+  --output data/selected_tasks_v0.html \
+  --frozen-set
+```
+
+## Ревью видимости объектов
+
+`data/visibility_review.html` — редактируемый дашборд по всем сценам
+inventory: agentview/wrist рендеры и статус `visible_agentview`/`visible_wrist`
+для каждого объекта, с фильтрами по suite/поиску/только-pending/только
+AI-flagged. Изменения статуса накапливаются в браузере и выгружаются кнопкой
+**Download corrections** в `visibility_corrections.json`.
+
+```bash
+python scripts/generate_visibility_review.py \
+  --hints path/to/review_hints.json   # опционально: AI-подсказки для сложных случаев
+
+python scripts/apply_visibility_review.py path/to/visibility_corrections.json
+
+python scripts/sync_selected_tasks_visibility.py   # прокинуть обновлённую
+                                                     # видимость в selected_tasks_v0.jsonl
+```

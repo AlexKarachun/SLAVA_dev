@@ -179,7 +179,12 @@ def render_quota_eligibility(values: dict[str, bool | None]) -> str:
     return f'<div class="quotas"><b>quota_eligibility</b>{content}</div>'
 
 
-def render_quota_summary(selected: list[dict[str, Any]]) -> str:
+def render_quota_summary(
+    selected: list[dict[str, Any]],
+    *,
+    pool_note: str,
+    candidates_header: str,
+) -> str:
     rows = []
     for field, label in QUOTA_LABELS.items():
         actual = sum(
@@ -205,10 +210,9 @@ def render_quota_summary(selected: list[dict[str, Any]]) -> str:
     return (
         '<section class="quota-summary">'
         "<h2>v0 quota coverage</h2>"
-        "<p>Minimums apply to the final 20-task set. Actual counts show eligible "
-        "scenes in the current <code>usable_for_slava=true</code> candidate pool.</p>"
+        f"<p>{html.escape(pool_note)}</p>"
         '<div class="table-wrap"><table class="summary-table"><thead><tr>'
-        "<th>Field</th><th>Quota</th><th>Minimum</th><th>Eligible candidates</th>"
+        f"<th>Field</th><th>Quota</th><th>Minimum</th><th>{html.escape(candidates_header)}</th>"
         "<th>Pending review</th><th>Status</th>"
         "</tr></thead><tbody>"
         + "".join(rows)
@@ -270,6 +274,11 @@ def generate_document(
     selected: list[dict[str, Any]],
     lexicon: dict[str, dict[str, str]],
     image_sources: dict[tuple[str, str], str | None],
+    *,
+    page_title: str,
+    heading: str,
+    pool_note: str,
+    candidates_header: str,
 ) -> str:
     suite_counts = Counter(str(record["suite"]) for record in selected)
     suite_summary = " · ".join(
@@ -279,13 +288,15 @@ def generate_document(
         render_scene(record, number, lexicon, image_sources)
         for number, record in enumerate(selected, 1)
     )
-    quota_summary = render_quota_summary(selected)
+    quota_summary = render_quota_summary(
+        selected, pool_note=pool_note, candidates_header=candidates_header
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SLAVA · selected scenes</title>
+  <title>{html.escape(page_title)}</title>
   <style>
     :root {{ --ink:#172033; --muted:#64748b; --line:#d8dee8; --paper:#fff;
       --canvas:#f3f6fa; --accent:#3157d5; }}
@@ -347,7 +358,7 @@ def generate_document(
 </head>
 <body>
   <header>
-    <h1>SLAVA selected scenes</h1>
+    <h1>{html.escape(heading)}</h1>
     <p>{len(selected)} scenes · {suite_summary}</p>
     <input id="search" type="search" placeholder="Search number, task, object…">
     <span id="shown">{len(selected)} shown</span>
@@ -378,6 +389,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--lexicon", type=Path, default=DEFAULT_LEXICON)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--frozen-set",
+        action="store_true",
+        help=(
+            "Treat --input as an already-frozen task manifest (e.g. "
+            "selected_tasks_v0.jsonl) instead of the full candidate inventory: "
+            "adjusts page title/wording and skips writing .nojekyll."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -401,9 +421,34 @@ def main() -> None:
         inventory_dir=input_path.parent,
         output_dir=output_path.parent,
     )
-    document = generate_document(selected, lexicon, image_sources)
+    if args.frozen_set:
+        page_title = "SLAVA · pilot v0 selected tasks"
+        heading = "SLAVA pilot v0 — selected tasks (D3)"
+        pool_note = (
+            "Minimums apply to this frozen 20-task set "
+            f"({input_path.name}). Counts show eligible scenes within it."
+        )
+        candidates_header = "Eligible in selected set"
+    else:
+        page_title = "SLAVA · selected scenes"
+        heading = "SLAVA selected scenes"
+        pool_note = (
+            "Minimums apply to the final 20-task set. Actual counts show eligible "
+            "scenes in the current usable_for_slava=true candidate pool."
+        )
+        candidates_header = "Eligible candidates"
+    document = generate_document(
+        selected,
+        lexicon,
+        image_sources,
+        page_title=page_title,
+        heading=heading,
+        pool_note=pool_note,
+        candidates_header=candidates_header,
+    )
     output_path.write_text(document, encoding="utf-8")
-    (output_path.parent / ".nojekyll").touch()
+    if not args.frozen_set:
+        (output_path.parent / ".nojekyll").touch()
     print(f"Wrote {len(selected)} selected scenes to {output_path}")
 
 

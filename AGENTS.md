@@ -77,6 +77,9 @@ Vision-Language-Action-моделей. При любой реализации и
 - визуальный review:
   [`data/screenshot_sheet_small.html`](data/screenshot_sheet_small.html),
   [`data/screenshot_sheet_full.html`](data/screenshot_sheet_full.html);
+- редактируемый review видимости объектов (все сцены, все объекты, agent+wrist
+  рендеры, статус можно менять прямо в браузере):
+  [`data/visibility_review.html`](data/visibility_review.html);
 - интерактивный review и top-20 selection:
   [`notebooks/01_collect_and_review_inventory.ipynb`](notebooks/01_collect_and_review_inventory.ipynb);
 - canonical inventory contract:
@@ -97,12 +100,12 @@ selected-task manifest. Готовность этапа определяйте �
 
 - [`data/task_inventory.jsonl`](data/task_inventory.jsonl) — основной
   объединенный inventory и источник истины. После завершения текущего
-  расширения здесь должно быть 112 сцен. Здесь находятся
+  расширения здесь должно быть 117 сцен. Здесь находятся
   `task_uid`, environment metadata, пути к изображениям, реальные sim handles,
   позы, ручная видимость, candidate slots, quota eligibility и решение по
   конкретной сцене `usable_for_slava`.
 - [`data/libero_inventory.jsonl`](data/libero_inventory.jsonl) — collector output
-  для 90 LIBERO-сцен. Используйте для диагностики и повторного merge, но не
+  для 95 LIBERO-сцен. Используйте для диагностики и повторного merge, но не
   переносите его поверх human review из объединенного inventory.
 - [`data/simpler_inventory.jsonl`](data/simpler_inventory.jsonl) — collector
   output; целевой план содержит 22 SimplerEnv-сцены. У WidowX нет wrist camera,
@@ -244,11 +247,13 @@ screenshot review, object lexicon и selected-task manifest.
 
 ## Неизменяемые решения
 
-- Канонический план candidate inventory содержит 112 сцен: 90 LIBERO и 22
+- Канонический план candidate inventory содержит 117 сцен: 95 LIBERO и 22
   SimplerEnv. До выполнения дополнительного SimplerEnv-рендера локальные
   manifests могут временно содержать прежние 102 сцены; не создавайте
   недостающие строки без реального reset и RGB-render.
-- LIBERO использует suites spatial/object/goal и init ids `0, 17, 34`.
+- LIBERO использует suites spatial/object/goal и базовые init ids `0, 17, 34`.
+  Для `libero_spatial` task 2 дополнительно собраны init ids `1, 2, 3, 4, 5`,
+  выбранные для покрытия spatial/surface и distractor-квот.
 - SimplerEnv использует закрепленные `widowx_*` задачи и `reset_seed=0`.
   Базовые episode ids всех четырех задач — `0, 8, 16`; для
   `widowx_carrot_on_plate` и `widowx_stack_cube` дополнительно используются
@@ -418,7 +423,13 @@ Dashboard и screenshot sheet при одинаковых фильтрах об�
   [`src/slava_inventory/notebook_ui.py`](src/slava_inventory/notebook_ui.py);
 - HTML review:
   [`scripts/generate_screenshot_sheet.py`](scripts/generate_screenshot_sheet.py);
-- validation: [`scripts/validate_inventory.py`](scripts/validate_inventory.py).
+- validation: [`scripts/validate_inventory.py`](scripts/validate_inventory.py);
+- редактируемый дашборд по object visibility:
+  [`scripts/generate_visibility_review.py`](scripts/generate_visibility_review.py)
+  → `data/visibility_review.html`, правки применяются через
+  [`scripts/apply_visibility_review.py`](scripts/apply_visibility_review.py), а
+  [`scripts/sync_selected_tasks_visibility.py`](scripts/sync_selected_tasks_visibility.py)
+  прокидывает обновлённую видимость в `data/selected_tasks_v0.jsonl`.
 
 После изменений выполняйте проверки, пропорциональные риску. Особенно берегите
 `data/task_inventory.jsonl`, `data/object_lexicon.csv` и `data/images`: human
