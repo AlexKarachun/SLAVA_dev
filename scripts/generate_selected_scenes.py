@@ -184,15 +184,19 @@ def render_quota_summary(
     *,
     pool_note: str,
     candidates_header: str,
+    show_pending: bool,
 ) -> str:
     rows = []
     for field, label in QUOTA_LABELS.items():
         actual = sum(
             record["quota_eligibility"].get(field) is True for record in selected
         )
-        pending = sum(
-            record["quota_eligibility"].get(field) is None for record in selected
-        )
+        pending_cell = ""
+        if show_pending:
+            pending = sum(
+                record["quota_eligibility"].get(field) is None for record in selected
+            )
+            pending_cell = f"<td>{pending}</td>"
         minimum = QUOTA_MINIMUMS[field]
         met = actual >= minimum
         status_class = "summary-met" if met else "summary-missing"
@@ -203,7 +207,7 @@ def render_quota_summary(
             f"<td>{html.escape(label)}</td>"
             f"<td>{minimum} / 20</td>"
             f"<td>{actual} / {len(selected)}</td>"
-            f"<td>{pending}</td>"
+            f"{pending_cell}"
             f'<td><span class="{status_class}">{html.escape(status)}</span></td>'
             "</tr>"
         )
@@ -213,7 +217,8 @@ def render_quota_summary(
         f"<p>{html.escape(pool_note)}</p>"
         '<div class="table-wrap"><table class="summary-table"><thead><tr>'
         f"<th>Field</th><th>Quota</th><th>Minimum</th><th>{html.escape(candidates_header)}</th>"
-        "<th>Pending review</th><th>Status</th>"
+        + ("<th>Pending review</th>" if show_pending else "")
+        + "<th>Status</th>"
         "</tr></thead><tbody>"
         + "".join(rows)
         + "</tbody></table></div></section>"
@@ -287,6 +292,7 @@ def generate_document(
     pool_note: str,
     candidates_header: str,
     show_lexicon: bool = True,
+    show_pending: bool = True,
 ) -> str:
     suite_counts = Counter(str(record["suite"]) for record in selected)
     suite_summary = " · ".join(
@@ -303,7 +309,10 @@ def generate_document(
         for number, record in enumerate(selected, 1)
     )
     quota_summary = render_quota_summary(
-        selected, pool_note=pool_note, candidates_header=candidates_header
+        selected,
+        pool_note=pool_note,
+        candidates_header=candidates_header,
+        show_pending=show_pending,
     )
     return f"""<!doctype html>
 <html lang="en">
@@ -460,6 +469,7 @@ def main() -> None:
         pool_note=pool_note,
         candidates_header=candidates_header,
         show_lexicon=not args.frozen_set,
+        show_pending=not args.frozen_set,
     )
     output_path.write_text(document, encoding="utf-8")
     if not args.frozen_set:
