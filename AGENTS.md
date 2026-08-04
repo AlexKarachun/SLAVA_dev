@@ -1032,6 +1032,22 @@ annotations и локальные рендеры нельзя восстанав
   дописывать абзац сверху), когда заводить/расширять skill вместо нового,
   структура самодостаточного стартового промпта для следующего чата.
 
+Кроме `slava-*`, в `.claude/skills/` также лежат 14 сторонних skills из
+[obra/superpowers](https://github.com/obra/superpowers) (`brainstorming`,
+`writing-plans`, `executing-plans`, `test-driven-development`,
+`systematic-debugging`, `verification-before-completion`,
+`subagent-driven-development`, `dispatching-parallel-agents`,
+`requesting-code-review`/`receiving-code-review`, `using-git-worktrees`,
+`finishing-a-development-branch`, `using-superpowers`, `writing-skills`) —
+общая методология разработки (TDD, поиск root cause, план перед кодом,
+верификация перед заявлением "готово"), не специфичная для SLAVA. Скопированы
+руками (не через `claude plugin install`), чтобы уехать вместе с `git clone`
+на другую машину — источник, версия, коммит и лицензия (MIT) записаны в
+`.claude/skills/THIRD_PARTY_NOTICES.md`. Это вендоренный снепшот: не
+редактировать их как `slava-*` (новые находки/поправки — в апстрим или в
+отдельный `slava-*`-skill, если это специфично для проекта), обновлять через
+переустановку/повторное копирование, не ручным патчем.
+
 Эти файлы — не статичная документация. Когда в ходе работы находится новое
 устойчивое правило, исключение или ошибка (как случай `__middle_drawer` vs
 `wooden_cabinet_1_middle_region`, или пропущенный `bottom_region`), агент
