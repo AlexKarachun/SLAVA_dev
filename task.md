@@ -596,9 +596,135 @@ token_len
 
 Почему bbox не обязателен: первые поведенческие метрики считаются из sim-состояния - поз, контактов и предикатов. Картинка нужна модели, sim_handle нужен авторазметчику, а маски нужны только для позднего visual oracle.
 
-Шаблон:
-
 ```yaml
+upd
+task_uid: libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001
+suite: libero_spatial
+task_id: 2
+init_state_id: 1
+frame_version: "0.2"
+canonical_en: "pick up the black bowl from table center and place it on the plate"
+bddl_file: "libero/libero/bddl_files/libero_spatial/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate.bddl"
+
+# init_state_id/bddl_file — только LIBERO, null для SimplerEnv.
+# episode_id/reset_seed/gym_env_name — только SimplerEnv, null для LIBERO.
+environment: LIBERO
+commit: "8f1084e3132a39270c3a13ebe37270a43ece2a01"
+task_name: pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate
+episode_id: null
+reset_seed: null
+gym_env_name: null
+
+images:
+  agentview_rgb: images/libero/libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__agentview.png
+  wrist_rgb: images/libero/libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__wrist.png
+  agentview_segmentation: null
+  wrist_segmentation: null
+  depth: null
+
+scene:
+  objects:
+    - id: akita_black_bowl_1
+      sim_handle: akita_black_bowl_1
+      raw_name: akita_black_bowl
+      category_en: bowl
+      category_ru: миска
+      color_en: black
+      color_ru: черная
+      pose_xyz_initial: [-0.075, -0.003, 0.97]
+      visible_agentview: true
+      visible_wrist: true
+      bbox2d_agentview: null
+      mask_id_agentview: null
+      role: target
+
+    - id: plate_1
+      sim_handle: plate_1
+      raw_name: plate
+      category_en: plate
+      category_ru: тарелка
+      color_en: white
+      color_ru: белая
+      pose_xyz_initial: [0.068, 0.187, 0.97]
+      visible_agentview: true
+      visible_wrist: visible_partial
+      bbox2d_agentview: null
+      mask_id_agentview: null
+      role: reference
+
+    - id: akita_black_bowl_2
+      sim_handle: akita_black_bowl_2
+      raw_name: akita_black_bowl
+      category_en: bowl
+      category_ru: миска
+      color_en: black
+      color_ru: черная
+      pose_xyz_initial: [0.019, 0.306, 0.97]
+      visible_agentview: true
+      visible_wrist: visible_partial
+      bbox2d_agentview: null
+      mask_id_agentview: null
+      role: distractor
+
+    - id: wooden_cabinet_1
+      sim_handle: wooden_cabinet_1
+      raw_name: wooden_cabinet
+      category_en: cabinet
+      category_ru: шкаф
+      color_en: black
+      color_ru: черный
+      pose_xyz_initial: [0.036, -0.278, 0.905]
+      visible_agentview: true
+      visible_wrist: visible_partial
+      bbox2d_agentview: null
+      mask_id_agentview: null
+      role: background
+
+slots:
+  action: pick_place
+  target: akita_black_bowl_1
+  reference: plate_1
+  relation: on
+  forbidden: [akita_black_bowl_2]
+  success_predicates:
+    - type: spatial_relation
+      relation: on
+      arg1: akita_black_bowl_1
+      arg2: plate_1
+    # type: state — для задач без пары объектов (open/turn_on):
+    #   - type: state
+    #     predicate: open
+    #     arg1: wooden_cabinet_1_middle_region
+
+variants:
+  en_canonical: "pick up the black bowl from table center and place it on the plate"
+  en_paraphrase: "grab the black bowl at the center of the table and set it on the plate"
+  mt_russian: null
+  ru_literal: "подними черную миску по центру стола и поставь ее на тарелку"
+  ru_free_order: "черную миску по центру стола подними и поставь на тарелку"
+  ru_case_swap: "поставь тарелку на черную миску по центру стола"
+  ru_negation: "подними не ту миску, что рядом с формочкой, а ту, что по центру стола, и поставь на тарелку"
+  code_switch: "подними black bowl по центру стола и поставь на plate"
+  ru_translit: "podnimi chernuyu misku po tsentru stola i postav ee na tarelku"
+  ru_colloquial: "подними-ка черную миску по центру стола и поставь ее на тарелку"
+  ru_anaphora: null
+
+mt_metadata: null
+
+axis_na:
+  ru_anaphora: "en_canonical/ru_literal уже используют явную анафору ('...place it on the plate' / '...поставь ее на тарелку') для этого двухшагового действия; отдельный ru_anaphora не даст содержательного контраста с ru_literal."
+
+validation:
+  author: "claude-sonnet-5 (llm draft, pending human review + native check)"
+  native_check: passed
+  naturalness: {ru_literal: 5, ru_free_order: 5, ru_case_swap: 4, ru_negation: 5, code_switch: 4, ru_colloquial: 5}
+  equivalence: {ru_literal: 5, ru_free_order: 5, ru_case_swap: 4, ru_negation: 5, code_switch: 5, ru_colloquial: 5}
+  ambiguity:   {ru_literal: 5, ru_free_order: 5, ru_case_swap: 5, ru_negation: 5, code_switch: 5, ru_colloquial: 5}
+  notes: "mt_russian requires a real MT pass (e.g. Google Translate), not authored by the LLM draft. All RU variants are LLM drafts pending human native check before freeze."
+
+token_len: {}
+
+old
 task_uid: libero_spatial_003_seed000
 suite: libero_spatial
 task_id: 3
@@ -694,6 +820,8 @@ validation:
 
 token_len: {}
 ```
+
+Шаблон:
 
 # Instruction variants для v0
 

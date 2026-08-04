@@ -11,6 +11,213 @@
 валидаторы и артефакты приведите в согласованное состояние. Неизменяемые
 научные или data-contract решения меняйте только осознанно и явно.
 
+## Текущее состояние проекта (актуализируется агентом)
+
+Этот раздел — единственный persistent handoff по текущему шагу работы: если
+пользователь в начале нового чата попросит просто прочитать `AGENTS.md`, весь
+нужный контекст должен быть здесь, а не в отдельном файле-снапшоте (`expl.md`
+существовал раньше именно как такой файл и был сознательно удалён —
+предполагается, что этот раздел заменяет его целиком, без отдельного
+handoff-файла). Актуальность этого раздела важнее его краткости.
+
+**Этап:** D4 (grounded semantic frames + instruction variants), после
+закрытого D3 (`data/selected_tasks_v0.jsonl`, 20 задач: 16 LIBERO + 4
+SimplerEnv). Порядок этапов — в "Порядок построения benchmark" ниже.
+
+**`data/frames_v0.jsonl`** — 20 фреймов, схема v0.2, полностью проходит
+`scripts/validate_frames.py`. **Все поля контента теперь реально заполнены,
+включая `mt_russian`** (см. ниже) — Tier-1 variants, три
+"желательных"/exploratory варианта (`ru_translit`, `ru_colloquial`,
+`ru_anaphora`, заполнены или обоснованно `axis_na`), `token_len` и
+`mt_russian`/`mt_metadata`. Правила авторинга (транслитерационная схема,
+`-ка`-стратегия для colloquial, критерии применимости anaphora) — в skill
+`slava-instruction-variants`. Дашборд (`scripts/generate_frames_review.py`):
+`ru_colloquial`/`ru_anaphora` в `SCORED_VARIANTS` (получают
+naturalness/equivalence/ambiguity), `ru_translit` в `TEXT_VARIANTS` без
+скоринга (как `en_paraphrase` — механический transform, скорить нечего).
+`validation.native_check` выставлен `"passed"` на всех 20 записях. RU Tier-1
+варианты были LLM draft, но пользователь лично просмотрел все переформулировки
+промптов и подтвердил, что LLM-draft оценок и его личного просмотра
+достаточно для human-verified native check — формальный построчный проход по
+`data/frames_review.html` с расстановкой оценок не потребовался. `validation.
+author`/`validation.notes` в `data/frames_v0.jsonl` обновлены под всех 20
+записях, чтобы отражать это честно (не "pending human review", а
+"human-verified by project owner"). Вопрос закрыт, freeze разблокирован.
+
+**Прошёл полный ручной+программный аудит всех 20 фреймов** (по явному
+запросу пользователя, высокий recall, "передаём данные другой команде"):
+`scene.objects` сверены с `object_lexicon.csv` программно (category/color,
+0 расхождений); полнота `scene.objects` против `task_inventory.jsonl`
+проверена (0 missing/extra sim_handle); все `variants`, включая
+`code_switch`, построчно сверены с лексиконом (правило — EN NP должна
+совпадать со словом, которое уже использует `en_canonical`/`en_paraphrase`
+для этого объекта, обычно `canonical_name_en`, но иногда `semantic_subtype_
+en` или урезанная форма без модификатора — см. skill
+`slava-instruction-variants`). В процессе аудита исправлено: `distractor`
+vs `background` роль переразмечена по всем сценам (см. ниже); `ru_case_swap`
+у `pick_up_the_black_bowl...` (была потеряна позиционная привязка «по
+центру стола», из-за чего цель не отличалась от дистрактора — той же
+черной миски); устаревшие draft-оценки `push_the_plate...__init034`
+(текст уже был исправлен раньше, оценки — нет); `ru_negation` у
+`pick_up_the_milk...` (generic «сок» → лексиконный «апельсиновый сок»);
+`flat_stove` везде теперь называется по `canonical_name_ru`
+(«электроплитка»)/`allowed_synonyms_ru` («настольная плита» в colloquial),
+а не по широкой `category_ru` («плита») — было расхождение с лексиконом,
+пользователь подтвердил, что нужно поправить; заодно `en_paraphrase` для
+`push_the_plate...` (`shove` → `slide`, чтобы не добавлять оттенок силы,
+которого нет в `push`). Ноль оценок `naturalness`/`equivalence`/`ambiguity`
+ниже порога 4 в текущем состоянии файла.
+
+**Проверено и сознательно НЕ считается багом:** 4 задачи с корзиной
+(`butter`/`cream_cheese`/`milk`/`tomato_sauce`) называют объект по
+`semantic_subtype` (масло/сливочный сыр/...), хотя
+`semantic_identity_visually_recoverable=no` в лексиконе для всех этих
+объектов (подпись на упаковке физически неразличима на рендере) — RU здесь
+обязан зеркалить `en_canonical` (буквальное неизменяемое имя LIBERO-таски),
+которое тоже называет объект по subtype; ограничение симметрично в EN/RU,
+значит не искажает Δlang, но стоит помнить при интерпретации результатов
+этих 4 сцен.
+
+**Оставшийся мягкий пункт, не блокирующий:** `ru_negation` у
+`widowx_stack_cube` (4 сцены) использует слово «желтый» дважды в разных
+ролях (forbidden-объект и reference для размещения) — формулировка после
+переупорядочивания в эту же сессию («возьми не желтый, а зеленый кубик и
+поставь на желтый») стала яснее прежней, но draft-оценка `naturalness: 4`
+(не 5) не пересчитывалась — можно перепроверить при желании, `native_check`
+это не блокирует (порог `>=4` пройден).
+
+**Вопрос направления шкалы `ambiguity` — решён.** Пользователь подтвердил:
+выше = чётче/однозначнее (5 = максимально однозначно), как и были проставлены
+все текущие draft-оценки. Менять данные не потребовалось.
+
+**QA pipeline из `task.md` (16 пунктов) сверен построчно с `validate_frames.py`
+и `frames_schema.py` — все 16 пунктов теперь реализованы и зелёные**
+(файлы картинок, sim_handle против `task_inventory.jsonl`, уникальность id,
+target/reference/forbidden-контракт, реестры action/relation, непустые
+success_predicates, реестр variants, `ru_negation`⇄`forbidden`,
+`ru_case_swap`⇄`axis_na`, native_check status, `axis_na`-reason, и —
+закрыто позже, в отдельной сессии — пункт 14, `token_len` для реальных
+токенизаторов, см. ниже).
+
+**`data/selected_tasks_v0.jsonl` (D3) отдельно перепроверен и подтверждён
+корректным.** Важно: у D3 в `task.md` нет отдельной JSON-схемы — это
+заморозка отобранных строк `task_inventory.jsonl` (`usable_for_slava=true`),
+поэтому правильный контракт для него — тот же `schemas/task_inventory.
+schema.json`, не что-то новое; `validate_inventory()` на нём зелёный. Также
+подтверждено: 16 LIBERO + 4 SimplerEnv; все 9 квот из `task.md` выполнены
+(ни одна не ниже минимума, `container` впритык 4/4); ни одного `null` в
+`quota_eligibility`; все `usable_for_slava=true`; `task_uid` уникальны;
+`init_state_id`/`episode_id` — только из зафиксированных в "Неизменяемые
+решения" наборов; `source.commit` совпадает с пинами в `scripts/bootstrap.sh`;
+множество `task_uid` в `selected_tasks_v0.jsonl` и `frames_v0.jsonl`
+идентично (0 потерянных/лишних сцен между D3 и D4).
+
+**Актуальный шаблон схемы фрейма v0.2** пользователь сам вставил в `task.md`
+(строки ~600-727: новый YAML-пример с `mt_metadata`/`token_len`, старый
+пример помечен `old` следом). Синхронизация с `schemas/frames_v0.schema.json`
+подтверждена. В `task.md` остались висящие маркеры-слова `upd`/`old` прямо в
+тексте (как минимум строки ~298, ~600, ~727) — спросили пользователя явно:
+он подтвердил, что `task.md` не трогаем в принципе, это его внешний источник
+истины и условие проекта. Оставлено как есть окончательно, не поднимать
+снова.
+
+**Git:** весь D4-pipeline пока не закоммичен (`data/frames_v0.jsonl`,
+`data/frames_review.html`, `data/prompts_v0.jsonl`,
+`schemas/frames_v0.schema.json`,
+`scripts/build_frames_v0.py`/`validate_frames.py`/`generate_frames_review.py`/
+`apply_frames_review.py`/`compute_token_len.py`/`export_prompts.py`/
+`run_mt_translate.py`,
+`src/slava_inventory/frames_schema.py`, `.claude/skills/`,
+`requirements-tokenizers.txt`) — все untracked. Ждут явной команды
+пользователя на коммит. `task.md`/`README.md` пользователь уже обновил сам
+под схему v0.2 — синхронизированы с `schemas/frames_v0.schema.json`.
+`data/HOPE_3D_models/` (209 МБ) сознательно не в git. Новое:
+`.venv-tokenizers/` (локальный venv для `compute_token_len.py`,
+`transformers`/`huggingface_hub`/`sentencepiece`) — `python -m venv` сам
+создаёт внутри `.venv-tokenizers/.gitignore` с `*`, в git не попадёт и не
+должен.
+
+**`token_len`/`token_len_metadata` теперь реальные** (закрыто в этой сессии,
+не эвристика). Схема и ключи-токенизаторы task.md не задавал явно — решены с
+пользователем в чате и записаны как источник истины в
+`src/slava_inventory/frames_schema.py` (`TOKEN_LEN_TOKENIZERS`,
+`TOKEN_LEN_CHECKPOINTS`): `qwen3_vl` (`Qwen/Qwen3-VL-4B-Instruct`, покрывает
+и GreenVLA), `openvla_oft`
+(`moojink/openvla-7b-oft-finetuned-libero-spatial-object-goal-10` —
+официальный OFT-чекпойнт именно под наши LIBERO spatial/object/goal сьюты,
+покрывает и Prismatic), `paligemma` (`google/paligemma-3b-pt-224`, gated —
+покрывает и π0/π0.5, у них тот же gemma-токенизатор), `smolvla`
+(`HuggingFaceTB/SmolVLM2-500M-Video-Instruct`). Форма — `token_len:
+{tokenizer_key: {variant_key: int}}`, посчитано для всех заполненных на
+данный момент `variants.*` (не для `mt_russian`, он всё ещё `null`).
+Подробности, известные грабли (lerobot pi0/smolvla не хранят собственный
+tokenizer.json, `trust_remote_code=False` для openvla-oft) и когда
+пере-запускать — в skill `slava-token-len`. Инструмент —
+[`scripts/compute_token_len.py`](scripts/compute_token_len.py), гоняется из
+отдельного gitignored venv `.venv-tokenizers/` (тяжёлая зависимость
+`transformers`, сознательно не в `requirements-notebook.txt`):
+`.venv-tokenizers/bin/python scripts/compute_token_len.py`, затем обычный
+`python3 scripts/validate_frames.py`. `google/paligemma-3b-pt-224` — gated,
+для скачивания нужен HF-аккаунт с принятой лицензией PaliGemma
+(`huggingface-cli login`); у пользователя уже есть.
+
+**`mt_russian` теперь реальный** (закрыто в этой сессии). Google Translate
+API не подошёл пользователю (биллинг/доступ) — переключились на DeepL API
+по его явному выбору; ключ передан через переменную окружения
+`DEEPL_API_KEY` (сначала пользователь один раз вставил ключ текстом в чат —
+это зафиксировано как небезопасное, ключ рекомендовано отозвать/перевыпустить,
+новый задан только через env var). Инструмент —
+[`scripts/run_mt_translate.py`](scripts/run_mt_translate.py): сырой перевод
+`variants.en_canonical`, без редактуры (по правилу task.md), header-based
+DeepL-авторизация (form-body деприкейчен с ноября 2025), `api-free.deepl.com`
+(free-tier ключ, суффикс `:fx`). `mt_metadata` = `{"system": "DeepL API
+(api-free.deepl.com, EN->RU)", "date": ...}`. Важная находка: у пользователя
+шелл по умолчанию — fish, ключ задан как `set -Ux` (fish universal
+variable) — invisible для bash/zsh-процессов, которыми пользуется этот
+харнесс; MT-скрипт нужно гонять через `fish -c '...'`, не напрямую. Raw
+DeepL-вывод оставлен как есть, включая наблюдаемую непоследовательность
+между похожими предложениями (`"со средины стола"` vs `"со середины
+стола"` для двух пар init state одной задачи) — это ожидаемое поведение
+сырого MT, не баг. Все грабли — в skill `slava-mt-russian`. После MT-прогона
+`token_len` пересчитан (`compute_token_len.py`, добавилась колонка
+`mt_russian`), `validate_frames.py` зелёный.
+
+**`scripts/export_prompts.py` теперь существует** (закрыто в этой сессии).
+Формат task.md не задавал (только "есть export_prompts.py" и "первые prompts
+для OpenVLA/GreenVLA-style eval") — решено с пользователем: JSONL, одна
+строка на `(task_uid, variant)`, 7 primary-вариантов — 6 из "Сначала
+затравка" (`en_canonical`, `en_paraphrase`, `ru_literal`, `ru_case_swap`,
+`ru_negation`, `code_switch`) плюс `mt_russian` (добавлен по решению
+пользователя, как только перестал быть `null` — у него своя строка в
+"Table - behavioral pilot"). `axis_na`-варианты у конкретной сцены
+пропускаются (не эмитятся как `null`-промпты). Выход —
+[`data/prompts_v0.jsonl`](data/prompts_v0.jsonl), 127 строк из 20 сцен × 7
+вариантов минус axis_na (`ru_case_swap` заполнен у 8/20, `ru_negation` у
+19/20 — совпадает с минимальными квотами `task.md`; `mt_russian` у всех
+20/20). Каждая строка несёт не только `instruction`, но и reset-metadata
+(`bddl_file`/`init_state_id` или `episode_id`/`reset_seed`/`gym_env_name`) и
+`target_object`/`reference_object`/`forbidden_objects`/`success_predicates`
+— то, что нужно eval harness для авторазметки роллаута по
+`rollout_annotations.jsonl` контракту из `task.md`, не только текст промпта.
+
+**QA pipeline `task.md` теперь полностью закрыт, включая native check.**
+Все 16 пунктов чеклиста зелёные; пользователь лично просмотрел RU
+переформулировки промптов и явно подтвердил, что это достаточно как
+human-verified native check (не требуется формальный построчный проход по
+`data/frames_review.html`) — `validation.author`/`validation.notes` в
+`data/frames_v0.jsonl` обновлены под всех 20 записях, чтобы это отражать
+честно. Направление шкалы `ambiguity` тоже подтверждено (выше = чётче).
+`task.md` содержит висящие маркеры `upd`/`old` (см. выше) — пользователь
+явно попросил не трогать этот файл, оставлено окончательно. Freeze tag
+`slava-pilot-v0` проставлен по итогам этого явного согласия.
+
+**Следующий крупный блок работы:** первые model rollouts —
+`rollout_annotations.jsonl`, rollout logger, метрики из "Table - behavioral
+pilot"/"Table - cleaned language effect" в `task.md`. Ничего из этого не
+начато, не начинать без явной просьбы пользователя. Масштабирование
+pipeline на ~200 сцен — тоже отдельный будущий блок, не путать с first
+rollouts.
+
 ## Главный принцип: это VLA-бенчмарк
 
 SLAVA строится как исследовательский benchmark для
@@ -35,6 +242,43 @@ Vision-Language-Action-моделей. При любой реализации и
   валидности VLA-бенчмарка. Если общее software-решение конфликтует с
   benchmark design, явно покажите конфликт и сохраните научный смысл.
 
+## `task.md` — контракт, от которого нельзя отходить молча
+
+[`task.md`](task.md) не справочный документ, а source of truth по структурам
+данных, схемам, квотам и процессу, из которого копируются реальные
+формулировки в другие места (внешний источник пользователя, из которого он
+сам вставляет актуальные разделы в `task.md`). Результат этой работы передаётся
+следующим людям, у которых не будет истории этого диалога — они будут
+ориентироваться только на `task.md` и на данные/код, которые ему соответствуют.
+Поэтому:
+
+- не изобретайте собственные названия полей, id-схемы, соглашения об
+  именовании или структуры данных там, где `task.md` уже даёт пример или
+  правило — даже если своя схема кажется чище или удобнее в реализации.
+  Пример такой ошибки из этой сессии: `build_frames_v0.py` завёл id
+  `wooden_cabinet_1__middle_drawer` вместо того, чтобы использовать реальное
+  имя BDDL-региона `wooden_cabinet_1_middle_region`, уже присутствующее в
+  `data/libero_bddl` и в `success_predicates` исходного inventory — костыль,
+  который расходился и с `task.md`, и с физической средой;
+- если для конкретного случая `task.md` не даёт прямого примера (как было с
+  `type: state` для success_predicates у `open`/`turn_on`), расширяйте
+  структуру в согласии с духом существующего контракта, а не произвольно;
+  явно проговорите это с пользователем, а не решайте молча;
+  расхождение самого `task.md` (например, отсутствие `ambiguity` в YAML-примере
+  при том, что раздел "Native check" требует три оценки) фиксируйте как
+  находку, а не тихо исправляйте под себя;
+- если требование пользователя или реальность (среда, BDDL, рендеры) всё же
+  вынуждают отойти от `task.md` содержательно — не просто в деталях
+  реализации, а в структуре данных, схеме, названии поля или процессе —
+  **обязательно скажите об этом пользователю отдельно и явно**, до того как
+  закрепите это в коде/данных. Ему нужно успеть обновить свой внешний источник
+  `task.md`, иначе следующая сессия снова разойдётся с ним;
+- если расхождение с `task.md` уже существует на диске (например, раздел
+  устарел, потому что пользователь ещё не перенёс туда согласованные в чате
+  правки), не выбирайте эту рассинхронизацию как разрешение изобретать что-то
+  третье — по возможности ориентируйтесь на актуальную договорённость из
+  диалога и явно напомните об открытом расхождении.
+
 ## Как помогать пользователю
 
 Пользователь ведет исследовательский проект и предпочитает совместную,
@@ -42,6 +286,9 @@ Vision-Language-Action-моделей. При любой реализации и
 
 - По умолчанию общайтесь по-русски.
 - Сначала сообщайте конкретный результат или диагноз, затем необходимые детали.
+- Пользователь предпочитает короткие ответы связным текстом абзацами, а не
+  списками/буллитами. Списки уместны только когда перечисление явно уместнее
+  прозы (например, построчная сверка пунктов чек-листа).
 - Объясняйте поля и решения на реальных примерах из SLAVA, а не только
   абстрактными определениями.
 - Для ручной разметки предпочитайте удобные визуальные интерфейсы: карточки,
@@ -84,6 +331,43 @@ Vision-Language-Action-моделей. При любой реализации и
   [`notebooks/01_collect_and_review_inventory.ipynb`](notebooks/01_collect_and_review_inventory.ipynb);
 - canonical inventory contract:
   [`schemas/task_inventory.schema.json`](schemas/task_inventory.schema.json);
+- замороженный D3 manifest (20 задач): [`data/selected_tasks_v0.jsonl`](data/selected_tasks_v0.jsonl),
+  человекочитаемый лист с квотами: [`data/selected_tasks_v0.html`](data/selected_tasks_v0.html);
+- grounded semantic frames v0.2 (target/reference/relation/forbidden + Tier-1
+  instruction variants на каждую из 20 сцен): [`data/frames_v0.jsonl`](data/frames_v0.jsonl),
+  contract: [`schemas/frames_v0.schema.json`](schemas/frames_v0.schema.json). Верхний
+  уровень фрейма сделан плоским буквально по шаблону из `task.md`
+  (`task_uid`/`suite`/`task_id`/`init_state_id`/`frame_version`/`canonical_en`/
+  `bddl_file`, без вложенного `source`), расширен `environment`/`commit`/`task_name`/
+  `episode_id`/`reset_seed`/`gym_env_name` (`null` для чужого суита) для
+  воспроизводимости SimplerEnv-сцен и `mt_metadata` под будущий реальный MT-прогон.
+  `scene.objects[].role` — только `target`/`reference`/`distractor`/`background`, как
+  в шаблоне; `forbidden` — не роль, а независимый список id в `slots.forbidden`
+  (объект с ролью `distractor` или `reference`, явно названный в `ru_negation`).
+  `slots.success_predicates` — структурированные (`type: spatial_relation` с
+  `relation`/`arg1`/`arg2`, либо `type: state` для `open`/`turn_on` — второй тип
+  шаблон не покрывал явно), ссылаются на `id` из `scene.objects`, а не на сырые
+  BDDL-регионы. Собран скриптом
+  [`scripts/build_frames_v0.py`](scripts/build_frames_v0.py) как LLM draft
+  (`validation.native_check="pending"` везде, `mt_russian`/`mt_metadata` всегда
+  `null` при регенерации — нужен реальный MT-прогон, а не LLM-перевод, ещё не
+  начат, заблокирован на доступе пользователя к Google Translate API).
+  Валидация — [`scripts/validate_frames.py`](scripts/validate_frames.py):
+  схема + физическое наличие картинок + сверка `sim_handle` с
+  `task_inventory.jsonl` (правила 1–2 из QA-чеклиста `task.md`); `token_len`
+  теперь тоже реальный (не эвристика) — считает
+  [`scripts/compute_token_len.py`](scripts/compute_token_len.py) из
+  отдельного venv `.venv-tokenizers/`, см. skill `slava-token-len`. Перед
+  freeze обязательны ручная доводка и native check по правилам из `task.md`
+  ("Native check"), удобно делать в
+  [`data/frames_review.html`](data/frames_review.html)
+  (генератор [`scripts/generate_frames_review.py`](scripts/generate_frames_review.py),
+  применение правок [`scripts/apply_frames_review.py`](scripts/apply_frames_review.py));
+- плоские prompts для первых roll-out'ов (JSONL, один `(task_uid, variant)`
+  на строку, 6 primary-вариантов из "Сначала затравка" `task.md`, с
+  reset-metadata и target/reference/forbidden/success_predicates для
+  авторазметки): [`data/prompts_v0.jsonl`](data/prompts_v0.jsonl), генератор
+  [`scripts/export_prompts.py`](scripts/export_prompts.py);
 - подробный research и benchmark plan: [`task.md`](task.md);
 - deployment и pinned dependencies: [`scripts/bootstrap.sh`](scripts/bootstrap.sh).
 
@@ -356,6 +640,67 @@ object lexicon и все доступные RGB-ракурсы. Название
 помечайте в `notes`; не превращайте их в общее правило без повторяемого
 основания.
 
+### Мнемоническое правило для frames_v0: составные объекты (несколько ручек/ящиков)
+
+Когда target или forbidden — это не отдельный физический объект, а адресуемая
+часть одного составного объекта (например, конкретный ящик шкафа `wooden_cabinet`
+с несколькими ящиками), в `scene.objects` заводятся синтетические под-объекты с
+общим `sim_handle`, но разными `id`. `id` должен буквально совпадать с полным
+именем BDDL-региона фикстуры (`:target wooden_cabinet_1` + имя региона из
+`:regions`, склеенные через одно подчёркивание — например `wooden_cabinet_1_middle_region`
+/ `wooden_cabinet_1_top_region`, как в
+`data/libero_bddl/libero_goal/open_the_middle_drawer_of_the_cabinet.bddl`,
+где `:goal (Open wooden_cabinet_1_middle_region)`), а не изобретаться заново
+(двойное подчёркивание и произвольные суффиксы вроде `__middle_drawer` — баг,
+исправленный в этой сессии). Это также совпадает с тем, как
+`success_predicates` в исходном `task_inventory`/`selected_tasks_v0.jsonl`
+уже ссылались на этот регион до перехода на frames_v0. Роль (`role`) у обоих —
+обычная `target`/`distractor`: отдельной роли `forbidden` в схеме нет (см.
+`scene.objects[].role` выше). То, что под-объект используется как
+forbidden-кандидат для `ru_negation`, выражается только через его `id` в
+`slots.forbidden`, а не через role. Это позволяет `slots.target`/
+`slots.forbidden` указывать на конкретную часть без нарушения контракта "один
+физический объект — один `sim_handle`" из `task_inventory`. Так уже размечен
+`open_the_middle_drawer_of_the_cabinet` в
+[`scripts/build_frames_v0.py`](scripts/build_frames_v0.py). Не путайте это с
+`ru_case_swap`: у составного объекта нет полноценного reference для
+перестановки ролей (`reference` тут `null`, обе части — `target`/`distractor`
+внутри одного физического объекта), это пара для `ru_negation`, а не для
+`ru_case_swap`.
+
+Третий под-объект того же шкафа, `wooden_cabinet_1_bottom_region`, размечен
+`role: distractor`, но сознательно НЕ включён в `slots.forbidden` — он не
+назван в тексте `ru_negation` («не верхний, а средний ящик...»), а
+`forbidden` привязан именно к тому, что явно названо в «не X, а Y» (метрика
+`forbidden_object_touch` из `task.md` диагностирует именно негированный
+кандидат, а не любой неверный объект вообще). Не путайте «правдоподобная
+неверная альтернатива действию» (`role: distractor`) с «названа как неверная
+в конкретном instruction variant» (`slots.forbidden`) — это разные вопросы,
+и `distractor`, не входящий в `forbidden`, — нормальный, ожидаемый случай.
+
+**Известное ограничение: `build_scene_objects` копирует `visible_agentview`/
+`visible_wrist` родительского физического объекта на все его синтетические
+под-объекты без изменений** (см. `base["visible_agentview"]`/
+`base["visible_wrist"]` в `scripts/build_frames_v0.py`). Это может быть
+неверно: видимость человек проверял для шкафа целиком в
+`visibility_review.html` («виден ли шкаф»), а не для того, различима ли
+конкретно эта его часть («виден ли именно этот ящик, а не сосед сверху/
+снизу») — особенно на wrist-камере, которая для физического объекта
+`wooden_cabinet` в этой сцене вообще на грани кадра
+(`visible_wrist: visible_partial` унаследовано, но малоинформативно на уровне
+под-объекта). Перед freeze любой сцены с составным объектом эту унаследованную
+видимость нужно перепроверять вручную по каждому под-объекту отдельно (agentview
+и особенно wrist), а не считать автоматически верной. Для
+`open_the_middle_drawer_of_the_cabinet` для этого делался разовый временный
+дашборд (`scripts/generate_cabinet_drawer_wrist_review.py` +
+`scripts/apply_cabinet_drawer_wrist_review.py` → `data/cabinet_drawer_wrist_review.html`,
+не часть постоянного pipeline и не входил в общий `apply_frames_review.py`
+op-словарь); правки уже применены в `frames_v0.jsonl` (`visible_wrist`:
+`top_region=false` в обеих сценах шкафа, `bottom_region=true` в `init034`), и
+сам дашборд после использования удалён из репозитория. Для следующего
+составного объекта потребуется аналогичный разовый инструмент, а не
+восстановление этого.
+
 Выбор финального v0 set и расширенная selection metadata должны жить в
 selected-task manifest согласно [`task.md`](task.md), а не в случайных новых
 inventory fields.
@@ -429,8 +774,118 @@ Dashboard и screenshot sheet при одинаковых фильтрах об�
   → `data/visibility_review.html`, правки применяются через
   [`scripts/apply_visibility_review.py`](scripts/apply_visibility_review.py), а
   [`scripts/sync_selected_tasks_visibility.py`](scripts/sync_selected_tasks_visibility.py)
-  прокидывает обновлённую видимость в `data/selected_tasks_v0.jsonl`.
+  прокидывает обновлённую видимость в `data/selected_tasks_v0.jsonl`;
+- grounded semantic frames v0.2: schema runtime
+  [`src/slava_inventory/frames_schema.py`](src/slava_inventory/frames_schema.py),
+  сборка [`scripts/build_frames_v0.py`](scripts/build_frames_v0.py) →
+  `data/frames_v0.jsonl`, валидация
+  [`scripts/validate_frames.py`](scripts/validate_frames.py), редактируемый
+  дашборд native check
+  [`scripts/generate_frames_review.py`](scripts/generate_frames_review.py) →
+  `data/frames_review.html`, правки применяются через
+  [`scripts/apply_frames_review.py`](scripts/apply_frames_review.py);
+  реальный `mt_russian` (сырой MT, DeepL API) заполняет
+  [`scripts/run_mt_translate.py`](scripts/run_mt_translate.py) (ключ через
+  `DEEPL_API_KEY`, см. skill `slava-mt-russian`); реальные `token_len`
+  считает
+  [`scripts/compute_token_len.py`](scripts/compute_token_len.py) (нужен venv
+  `.venv-tokenizers/`, см. skill `slava-token-len`); экспорт prompts для
+  первых roll-out'ов —
+  [`scripts/export_prompts.py`](scripts/export_prompts.py) →
+  `data/prompts_v0.jsonl`.
 
 После изменений выполняйте проверки, пропорциональные риску. Особенно берегите
 `data/task_inventory.jsonl`, `data/object_lexicon.csv` и `data/images`: human
 annotations и локальные рендеры нельзя восстанавливать ценой их перезаписи.
+
+## Agent skills для повторяемых задач разметки
+
+В `.claude/skills/` живут project-scoped skills — операционный слой поверх
+контракта из этого файла и `task.md`: не «что за поле», а «как сделать
+хорошо, какие есть подводные камни, что мы уже один раз сделали неправильно».
+Они написаны, чтобы не переоткрывать заново на ~200 сценах то, что уже узнали
+на 20:
+
+- `slava-instruction-variants` — авторинг Tier-1 вариантов (`en_paraphrase`,
+  `ru_literal`, `ru_free_order`, `ru_case_swap`, `ru_negation`,
+  `code_switch`): один вариант — одна языковая ось, лаконичность промптов для
+  VLA, разбор реальных перегруженных формулировок, которые правили в пилоте;
+- `slava-object-lexicon` — заполнение `data/object_lexicon.csv`: порядок
+  источников истины, recoverability, согласование рода, `usable_v0`;
+- `slava-scene-roles` — роли `scene.objects` и `slots`
+  (`target`/`reference`/`distractor`/`background`/`forbidden`), включая
+  составные адресуемые объекты (id из BDDL-региона, а не выдуманная схема) и
+  унаследованную видимость под-объектов;
+- `slava-visibility-review` — разметка `visible_agentview`/`visible_wrist`,
+  включая ограничение для составных объектов;
+- `slava-quota-eligibility` — разметка девяти `quota_eligibility` флагов и
+  отбор манифеста под квоты `task.md`;
+- `slava-native-check` — прогон native check (`data/frames_review.html`):
+  что реально оценивается, пороги, и явно непрояснённый в `task.md` вопрос —
+  в какую сторону растёт шкала `ambiguity` (см. сам skill, там это разобрано
+  подробно и требует явного проговаривания с пользователем перед массовой
+  разметкой, а не молчаливого выбора направления);
+- `slava-token-len` — реальные токенизаторы для `token_len`/
+  `token_len_metadata`: какие 4 ключа/чекпойнта, почему lerobot pi0/smolvla
+  не хранят свой tokenizer.json, gated-доступ к PaliGemma, отдельный venv
+  `.venv-tokenizers/`, когда пере-запускать после regen/правок/`mt_russian`;
+- `slava-mt-russian` — реальный MT-прогон для `mt_russian`
+  (`scripts/run_mt_translate.py`): почему нельзя редактировать вывод, DeepL
+  header-auth/free-tier хост, ключ только через `DEEPL_API_KEY` (не в
+  чат/код/CLI), грабли fish `set -Ux` vs bash/zsh-окружение харнесса, порядок
+  пере-запуска `compute_token_len.py`/`export_prompts.py` после MT-прогона,
+  как переключать MT-провайдера (уже было один раз: Google → DeepL) и общее
+  правило безопасной передачи секретов в этом проекте;
+- `slava-session-handoff` — процесс закрытия сессии и подготовки нового
+  чата: сверка "Текущего состояния проекта" на противоречия (не просто
+  дописывать абзац сверху), когда заводить/расширять skill вместо нового,
+  структура самодостаточного стартового промпта для следующего чата.
+
+Эти файлы — не статичная документация. Когда в ходе работы находится новое
+устойчивое правило, исключение или ошибка (как случай `__middle_drawer` vs
+`wooden_cabinet_1_middle_region`, или пропущенный `bottom_region`), агент
+должен сразу дописать соответствующий skill, а не только упомянуть находку в
+чате — иначе следующая сессия наступит на те же грабли. Частное решение для
+одной сомнительной сцены сначала фиксируйте в `notes` конкретной записи; в
+skill превращайте только повторяемое правило, по той же логике, что и для
+мнемонических правил разметки квот выше.
+
+Список skills выше — не окончательный. Когда проект переходит к новому виду
+повторяемой ручной задачи, для которой ещё нет skill (например: MT-прогон и
+проверка `mt_russian`, замер `token_len` реальными токенизаторами, разметка
+`rollout_annotations`/failure labels после первых прогонов, что угодно из
+`task.md`, до чего мы ещё не дошли) — агент должен завести новый файл в
+`.claude/skills/<name>/SKILL.md` по образцу существующих (YAML frontmatter
+`name`/`description`, затем операционные правила и разобранные на реальных
+примерах ошибки), не дожидаясь отдельной просьбы пользователя. Не молчать и
+не откладывать: если задача уже второй раз требует одного и того же
+нетривиального решения, это сигнал завести skill сейчас, а не полагаться на
+то, что следующая сессия увидит переписку в истории — она её не увидит.
+
+## Агент обязан сам поддерживать `AGENTS.md` в актуальном состоянии
+
+Этот файл заменяет отдельные handoff-файлы вроде удалённого `expl.md`:
+пользователь должен иметь возможность в начале нового чата попросить агента
+просто прочитать `AGENTS.md` и получить весь нужный контекст без пересказа
+предыдущей переписки. Это работает только если файл действительно
+поддерживается в актуальном состоянии внутри той же сессии, где меняется
+состояние проекта, а не по отдельному запросу пользователя:
+
+- в конце значимого куска работы (закрыт этап, изменилось состояние
+  ключевого артефакта, принято решение, найдено расхождение с `task.md`,
+  появился новый открытый вопрос) — обновляйте раздел "Текущее состояние
+  проекта" тем же изменением, а не отдельным шагом после того, как
+  пользователь спросит;
+- если раздел "Текущее состояние проекта" устарел (описывает более раннюю
+  стадию, чем показывает фактическое состояние репозитория/данных) —
+  перепишите его при первой возможности, не оставляйте расхождение молча;
+- новые устойчивые мнемонические правила, предпочтения пользователя по
+  стилю работы и найденные баги/расхождения — по-прежнему фиксируются здесь
+  же, по местам (мнемоники квот, contract-раздел про `task.md`,
+  соответствующий skill), а не только в разделе статуса;
+- если правка меняет что-то, что уже описано в другом месте файла
+  (например, контракт схемы, список точек входа), поддерживайте оба места в
+  согласии, а не дублируйте информацию с риском разъехаться;
+- не разрастайте файл ради полноты: краткая, но точная сводка лучше
+  исчерпывающего, но устаревающего текста. Если детали лучше живут в skill
+  или в коде — ссылайтесь, а не копируйте.

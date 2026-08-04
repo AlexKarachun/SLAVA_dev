@@ -1,0 +1,146 @@
+---
+name: slava-session-handoff
+description: Close out a SLAVA_dev session and prepare a clean start for the next chat — reconcile AGENTS.md's "Текущее состояние проекта" against actual repo/data state, sweep ALL existing skills (not just obviously-related ones) for staleness given this session's changes, update or add skills for new repeatable work, keep the skills list in sync, and write a self-contained starter prompt. Use when the user says they're moving to a new chat, wants a handoff, or asks to update AGENTS.md/skills at the end of a session.
+---
+
+TRIGGER — load this skill whenever the user signals the session is ending,
+even briefly/informally, not just on an explicit "update AGENTS.md" ask:
+"заканчиваем", "закругляемся", "на сегодня всё", "давай на этом закончим",
+"переходим в новый чат", "wrapping up", "let's end here", "starting a new
+chat next", or any direct request for a handoff/starter-prompt/status
+update. If the phrase is ambiguous between "stop working right now, no
+wrap-up needed" and "close out properly" (bare "заканчиваем" can go either
+way), ask which one before silently picking one.
+
+# SLAVA session handoff
+
+`AGENTS.md` says outright: it replaces `expl.md` (a deleted snapshot file)
+specifically so a new chat can start from `AGENTS.md` alone, with no need to
+re-read prior conversation history. That only holds if the handoff is done
+properly at the end of a session — this skill is the checklist for that.
+
+## 1. Reconcile "Текущее состояние проекта" against reality, not against what it said before
+
+Don't just append a new paragraph describing this session's changes on top
+of what's already there — that's how the section grows stale contradictions
+(this happened once: a `token_len` paragraph from an earlier session still
+said "`token_len` пустой `{}` везде, ждёт реальных токенизаторов" several
+paragraphs above a *newer* paragraph correctly saying token_len was now
+real; a stale `mt_russian: null` claim survived similarly). Concretely:
+
+- Grep the status section for every field/script this session touched
+  (`grep -n "token_len\|mt_russian\|export_prompts" AGENTS.md`) and check
+  each hit is still true, not just the paragraph you added — a
+  straightforward grep beats rereading four screens of prose. Particular
+  contradictions to check for after data-pipeline work: "ещё не
+  существует" / "заблокирован" / "null" claims about something you just
+  built or filled.
+- If an old paragraph is now superseded, rewrite or delete it in place —
+  don't leave both the old and new claims in the file for a future agent to
+  have to arbitrate.
+- Re-run whatever validator matters (here: `python3 scripts/validate_frames.py`)
+  after any edit that could have drifted from the data, even doc-only edits,
+  as a sanity check that the file and the data still agree.
+
+## 2. Sweep ALL existing skills for staleness, not just the ones the session touched
+
+This is easy to skip because it doesn't feel like "this session's work" —
+but a skill can go stale from a change made somewhere else entirely. If this
+session changed a field name, a script's behavior, a file path, a decided
+default, or a data-contract shape that an *unrelated* skill mentions or
+assumes, that skill is now wrong even though nobody was thinking about it.
+Concretely: `ls .claude/skills/`, then for each skill not already touched
+this session, grep it for the names of whatever changed
+(`grep -rn "<field or script name>" .claude/skills/`) and read any hits in
+context — a passing mention that's now inaccurate is worth a one-line fix
+even in a skill that isn't "about" this session's topic.
+
+## 3. Update or add skills for anything genuinely repeatable
+
+Not every session needs a new skill. The bar (same one `AGENTS.md` states
+for quota mnemonics): did this session do a nontrivial thing that will need
+doing again, where getting it wrong once already cost real back-and-forth?
+Signals from this project's history: a provider integration with
+non-obvious auth (`slava-mt-russian`), an environment-setup dependency that
+isn't part of the default install (`slava-token-len`'s `.venv-tokenizers`),
+a data-contract decision task.md left unspecified that got resolved with
+the user (both of the above record their shape decisions). A one-off
+scene-specific fix belongs in that record's `notes` field, not a skill.
+
+When updating an existing skill instead of writing a new one: prefer
+extending it over creating a near-duplicate. `slava-mt-russian` started as
+"how to run the DeepL pass" and grew a "how to switch provider" section
+instead of spawning a separate `slava-mt-provider-switching` skill, because
+both are about the same `mt_russian` field and the same script entry point.
+If a skill's frontmatter `description` no longer covers what the file
+actually contains after an edit (a common miss — the body grows, the
+one-line summary doesn't), update the description too; it's the only part
+of the skill visible before it's loaded, and a stale description means the
+next session won't know to load it for the new content.
+
+## 4. Keep the skills list in AGENTS.md in sync with `.claude/skills/`
+
+`AGENTS.md`'s "Agent skills для повторяемых задач разметки" section lists
+every skill with a one-line summary of what it's for. `ls .claude/skills/`
+and diff that against the list by hand — a new skill file with no AGENTS.md
+entry is invisible to a future agent that only reads AGENTS.md (per this
+skill's own premise in the header above), and a stale entry describing a
+skill that no longer matches its file is actively misleading.
+
+## 5. Write a self-contained starter prompt for the next chat
+
+The next chat has zero memory of this conversation — the prompt is the only
+thing it gets beyond `AGENTS.md` itself. Structure that has worked in this
+project:
+
+1. Explicit read order: `AGENTS.md` in full, then `README.md`, then the
+   specific `task.md` section(s) relevant to what's left (not the whole
+   file — point at section headers), then `git status`.
+2. One line stating what's already done and confirmed, with an explicit
+   "don't reopen this without a concrete reason" — point at which skills
+   hold the reasoning, don't re-paste it into the prompt.
+3. The actual remaining work, phrased as open questions to raise with the
+   user before acting where a decision is genuinely the user's to make —
+   not as a to-do list the agent should just execute. If a session ended
+   with unresolved questions (a scale direction, a stray artifact in an
+   external file, a soft non-blocking issue), list them explicitly by name
+   — they're easy to lose track of if left implicit in "see AGENTS.md".
+4. An explicit boundary on scope: what NOT to start without the user asking
+   (e.g. "don't scale to ~200 scenes", "don't tag the freeze without
+   explicit go-ahead") — carried over from the current session's own scope
+   boundary, not invented fresh.
+5. Any live operational gotcha that would otherwise cost a repeat
+   back-and-forth in the new chat (e.g. this project's fish-vs-bash
+   environment variable visibility issue, or "never accept secrets as chat
+   text") — one line, pointing at the skill that has the full detail.
+
+Keep it as dense as the examples already used in this project's handoffs —
+a few paragraphs, not a full re-derivation of the project. The next agent
+can and should read `AGENTS.md` itself for anything that doesn't change
+what it should ask or do next.
+
+## 6. Final end-to-end sanity pass before ending
+
+Do this last, after every other step above, not just after the last edit
+you happened to make:
+
+- Reread every file you touched this handoff (`AGENTS.md`, any edited
+  skills, the starter prompt) start to finish, not diff-by-diff. Diffs show
+  what changed but not whether the *surrounding* text still reads
+  coherently — this is how the `token_len`/`mt_russian` contradiction
+  described in step 1 was actually caught, not by reviewing the edit that
+  introduced it.
+- Re-run the project's validator(s) one more time after all doc edits are
+  in (`python3 scripts/validate_frames.py` here) — cheap insurance that a
+  doc-only pass didn't somehow coincide with a data edit going stale.
+- Run `git status --short` and check it actually matches what the starter
+  prompt / AGENTS.md's "Git" paragraph claims is untracked — a file added
+  mid-session is easy to forget to mention.
+
+## 7. Don't commit anything as part of a handoff
+
+Reconciling `AGENTS.md`/skills/starter-prompt is a documentation and
+planning act, not a signal to `git add`/`git commit` the session's work —
+this project only commits on the user's explicit instruction (see
+`AGENTS.md`'s own rule). Say what's still untracked in the handoff status,
+don't stage it.

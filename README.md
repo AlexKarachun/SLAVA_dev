@@ -74,6 +74,76 @@ python scripts/generate_selected_scenes.py \
   --frozen-set
 ```
 
+## Grounded semantic frames v0.2 (D4)
+
+`data/frames_v0.jsonl` — по одной записи на каждую из 20 задач D3
+(`data/selected_tasks_v0.jsonl`): grounded `target`/`reference`/`relation`/
+`forbidden` slots и Tier-1 instruction variants (`en_canonical`,
+`en_paraphrase`, `mt_russian`, `ru_literal`, `ru_free_order`,
+`ru_case_swap`/`axis_na`, `ru_negation`/`axis_na`, `code_switch`). Это LLM
+draft для RU-текста (`validation.native_check="pending"`), перед freeze
+нужны ручная доводка и native check; `mt_russian` — исключение: это сырой
+MT (DeepL API), не LLM draft, и его нельзя редактировать/улучшать.
+
+```bash
+python scripts/build_frames_v0.py   # регенерирует data/frames_v0.jsonl из
+                                     # selected_tasks_v0.jsonl + object_lexicon.csv
+python scripts/validate_frames.py   # схема schemas/frames_v0.schema.json
+```
+
+`token_len` считается реальными токенизаторами (не эвристикой) в отдельном
+venv — тяжёлая зависимость `transformers`, не часть основного pipeline:
+
+```bash
+python3 -m venv .venv-tokenizers
+.venv-tokenizers/bin/python -m pip install -r requirements-tokenizers.txt
+.venv-tokenizers/bin/python scripts/compute_token_len.py
+```
+
+`google/paligemma-3b-pt-224` — gated-репозиторий на HuggingFace (нужен
+аккаунт с принятой лицензией и `huggingface-cli login`). Подробности и
+список токенизаторов — в skill `slava-token-len`.
+
+`mt_russian` — сырой машинный перевод `en_canonical` (DeepL API, без
+редактуры — см. правило в `task.md`). Ключ передаётся через переменную
+окружения `DEEPL_API_KEY`, никогда не в командной строке или коде:
+
+```bash
+# fish: ключ хранится как universal variable, видна только fish-процессам
+fish -c '.venv-tokenizers/bin/python scripts/run_mt_translate.py'
+.venv-tokenizers/bin/python scripts/compute_token_len.py   # добавит колонку mt_russian
+python3 scripts/validate_frames.py
+```
+
+Подробности (fish `set -Ux` vs bash/zsh окружение, DeepL header-based auth,
+free-tier `api-free.deepl.com` хост) — в skill `slava-mt-russian`.
+
+Экспорт плоских prompts для первых roll-out'ов (JSONL, одна строка на
+`(task_uid, variant)`, 6 primary-вариантов из "Сначала затравка" в
+`task.md` + `mt_russian`):
+
+```bash
+python scripts/export_prompts.py
+```
+
+Результат — `data/prompts_v0.jsonl`. Каждая строка несёт reset-metadata
+(`bddl_file`/`init_state_id` или `episode_id`/`reset_seed`/`gym_env_name`) и
+`target_object`/`reference_object`/`forbidden_objects`/`success_predicates`
+для авторазметки роллаутов (`rollout_annotations.jsonl` из `task.md`), а не
+только текст инструкции.
+
+Native check и ревью грамматики/ролей объектов удобно делать в редактируемом
+дашборде `data/frames_review.html`: рендеры, роли объектов
+(target/reference/distractor/forbidden/background с одной кнопкой на объект),
+action/relation, текст каждого Tier-1 варианта и его naturalness/equivalence/
+ambiguity (1–5). Правки накапливаются в браузере и выгружаются кнопкой
+**Download corrections** в `frames_review_corrections.json`.
+
+```bash
+python scripts/generate_frames_review.py
+python scripts/apply_frames_review.py path/to/frames_review_corrections.json
+```
+
 ## Ревью видимости объектов
 
 `data/visibility_review.html` — редактируемый дашборд по всем сценам

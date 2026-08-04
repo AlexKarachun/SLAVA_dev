@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alexkrachun.github.io/SLAVA_dev/schemas/frames_v0.schema.json",
+  "title": "SLAVA grounded semantic frame v0.2",
+  "description": "Documentation mirror of src/slava_inventory/frames_schema.py, the actual runtime validator. One record = one selected task + init state from selected_tasks_v0.jsonl, enriched with grounded slots and Tier-1 instruction variants. Top-level fields follow task.md's 'Схема фрейма v0.2' template literally (flat task_uid/suite/task_id/init_state_id/frame_version/canonical_en/bddl_file, not nested under a 'source' object), extended with environment/commit/task_name/episode_id/reset_seed/gym_env_name so SimplerEnv rows stay reproducible (task.md's list is a floor, not an exclusive set) and mt_metadata for when mt_russian gets a real MT pass.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_uid", "suite", "task_id", "init_state_id", "frame_version", "canonical_en",
+    "bddl_file", "environment", "commit", "task_name", "episode_id", "reset_seed",
+    "gym_env_name", "images", "scene", "slots", "variants", "mt_metadata", "axis_na",
+    "validation", "token_len", "token_len_metadata"
+  ],
+  "properties": {
+    "task_uid": {"type": "string", "minLength": 1},
+    "suite": {"type": "string", "minLength": 1},
+    "task_id": {"type": "integer"},
+    "init_state_id": {"type": ["integer", "null"], "description": "LIBERO only; null for SimplerEnv."},
+    "frame_version": {"const": "0.2"},
+    "canonical_en": {"type": "string", "minLength": 1},
+    "bddl_file": {"type": ["string", "null"], "description": "LIBERO only; null for SimplerEnv."},
+    "environment": {"enum": ["LIBERO", "SimplerEnv"]},
+    "commit": {"type": "string", "minLength": 1},
+    "task_name": {"type": "string", "minLength": 1},
+    "episode_id": {"type": ["integer", "null"], "description": "SimplerEnv only; null for LIBERO."},
+    "reset_seed": {"type": ["integer", "null"], "description": "SimplerEnv only; null for LIBERO."},
+    "gym_env_name": {"type": ["string", "null"], "description": "SimplerEnv only; null for LIBERO."},
+    "images": {"$ref": "#/$defs/images"},
+    "scene": {"$ref": "#/$defs/scene"},
+    "slots": {"$ref": "#/$defs/slots"},
+    "variants": {"$ref": "#/$defs/variants"},
+    "mt_metadata": {"$ref": "#/$defs/mtMetadata"},
+    "axis_na": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+    "validation": {"$ref": "#/$defs/validation"},
+    "token_len": {
+      "type": "object",
+      "description": "task.md QA item 14 doesn't specify a shape; decided with the user: tokenizer -> variant -> int, one key per backbone family in task.md's 'Модели и среды' table (qwen3_vl covers GreenVLA too, openvla_oft covers Prismatic too, paligemma covers pi0/pi0.5 too, smolvla). Empty {} until scripts/compute_token_len.py has run; once non-empty, must have exactly these four keys, each mapping every currently-filled variants.* key to a non-negative token count. See frames_schema.py's TOKEN_LEN_TOKENIZERS for the authoritative key set."
+    },
+    "token_len_metadata": {
+      "description": "Mirrors mt_metadata's pattern: which checkpoint token_len was measured with, per tokenizer key. Null while token_len is empty.",
+      "type": ["object", "null"],
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentview_rgb", "wrist_rgb", "agentview_segmentation", "wrist_segmentation", "depth"],
+      "properties": {
+        "agentview_rgb": {"type": "string", "minLength": 1},
+        "wrist_rgb": {"type": ["string", "null"]},
+        "agentview_segmentation": {"type": "null"},
+        "wrist_segmentation": {"type": "null"},
+        "depth": {"type": "null"}
+      }
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objects"],
+      "properties": {
+        "objects": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sceneObject"}}
+      }
+    },
+    "sceneObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "sim_handle", "raw_name", "category_en", "category_ru", "color_en",
+        "color_ru", "pose_xyz_initial", "visible_agentview", "visible_wrist",
+        "bbox2d_agentview", "mask_id_agentview", "role"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "sim_handle": {"type": "string", "minLength": 1},
+        "raw_name": {"type": "string", "minLength": 1},
+        "category_en": {"type": "string", "minLength": 1},
+        "category_ru": {"type": "string", "minLength": 1},
+        "color_en": {"type": "string", "minLength": 1},
+        "color_ru": {"type": "string", "minLength": 1},
+        "pose_xyz_initial": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+        "visible_agentview": {"enum": [true, false, "visible_partial", null]},
+        "visible_wrist": {"enum": [true, false, "visible_partial", null]},
+        "bbox2d_agentview": {"type": "null"},
+        "mask_id_agentview": {"type": "null"},
+        "role": {
+          "enum": ["target", "reference", "distractor", "background"],
+          "description": "task.md's template only shows target/reference/distractor; 'background' is an addition for non-participating scene props its 3-object toy example didn't need. 'forbidden' is deliberately NOT a role -- it is the subset of distractor ids named in slots.forbidden (see slots.forbidden below)."
+        }
+      }
+    },
+    "slots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "target", "reference", "relation", "forbidden", "success_predicates"],
+      "properties": {
+        "action": {"enum": ["pick_place", "open", "turn_on", "push", "stack"]},
+        "target": {"type": "string", "minLength": 1},
+        "reference": {"type": ["string", "null"]},
+        "relation": {"enum": ["on", "in", "in_front_of", "left_of", "right_of", "next_to", null]},
+        "forbidden": {
+          "type": "array", "items": {"type": "string"},
+          "description": "ids from scene.objects named in variants.ru_negation as the wrong pick. Usually a subset of role=distractor objects, but a role=reference object may also double as forbidden (e.g. the wrong object to grasp in a 2-object stacking task)."
+        },
+        "success_predicates": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/predicate"}}
+      }
+    },
+    "predicate": {
+      "description": "task.md's template only shows the 'spatial_relation' shape; 'state' is an addition for single-object state-change tasks (open/turn_on) that example doesn't cover.",
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "relation", "arg1", "arg2"],
+          "properties": {
+            "type": {"const": "spatial_relation"},
+            "relation": {"enum": ["on", "in", "in_front_of", "left_of", "right_of", "next_to"]},
+            "arg1": {"type": "string", "minLength": 1},
+            "arg2": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "predicate", "arg1"],
+          "properties": {
+            "type": {"const": "state"},
+            "predicate": {"enum": ["open", "turned_on"]},
+            "arg1": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "variants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "en_canonical", "en_paraphrase", "mt_russian", "ru_literal", "ru_free_order",
+        "ru_case_swap", "ru_negation", "code_switch", "ru_translit", "ru_colloquial",
+        "ru_anaphora"
+      ],
+      "properties": {
+        "en_canonical": {"type": "string", "minLength": 1},
+        "en_paraphrase": {"type": ["string", "null"]},
+        "mt_russian": {"type": ["string", "null"]},
+        "ru_literal": {"type": ["string", "null"]},
+        "ru_free_order": {"type": ["string", "null"]},
+        "ru_case_swap": {"type": ["string", "null"]},
+        "ru_negation": {"type": ["string", "null"]},
+        "code_switch": {"type": ["string", "null"]},
+        "ru_translit": {"type": ["string", "null"]},
+        "ru_colloquial": {"type": ["string", "null"]},
+        "ru_anaphora": {"type": ["string", "null"]}
+      }
+    },
+    "mtMetadata": {
+      "description": "task.md: 'Храним также систему перевода: mt_metadata: {system, date}'. null until variants.mt_russian is filled by a real MT pass (never by the LLM draft).",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["system", "date"],
+      "properties": {
+        "system": {"type": "string", "minLength": 1},
+        "date": {"type": "string", "minLength": 1}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["author", "native_check", "naturalness", "equivalence", "ambiguity", "notes"],
+      "properties": {
+        "author": {"type": "string", "minLength": 1},
+        "native_check": {"enum": ["pending", "passed", "failed"]},
+        "naturalness": {"type": "object"},
+        "equivalence": {"type": "object"},
+        "ambiguity": {
+          "type": "object",
+          "description": "Not present in task.md's YAML template's validation block, but explicitly required by the 'Native check' section right below it (naturalness/equivalence/ambiguity, all >=4 to pass) -- task.md's own template appears incomplete here, so this field is kept."
+        },
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}
