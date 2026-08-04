@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export data/frames_v0.jsonl into flat prompts for the first model rollouts
+"""Export data/pilot_v0_release/frames_v0.jsonl into flat prompts for the first model rollouts
 -- task.md's "Definition of Done: pilot v0" ("Есть export_prompts.py",
 "Есть первые prompts для OpenVLA/GreenVLA-style eval").
 
@@ -33,8 +33,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import load_jsonl, save_jsonl  # noqa: E402
 
-DEFAULT_FRAMES = PROJECT_ROOT / "data" / "frames_v0.jsonl"
-DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "prompts_v0.jsonl"
+DEFAULT_FRAMES = PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"
+DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "pilot_v0_release" / "prompts_v0.jsonl"
 
 # task.md "Сначала затравка": "6 primary-вариантов: en_canonical,
 # en_paraphrase, ru_literal, ru_case_swap, ru_negation, code_switch".

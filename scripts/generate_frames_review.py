@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate an editable HTML native-check dashboard for data/frames_v0.jsonl.
+"""Generate an editable HTML native-check dashboard for data/pilot_v0_release/frames_v0.jsonl.
 
 For each of the 20 selected scenes shows the renders, the grounded object
 roles (target/reference/distractor/forbidden/background, editable), the
@@ -21,8 +21,9 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT = PROJECT_ROOT / "data" / "frames_v0.jsonl"
+DEFAULT_INPUT = PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"
 DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "frames_review.html"
+IMAGES_BASE_DIR = PROJECT_ROOT / "data"
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import load_jsonl  # noqa: E402
@@ -200,10 +201,10 @@ def render_scene(frame: dict[str, Any], base_dir: Path, output_dir: Path) -> str
     """
 
 
-def generate_html(frames: list[dict[str, Any]], input_path: Path, output_path: Path) -> str:
+def generate_html(frames: list[dict[str, Any]], output_path: Path) -> str:
     suites = sorted({str(f["suite"]) for f in frames})
     suite_options = "".join(f'<option value="{html.escape(s, quote=True)}">{html.escape(s)}</option>' for s in suites)
-    cards = "".join(render_scene(f, input_path.parent, output_path.parent) for f in frames)
+    cards = "".join(render_scene(f, IMAGES_BASE_DIR, output_path.parent) for f in frames)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -491,7 +492,7 @@ def main() -> None:
     frames = load_jsonl(input_path)
     validate_frames(frames)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    document = generate_html(frames, input_path, output_path)
+    document = generate_html(frames, output_path)
     output_path.write_text(document, encoding="utf-8")
     print(f"Wrote {len(frames)} scenes to {output_path}")
 

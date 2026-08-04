@@ -1,6 +1,6 @@
 ---
 name: slava-mt-russian
-description: Run or interpret the mt_russian machine-translation pass in data/frames_v0.jsonl (scripts/run_mt_translate.py) — MT provider auth (currently DeepL), raw/unedited output rule, how to switch provider, safe API-key handling, fish-vs-bash environment variable gotcha. Use when (re)running mt_russian, adding a scene, switching MT provider, or handling any new API credential in this project.
+description: Run or interpret the mt_russian machine-translation pass in data/pilot_v0_release/frames_v0.jsonl (scripts/run_mt_translate.py) — MT provider auth (currently DeepL), raw/unedited output rule, how to switch provider, safe API-key handling, fish-vs-bash environment variable gotcha. Use when (re)running mt_russian, adding a scene, switching MT provider, or handling any new API credential in this project.
 ---
 
 # SLAVA mt_russian
@@ -119,7 +119,7 @@ a gated HF token, anything else this project ends up calling out to):
    `mt_russian` prompts get exported — decided with the user to include it
    once real (it's its own row in task.md's "Table - behavioral pilot").
    Re-run `export_prompts.py` after a fresh MT pass to refresh
-   `data/prompts_v0.jsonl`.
+   `data/pilot_v0_release/prompts_v0.jsonl`.
 3. Only then `python3 scripts/validate_frames.py`.
 
 `scripts/build_frames_v0.py` (the LLM-draft regenerator) always resets

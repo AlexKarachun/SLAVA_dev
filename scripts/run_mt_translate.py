@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fill variants.mt_russian (+ mt_metadata) in data/frames_v0.jsonl with a
+"""Fill variants.mt_russian (+ mt_metadata) in data/pilot_v0_release/frames_v0.jsonl with a
 real machine-translation pass over variants.en_canonical -- task.md's
 `mt_russian` rule:
 
@@ -41,7 +41,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import load_jsonl, save_jsonl  # noqa: E402
 
-DEFAULT_FRAMES = PROJECT_ROOT / "data" / "frames_v0.jsonl"
+DEFAULT_FRAMES = PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"
 DEEPL_URL = "https://api-free.deepl.com/v2/translate"
 MT_SYSTEM = "DeepL API (api-free.deepl.com, EN->RU)"
 

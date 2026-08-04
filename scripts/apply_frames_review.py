@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_FRAMES = PROJECT_ROOT / "data" / "frames_v0.jsonl"
+DEFAULT_FRAMES = PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_inventory.io_utils import load_jsonl, save_jsonl  # noqa: E402

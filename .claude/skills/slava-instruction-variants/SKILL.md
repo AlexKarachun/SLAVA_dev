@@ -1,6 +1,6 @@
 ---
 name: slava-instruction-variants
-description: Author Tier-1 instruction variants (en_paraphrase, ru_literal, ru_free_order, ru_case_swap, ru_negation, code_switch) for a SLAVA grounded_frame. Use when writing or reviewing variants.* in data/frames_v0.jsonl, or when scaling frame authoring from the 20-scene pilot to the 200-scene set.
+description: Author Tier-1 instruction variants (en_paraphrase, ru_literal, ru_free_order, ru_case_swap, ru_negation, code_switch) for a SLAVA grounded_frame. Use when writing or reviewing variants.* in data/pilot_v0_release/frames_v0.jsonl, or when scaling frame authoring from the 20-scene pilot to the 200-scene set.
 ---
 
 # SLAVA instruction-variant authoring

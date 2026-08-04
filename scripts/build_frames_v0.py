@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the v0.2 grounded semantic frame draft (data/frames_v0.jsonl).
+"""Build the v0.2 grounded semantic frame draft (data/pilot_v0_release/frames_v0.jsonl).
 
 Reads the frozen 20-task manifest (data/selected_tasks_v0.jsonl) and the
 object lexicon, attaches grounded target/reference/relation/forbidden slots
@@ -25,7 +25,7 @@ from slava_inventory.frames_schema import FRAME_VERSION, validate_frames  # noqa
 
 SELECTED_PATH = PROJECT_ROOT / "data" / "selected_tasks_v0.jsonl"
 LEXICON_PATH = PROJECT_ROOT / "data" / "object_lexicon.csv"
-OUTPUT_PATH = PROJECT_ROOT / "data" / "frames_v0.jsonl"
+OUTPUT_PATH = PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"
 
 AUTHOR = "claude-sonnet-5 (llm draft, pending human review + native check)"
 

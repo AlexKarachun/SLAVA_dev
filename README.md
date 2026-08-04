@@ -76,19 +76,21 @@ python scripts/generate_selected_scenes.py \
 
 ## Grounded semantic frames v0.2 (D4)
 
-`data/frames_v0.jsonl` — по одной записи на каждую из 20 задач D3
+`data/pilot_v0_release/frames_v0.jsonl` — по одной записи на каждую из 20 задач D3
 (`data/selected_tasks_v0.jsonl`): grounded `target`/`reference`/`relation`/
 `forbidden` slots и Tier-1 instruction variants (`en_canonical`,
 `en_paraphrase`, `mt_russian`, `ru_literal`, `ru_free_order`,
-`ru_case_swap`/`axis_na`, `ru_negation`/`axis_na`, `code_switch`). Это LLM
-draft для RU-текста (`validation.native_check="pending"`), перед freeze
-нужны ручная доводка и native check; `mt_russian` — исключение: это сырой
-MT (DeepL API), не LLM draft, и его нельзя редактировать/улучшать.
+`ru_case_swap`/`axis_na`, `ru_negation`/`axis_na`, `code_switch`).
+Пилот v0 заморожен (`validation.native_check="passed"`, tag `slava-pilot-v0`):
+RU-текст был LLM draft, native check пройден — пользователь лично
+просмотрел RU-переформулировки и подтвердил LLM-draft оценки как
+human-verified; `mt_russian` — сырой MT (DeepL API), не LLM draft, и его
+нельзя редактировать/улучшать.
 
 ```bash
-python scripts/build_frames_v0.py   # регенерирует data/frames_v0.jsonl из
+python scripts/build_frames_v0.py   # регенерирует data/pilot_v0_release/frames_v0.jsonl из
                                      # selected_tasks_v0.jsonl + object_lexicon.csv
-python scripts/validate_frames.py   # схема schemas/frames_v0.schema.json
+python scripts/validate_frames.py   # схема data/pilot_v0_release/frames_v0.schema.json
 ```
 
 `token_len` считается реальными токенизаторами (не эвристикой) в отдельном
@@ -126,7 +128,7 @@ free-tier `api-free.deepl.com` хост) — в skill `slava-mt-russian`.
 python scripts/export_prompts.py
 ```
 
-Результат — `data/prompts_v0.jsonl`. Каждая строка несёт reset-metadata
+Результат — `data/pilot_v0_release/prompts_v0.jsonl`. Каждая строка несёт reset-metadata
 (`bddl_file`/`init_state_id` или `episode_id`/`reset_seed`/`gym_env_name`) и
 `target_object`/`reference_object`/`forbidden_objects`/`success_predicates`
 для авторазметки роллаутов (`rollout_annotations.jsonl` из `task.md`), а не

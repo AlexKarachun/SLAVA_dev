@@ -1,4 +1,4 @@
-"""Validation for the SLAVA v0.2 grounded semantic frame schema (frames_v0.jsonl).
+"""Validation for the SLAVA v0.2 grounded semantic frame schema (data/pilot_v0_release/frames_v0.jsonl).
 
 One record = one selected task + init state (matches the row it was built
 from in selected_tasks_v0.jsonl), enriched with grounded target/reference/

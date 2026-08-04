@@ -1,6 +1,6 @@
 ---
 name: slava-token-len
-description: Compute/interpret token_len + token_len_metadata in data/frames_v0.jsonl using real tokenizers (not an estimate). Use when filling token_len for new/changed scenes, adding a tokenizer, or re-running after mt_russian/new variants get filled.
+description: Compute/interpret token_len + token_len_metadata in data/pilot_v0_release/frames_v0.jsonl using real tokenizers (not an estimate). Use when filling token_len for new/changed scenes, adding a tokenizer, or re-running after mt_russian/new variants get filled.
 ---
 
 # SLAVA token_len

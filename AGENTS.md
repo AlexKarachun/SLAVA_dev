@@ -26,7 +26,7 @@ grounded semantic frames + instruction variants готовы, после зак�
 Следующий этап — первые model rollouts (см. конец этого раздела). Порядок
 этапов — в "Порядок построения benchmark" ниже.
 
-**`data/frames_v0.jsonl`** — 20 фреймов, схема v0.2, полностью проходит
+**`data/pilot_v0_release/frames_v0.jsonl`** — 20 фреймов, схема v0.2, полностью проходит
 `scripts/validate_frames.py`. **Все поля контента теперь реально заполнены,
 включая `mt_russian`** (см. ниже) — Tier-1 variants, три
 "желательных"/exploratory варианта (`ru_translit`, `ru_colloquial`,
@@ -42,7 +42,7 @@ naturalness/equivalence/ambiguity), `ru_translit` в `TEXT_VARIANTS` без
 промптов и подтвердил, что LLM-draft оценок и его личного просмотра
 достаточно для human-verified native check — формальный построчный проход по
 `data/frames_review.html` с расстановкой оценок не потребовался. `validation.
-author`/`validation.notes` в `data/frames_v0.jsonl` обновлены под всех 20
+author`/`validation.notes` в `data/pilot_v0_release/frames_v0.jsonl` обновлены под всех 20
 записях, чтобы отражать это честно (не "pending human review", а
 "human-verified by project owner"). Вопрос закрыт, freeze разблокирован.
 
@@ -116,7 +116,7 @@ schema.json`, не что-то новое; `validate_inventory()` на нём з
 
 **Актуальный шаблон схемы фрейма v0.2** пользователь сам вставил в `task.md`
 (строки ~600-727: новый YAML-пример с `mt_metadata`/`token_len`, старый
-пример помечен `old` следом). Синхронизация с `schemas/frames_v0.schema.json`
+пример помечен `old` следом). Синхронизация с `data/pilot_v0_release/frames_v0.schema.json`
 подтверждена. В `task.md` остались висящие маркеры-слова `upd`/`old` прямо в
 тексте (как минимум строки ~298, ~600, ~727) — спросили пользователя явно:
 он подтвердил, что `task.md` не трогаем в принципе, это его внешний источник
@@ -124,8 +124,8 @@ schema.json`, не что-то новое; `validate_inventory()` на нём з
 снова.
 
 **Git:** весь D4-pipeline закоммичен (коммит `113e531`, "Freeze D4 pilot v0"
-— `data/frames_v0.jsonl`, `data/frames_review.html`, `data/prompts_v0.jsonl`,
-`schemas/frames_v0.schema.json`, все `scripts/*frames*`/`compute_token_len.py`/
+— `data/pilot_v0_release/frames_v0.jsonl`, `data/frames_review.html`, `data/pilot_v0_release/prompts_v0.jsonl`,
+`data/pilot_v0_release/frames_v0.schema.json`, все `scripts/*frames*`/`compute_token_len.py`/
 `export_prompts.py`/`run_mt_translate.py`, `src/slava_inventory/
 frames_schema.py`, `.claude/skills/`, `requirements-tokenizers.txt`, плюс
 регенерированные `data/screenshot_sheet_small.html`/`screenshot_sheet_full.
@@ -139,6 +139,23 @@ v0.2-шаблона) по его явному согласию. **Тег `slava-
 `transformers`/`huggingface_hub`/`sentencepiece`) — `python -m venv` сам
 создаёт внутри `.venv-tokenizers/.gitignore` с `*`, в git не попадёт и не
 должен.
+
+**Реорганизация после freeze:** `frames_v0.jsonl`/`prompts_v0.jsonl`/
+`frames_v0.schema.json` перенесены из `data/`/`schemas/` в новую подпапку
+`data/pilot_v0_release/` (по явной просьбе пользователя — физически отделить
+то, что D4 передаёт следующему этапу, от вспомогательных артефактов). Все
+пути в `scripts/*frames*`/`compute_token_len.py`/`export_prompts.py`/
+`run_mt_translate.py`, `src/slava_inventory/frames_schema.py`, `README.md` и
+этом файле обновлены. По ходу нашлась и исправлена связанная бага: и
+`validate_frames.py`, и `generate_frames_review.py` резолвили путь к
+картинкам (`images.agentview_rgb`/`wrist_rgb`) относительно директории самого
+`frames_v0.jsonl`, а не относительно `data/`, где реально лежит
+`data/images/` — при регенерации это привело бы к ложным "missing file". Оба
+скрипта теперь используют отдельную константу `IMAGES_BASE_DIR = data/`,
+независимую от того, где лежит сам `frames_v0.jsonl`. `git mv` сохранил
+историю файлов; тег `slava-pilot-v0` остался на прежнем коммите (`113e531`) —
+это состояние данных на freeze, реорганизация путей не меняет содержание
+фреймов.
 
 **`token_len`/`token_len_metadata` теперь реальные** (закрыто в этой сессии,
 не эвристика). Схема и ключи-токенизаторы task.md не задавал явно — решены с
@@ -194,7 +211,7 @@ DeepL-вывод оставлен как есть, включая наблюда
 пользователя, как только перестал быть `null` — у него своя строка в
 "Table - behavioral pilot"). `axis_na`-варианты у конкретной сцены
 пропускаются (не эмитятся как `null`-промпты). Выход —
-[`data/prompts_v0.jsonl`](data/prompts_v0.jsonl), 127 строк из 20 сцен × 7
+[`data/pilot_v0_release/prompts_v0.jsonl`](data/pilot_v0_release/prompts_v0.jsonl), 127 строк из 20 сцен × 7
 вариантов минус axis_na (`ru_case_swap` заполнен у 8/20, `ru_negation` у
 19/20 — совпадает с минимальными квотами `task.md`; `mt_russian` у всех
 20/20). Каждая строка несёт не только `instruction`, но и reset-metadata
@@ -208,18 +225,142 @@ DeepL-вывод оставлен как есть, включая наблюда
 переформулировки промптов и явно подтвердил, что это достаточно как
 human-verified native check (не требуется формальный построчный проход по
 `data/frames_review.html`) — `validation.author`/`validation.notes` в
-`data/frames_v0.jsonl` обновлены под всех 20 записях, чтобы это отражать
+`data/pilot_v0_release/frames_v0.jsonl` обновлены под всех 20 записях, чтобы это отражать
 честно. Направление шкалы `ambiguity` тоже подтверждено (выше = чётче).
 `task.md` содержит висящие маркеры `upd`/`old` (см. выше) — пользователь
 явно попросил не трогать этот файл, оставлено окончательно. Freeze tag
 `slava-pilot-v0` проставлен по итогам этого явного согласия.
 
-**Следующий крупный блок работы:** первые model rollouts —
-`rollout_annotations.jsonl`, rollout logger, метрики из "Table - behavioral
-pilot"/"Table - cleaned language effect" в `task.md`. Ничего из этого не
-начато, не начинать без явной просьбы пользователя. Масштабирование
-pipeline на ~200 сцен — тоже отдельный будущий блок, не путать с first
-rollouts.
+**Следующий крупный блок работы: первые model rollouts.** Ничего из этого
+кода не начато — это задача для следующей сессии (пользователь переезжает на
+GPU-сервер, там её будет писать новый агент). Ниже — подробный бриф: что
+нужно построить, что и как собирать, что уже решено с пользователем, и что
+явно осталось открытым и требует обсуждения с ним перед/во время реализации.
+Масштабирование pipeline на ~200 сцен — это отдельный будущий блок, не
+путать с first rollouts, не начинать раньше него.
+
+### Вход и цель
+
+Вход — [`data/pilot_v0_release/prompts_v0.jsonl`](data/pilot_v0_release/prompts_v0.jsonl)
+(127 строк `(task_uid, variant)` — 20 сцен × 7 primary-вариантов минус
+`axis_na`) и [`data/pilot_v0_release/frames_v0.jsonl`](data/pilot_v0_release/frames_v0.jsonl)
+(более полный источник — нужен, если для `first_contact_object` придётся
+сопоставлять `sim_handle` из симулятора с `id`/ролью слота). Цель — прогнать
+каждую комбинацию (сцена × вариант × модель) closed-loop в симуляторе,
+залогировать поведение и получить `rollout_annotations.jsonl` +
+таблицы "Table - behavioral pilot"/"Table - cleaned language effect" из
+`task.md`. Формат `rollout_annotations.jsonl` и список `failure labels`
+(`success`/`target_grounding_error`/`reference_grounding_error`/
+`relation_binding_error`/`negation_error`/`physical_execution_error`/
+`no_action_or_timeout`/`unclear`, с правилами разметки каждой) заданы в
+`task.md`, разделы "Auto-labeling для первых прогонов" и "Failure labels" —
+не изобретать свою схему, реализовывать строго по этим разделам.
+
+### Модели — 5, не 4
+
+`task.md` в таблице "Модели и среды" перечисляет 3 строки, но GreenVLA у
+пользователя считается за **две отдельные модели** — R0 (base) и R1 (bridge),
+как и в его собственном описании curriculum'а (`R0-base → R1-bridge →
+R2-bridge` в разделе "Наш core"). Итоговый список для первого прохода:
+
+1. **GreenVLA-R0** — Qwen3-VL-4B-Instruct бэкбон, action-tuned R0.
+2. **GreenVLA-R1 (bridge)** — тот же бэкбон, следующая стадия curriculum'а.
+3. **OpenVLA-OFT** — `moojink/openvla-7b-oft-finetuned-libero-spatial-object-goal-10`
+   (тот же чекпойнт, что уже используется для `token_len`).
+4. **π0/π0.5** — через lerobot, PaliGemma-бэкбон.
+5. **SmolVLA** — через lerobot, `HuggingFaceTB/SmolVLM2-500M-Video-Instruct`
+   судя по регистру токенизаторов, но конкретный action-policy чекпойнт для
+   инференса (не только токенизатор) ещё предстоит выбрать/подтвердить.
+
+### Модель → среда
+
+`task.md` явно привязывает только GreenVLA (обе версии) → SimplerEnv/bridge
+(4 сцены) и OpenVLA-OFT → LIBERO (16 сцен). Для π0/π0.5 и SmolVLA
+пользователь явно решил: **обе модели гоняются на обеих средах, то есть на
+всех 20 сценах** — не только на своей "родной" среде из таблицы `task.md`.
+Значит нужна LIBERO-интеграция для lerobot-политик (π0/π0.5, SmolVLA) и
+SimplerEnv/bridge-интеграция для них же — обе стороны matrix, а не только
+одна. Итоговая матрица прогонов: GreenVLA-R0/R1 × 4 SimplerEnv-сцены,
+OpenVLA-OFT × 16 LIBERO-сцен, π0/π0.5 и SmolVLA × все 20 сцен (обе среды).
+
+### Объём первого прохода
+
+Пользователь явно выбрал: **все 5 моделей × все 127 промптов** (не
+уменьшенное подмножество, вопреки более осторожному совету `task.md` для
+полного 60–80-задачного набора — "2–3 модели"). Технических препятствий к
+этому нет: эпизоды LIBERO/SimplerEnv короткие (обычно до нескольких сотен
+шагов), инференс VLA на современной GPU быстрый, весь объём (максимум
+5 × 127 = 635 эпизодов, меньше — там, где модель не покрывает среду сцены)
+занимает часы, не дни, на одной GPU уровня A100/RTX 4090.
+
+**Открытый вопрос, не решённый явно: сколько повторов на комбинацию
+(сцена × вариант × модель).** `task.md` для полного набора советует 25
+роллаутов/вариант — но там "вариант" пулит много разных задач, у нас же
+каждая (сцена, вариант) уже фиксированная точка с зафиксированным
+`init_state_id`/`episode_id`/`reset_seed`. Если политика детерминирована (или
+инференс без сэмплирования), повторный прогон той же комбинации даст тот же
+результат — тогда лишние повторы не добавляют статистической мощности, только
+тратят compute. Если политика или окружение стохастичны (temperature,
+sampling actions, шум в физике), повторы осмысленны. **Прежде чем писать
+rollout logger, нужно решить с пользователем: n=1 на комбинацию по
+умолчанию, или n>1 с явным указанием источника стохастичности** — не
+предполагать это молча.
+
+### Что логировать на каждом шаге (rollout logger)
+
+По разделу "Auto-labeling для первых прогонов" `task.md`:
+
+```
+object poses
+contacts
+gripper state
+robot action
+current instruction variant
+task_uid
+seed
+model name
+```
+
+Из этого автоматически считаются (тоже per `task.md`): `first_contact_object`,
+`wrong_object_rate`, `forbidden_object_touch`, `final_spatial_predicate`,
+`relation_success`, `conditional_execution_success`, `action_divergence_to_en`.
+`first_contact_object` — это `sim_handle`; чтобы связать его с ролью
+(target/reference/distractor/forbidden), нужен `scene.objects` из
+`frames_v0.jsonl`, не только `prompts_v0.jsonl`.
+
+**Дополнительно по явной просьбе пользователя, не из task.md:** сохранять
+записи с камер (`agentview` + `wrist`, где есть — у SimplerEnv/WidowX нет
+wrist-камеры) в ходе роллаута — кадры или видео, "для дебага и красоты", не
+как обязательный вход в auto-labeling метрики. Формат (видео vs frame dump,
+частота кадров, куда сохранять) ещё не решён — обсудить на сервере.
+
+### Выход
+
+`rollout_annotations.jsonl`, одна строка на эпизод, строго по формату из
+`task.md` (`run_id`, `model`, `task_uid`, `variant`, `instruction`, `seed`,
+`success`, `first_contact_object`, `target_object`, `reference_object`,
+`wrong_object`, `forbidden_object_touched`, `final_relation_success`,
+`conditional_execution_success`, `failure_type_auto`, `notes`). Первые **100
+rollouts** — ручная валидация точности auto-labeler'а (`task.md`, строка
+1224), прежде чем доверять разметке всего массива. Далее — таблицы "Table -
+behavioral pilot" (SR/first-contact target accuracy/wrong-object
+rate/relation success/forbidden touch по каждому из 8 вариантов) и "Table -
+cleaned language effect" (Δlang-метрики — главная метрика пилота, отделяет
+языковой эффект от instruction-string OOD).
+
+### Открытые вопросы для сервера (явно не решены в этом чате)
+
+- сколько повторов на (сцена × вариант × модель) — см. выше;
+- точный action-policy чекпойнт для SmolVLA (инференс, не только
+  токенизатор) и π0/π0.5;
+- как именно поднимать LIBERO-инференс для lerobot-политик (π0/π0.5,
+  SmolVLA) — своя обвязка или готовая lerobot-интеграция;
+- формат/частота сохранения камерных записей;
+- спеки сервера уже обсуждались (см. предыдущий диалог) — ориентир: одна GPU
+  ≥24 ГБ VRAM (RTX 4090/A5000/A6000 или облачный A100 40 ГБ), headless
+  EGL-рендеринг для MuJoCo и SAPIEN, 32–64 ГБ RAM, 100+ ГБ диска под
+  чекпойнты — но нужно уточнить при реальном выборе конкретных чекпойнтов
+  π0/π0.5 и SmolVLA, если они окажутся тяжелее ожидаемого.
 
 ## Главный принцип: это VLA-бенчмарк
 
@@ -337,42 +478,52 @@ Vision-Language-Action-моделей. При любой реализации и
 - замороженный D3 manifest (20 задач): [`data/selected_tasks_v0.jsonl`](data/selected_tasks_v0.jsonl),
   человекочитаемый лист с квотами: [`data/selected_tasks_v0.html`](data/selected_tasks_v0.html);
 - grounded semantic frames v0.2 (target/reference/relation/forbidden + Tier-1
-  instruction variants на каждую из 20 сцен): [`data/frames_v0.jsonl`](data/frames_v0.jsonl),
-  contract: [`schemas/frames_v0.schema.json`](schemas/frames_v0.schema.json). Верхний
+  instruction variants на каждую из 20 сцен), **заморожено**
+  (freeze `slava-pilot-v0`): [`data/pilot_v0_release/frames_v0.jsonl`](data/pilot_v0_release/frames_v0.jsonl),
+  contract: [`data/pilot_v0_release/frames_v0.schema.json`](data/pilot_v0_release/frames_v0.schema.json). Верхний
   уровень фрейма сделан плоским буквально по шаблону из `task.md`
   (`task_uid`/`suite`/`task_id`/`init_state_id`/`frame_version`/`canonical_en`/
   `bddl_file`, без вложенного `source`), расширен `environment`/`commit`/`task_name`/
   `episode_id`/`reset_seed`/`gym_env_name` (`null` для чужого суита) для
-  воспроизводимости SimplerEnv-сцен и `mt_metadata` под будущий реальный MT-прогон.
-  `scene.objects[].role` — только `target`/`reference`/`distractor`/`background`, как
-  в шаблоне; `forbidden` — не роль, а независимый список id в `slots.forbidden`
-  (объект с ролью `distractor` или `reference`, явно названный в `ru_negation`).
+  воспроизводимости SimplerEnv-сцен и `mt_metadata` (заполнен, реальный
+  DeepL-прогон). `scene.objects[].role` — только
+  `target`/`reference`/`distractor`/`background`, как в шаблоне; `forbidden` —
+  не роль, а независимый список id в `slots.forbidden` (объект с ролью
+  `distractor` или `reference`, явно названный в `ru_negation`).
   `slots.success_predicates` — структурированные (`type: spatial_relation` с
   `relation`/`arg1`/`arg2`, либо `type: state` для `open`/`turn_on` — второй тип
   шаблон не покрывал явно), ссылаются на `id` из `scene.objects`, а не на сырые
-  BDDL-регионы. Собран скриптом
+  BDDL-регионы. Изначально собран скриптом
   [`scripts/build_frames_v0.py`](scripts/build_frames_v0.py) как LLM draft
-  (`validation.native_check="pending"` везде, `mt_russian`/`mt_metadata` всегда
-  `null` при регенерации — нужен реальный MT-прогон, а не LLM-перевод, ещё не
-  начат, заблокирован на доступе пользователя к Google Translate API).
-  Валидация — [`scripts/validate_frames.py`](scripts/validate_frames.py):
-  схема + физическое наличие картинок + сверка `sim_handle` с
-  `task_inventory.jsonl` (правила 1–2 из QA-чеклиста `task.md`); `token_len`
-  теперь тоже реальный (не эвристика) — считает
-  [`scripts/compute_token_len.py`](scripts/compute_token_len.py) из
-  отдельного venv `.venv-tokenizers/`, см. skill `slava-token-len`. Перед
-  freeze обязательны ручная доводка и native check по правилам из `task.md`
-  ("Native check"), удобно делать в
-  [`data/frames_review.html`](data/frames_review.html)
+  (регенерация даёт `validation.native_check="pending"`/`mt_russian=null` —
+  не запускайте её на замороженном файле без явной причины). Валидация —
+  [`scripts/validate_frames.py`](scripts/validate_frames.py): схема +
+  физическое наличие картинок (резолвятся от `data/`, не от места, где лежит
+  сам `frames_v0.jsonl`) + сверка `sim_handle` с `task_inventory.jsonl`
+  (правила 1–2 из QA-чеклиста `task.md`); `token_len` реальный (не
+  эвристика) — считает [`scripts/compute_token_len.py`](scripts/compute_token_len.py)
+  из отдельного venv `.venv-tokenizers/`, см. skill `slava-token-len`.
+  `validation.native_check="passed"`, human-verified пользователем (см.
+  выше) — редактируемый дашборд для будущих правок/масштабирования на
+  ~200 сцен — [`data/frames_review.html`](data/frames_review.html)
   (генератор [`scripts/generate_frames_review.py`](scripts/generate_frames_review.py),
   применение правок [`scripts/apply_frames_review.py`](scripts/apply_frames_review.py));
 - плоские prompts для первых roll-out'ов (JSONL, один `(task_uid, variant)`
-  на строку, 6 primary-вариантов из "Сначала затравка" `task.md`, с
-  reset-metadata и target/reference/forbidden/success_predicates для
-  авторазметки): [`data/prompts_v0.jsonl`](data/prompts_v0.jsonl), генератор
+  на строку, 6 primary-вариантов из "Сначала затравка" `task.md` + `mt_russian`,
+  с reset-metadata и target/reference/forbidden/success_predicates для
+  авторазметки): [`data/pilot_v0_release/prompts_v0.jsonl`](data/pilot_v0_release/prompts_v0.jsonl), генератор
   [`scripts/export_prompts.py`](scripts/export_prompts.py);
 - подробный research и benchmark plan: [`task.md`](task.md);
 - deployment и pinned dependencies: [`scripts/bootstrap.sh`](scripts/bootstrap.sh).
+
+**`data/pilot_v0_release/`** — отдельная подпапка для файлов, которые D4
+буквально передаёт следующему этапу (первые model rollouts): `frames_v0.jsonl`,
+`prompts_v0.jsonl`, `frames_v0.schema.json`. Всё остальное (`task_inventory.jsonl`,
+`object_lexicon.csv`, `selected_tasks_v0.jsonl`, все HTML-дашборды, `scripts/*`,
+`data/images/`, `.claude/skills/`) — вспомогательные/рабочие артефакты, они
+остаются на прежних местах вне этой папки. Это разделение — по явной просьбе
+пользователя, чтобы граница "что уходит в следующий этап" была видна физически
+в дереве репозитория, а не только по документации.
 
 Текущая работа находится на environment-first этапе: candidate inventory,
 рендеры и lexicon используются для ручного отбора сцен. Русский instruction
@@ -781,7 +932,7 @@ Dashboard и screenshot sheet при одинаковых фильтрах об�
 - grounded semantic frames v0.2: schema runtime
   [`src/slava_inventory/frames_schema.py`](src/slava_inventory/frames_schema.py),
   сборка [`scripts/build_frames_v0.py`](scripts/build_frames_v0.py) →
-  `data/frames_v0.jsonl`, валидация
+  `data/pilot_v0_release/frames_v0.jsonl`, валидация
   [`scripts/validate_frames.py`](scripts/validate_frames.py), редактируемый
   дашборд native check
   [`scripts/generate_frames_review.py`](scripts/generate_frames_review.py) →
@@ -795,7 +946,7 @@ Dashboard и screenshot sheet при одинаковых фильтрах об�
   `.venv-tokenizers/`, см. skill `slava-token-len`); экспорт prompts для
   первых roll-out'ов —
   [`scripts/export_prompts.py`](scripts/export_prompts.py) →
-  `data/prompts_v0.jsonl`.
+  `data/pilot_v0_release/prompts_v0.jsonl`.
 
 После изменений выполняйте проверки, пропорциональные риску. Особенно берегите
 `data/task_inventory.jsonl`, `data/object_lexicon.csv` и `data/images`: human

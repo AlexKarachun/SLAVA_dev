@@ -23,8 +23,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from slava_inventory.io_utils import load_jsonl  # noqa: E402
 from slava_inventory.frames_schema import validate_frames  # noqa: E402
 
-DEFAULT_FILES = [PROJECT_ROOT / "data" / "frames_v0.jsonl"]
+DEFAULT_FILES = [PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"]
 DEFAULT_INVENTORY = PROJECT_ROOT / "data" / "task_inventory.jsonl"
+IMAGES_BASE_DIR = PROJECT_ROOT / "data"
 
 
 def check_images_exist(records: list[dict], base_dir: Path) -> list[str]:
@@ -68,7 +69,7 @@ def main() -> None:
     for path in args.files:
         records = load_jsonl(path)
         validate_frames(records)
-        errors = check_images_exist(records, path.parent) + check_sim_handles(records, args.inventory)
+        errors = check_images_exist(records, IMAGES_BASE_DIR) + check_sim_handles(records, args.inventory)
         if errors:
             print(f"FAIL: {path} ({len(records)} records, {len(errors)} issue(s)):")
             for error in errors:

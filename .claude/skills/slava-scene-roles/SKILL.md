@@ -1,13 +1,13 @@
 ---
 name: slava-scene-roles
-description: Assign scene.objects roles (target/reference/distractor/background) and slots (target/reference/relation/forbidden/success_predicates) when authoring a SLAVA grounded_frame in data/frames_v0.jsonl, including composite/addressable objects (e.g. a cabinet's individual drawers). Use when building or reviewing frames, especially when scaling past the 20-scene pilot.
+description: Assign scene.objects roles (target/reference/distractor/background) and slots (target/reference/relation/forbidden/success_predicates) when authoring a SLAVA grounded_frame in data/pilot_v0_release/frames_v0.jsonl, including composite/addressable objects (e.g. a cabinet's individual drawers). Use when building or reviewing frames, especially when scaling past the 20-scene pilot.
 ---
 
 # SLAVA scene grounding: roles, slots, composite objects
 
 Source of truth: `AGENTS.md`'s "grounded semantic frames v0.2" entry and its
 two mnemonic-rule subsections (composite objects; `task.md` contract), plus
-`schemas/frames_v0.schema.json` / `src/slava_inventory/frames_schema.py` for
+`data/pilot_v0_release/frames_v0.schema.json` / `src/slava_inventory/frames_schema.py` for
 the literal contract. This skill is the judgment layer on top of that
 contract — the four roles look simple but the boundary cases are where the
 pilot actually spent its time.

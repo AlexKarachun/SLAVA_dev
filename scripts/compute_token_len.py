@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fill token_len (+ token_len_metadata) in data/frames_v0.jsonl with real
+"""Fill token_len (+ token_len_metadata) in data/pilot_v0_release/frames_v0.jsonl with real
 tokenizer counts -- task.md QA item 14 ("Есть token_len для нужных
 токенизаторов").
 
@@ -42,7 +42,7 @@ from slava_inventory.frames_schema import (  # noqa: E402
     validate_frames,
 )
 
-DEFAULT_FRAMES = PROJECT_ROOT / "data" / "frames_v0.jsonl"
+DEFAULT_FRAMES = PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl"
 
 
 def load_tokenizers() -> dict[str, object]:
