@@ -20,9 +20,11 @@
 предполагается, что этот раздел заменяет его целиком, без отдельного
 handoff-файла). Актуальность этого раздела важнее его краткости.
 
-**Этап:** D4 (grounded semantic frames + instruction variants), после
-закрытого D3 (`data/selected_tasks_v0.jsonl`, 20 задач: 16 LIBERO + 4
-SimplerEnv). Порядок этапов — в "Порядок построения benchmark" ниже.
+**Этап:** D4 закрыт и заморожен (tag `slava-pilot-v0`, коммит `113e531`) —
+grounded semantic frames + instruction variants готовы, после закрытого D3
+(`data/selected_tasks_v0.jsonl`, 20 задач: 16 LIBERO + 4 SimplerEnv).
+Следующий этап — первые model rollouts (см. конец этого раздела). Порядок
+этапов — в "Порядок построения benchmark" ниже.
 
 **`data/frames_v0.jsonl`** — 20 фреймов, схема v0.2, полностью проходит
 `scripts/validate_frames.py`. **Все поля контента теперь реально заполнены,
@@ -121,17 +123,18 @@ schema.json`, не что-то новое; `validate_inventory()` на нём з
 истины и условие проекта. Оставлено как есть окончательно, не поднимать
 снова.
 
-**Git:** весь D4-pipeline пока не закоммичен (`data/frames_v0.jsonl`,
-`data/frames_review.html`, `data/prompts_v0.jsonl`,
-`schemas/frames_v0.schema.json`,
-`scripts/build_frames_v0.py`/`validate_frames.py`/`generate_frames_review.py`/
-`apply_frames_review.py`/`compute_token_len.py`/`export_prompts.py`/
-`run_mt_translate.py`,
-`src/slava_inventory/frames_schema.py`, `.claude/skills/`,
-`requirements-tokenizers.txt`) — все untracked. Ждут явной команды
-пользователя на коммит. `task.md`/`README.md` пользователь уже обновил сам
-под схему v0.2 — синхронизированы с `schemas/frames_v0.schema.json`.
-`data/HOPE_3D_models/` (209 МБ) сознательно не в git. Новое:
+**Git:** весь D4-pipeline закоммичен (коммит `113e531`, "Freeze D4 pilot v0"
+— `data/frames_v0.jsonl`, `data/frames_review.html`, `data/prompts_v0.jsonl`,
+`schemas/frames_v0.schema.json`, все `scripts/*frames*`/`compute_token_len.py`/
+`export_prompts.py`/`run_mt_translate.py`, `src/slava_inventory/
+frames_schema.py`, `.claude/skills/`, `requirements-tokenizers.txt`, плюс
+регенерированные `data/screenshot_sheet_small.html`/`screenshot_sheet_full.
+html`/`docs/index.html`, которые оказались устаревшими относительно уже
+закоммиченного `task_inventory.jsonl`, и `task.md`-правки пользователя
+v0.2-шаблона) по его явному согласию. **Тег `slava-pilot-v0` проставлен** на
+этот коммит (freeze по "Definition of Done: pilot v0" из `task.md`) — тег и
+коммит локальные, не запушены, пуш делать только по отдельной явной
+просьбе. `data/HOPE_3D_models/` (209 МБ) сознательно не в git. Новое:
 `.venv-tokenizers/` (локальный venv для `compute_token_len.py`,
 `transformers`/`huggingface_hub`/`sentencepiece`) — `python -m venv` сам
 создаёт внутри `.venv-tokenizers/.gitignore` с `*`, в git не попадёт и не
