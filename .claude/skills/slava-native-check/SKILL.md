@@ -49,12 +49,15 @@ dashboard — they're listed in `TEXT_VARIANTS` (shown, editable) but not
   That only makes sense if this field is actually scoring **clarity /
   absence of ambiguity** (5 = one obvious referent, 1 = genuinely
   confusable), not "how ambiguous is this" in the literal sense of the word.
-  **Flag this explicitly to the user before scoring at scale** — don't
-  silently pick a polarity. `expl.md` (this project's prior handoff, since
-  removed) already noted the `ambiguity` field itself isn't in `task.md`'s
-  own YAML schema example even though the Native-check section requires it
-  — this metric has a documented history of being underspecified in
-  `task.md`, not a one-off ambiguity you're inventing.
+  **Resolved with the user during the pilot v0 freeze session:** higher =
+  clearer (5 = maximally unambiguous), confirming the direction all 20
+  pilot scenes were already scored in — no data changed. `expl.md` (this
+  project's prior handoff, since removed) already noted the `ambiguity`
+  field itself isn't in `task.md`'s own YAML schema example even though the
+  Native-check section requires it — this metric has a documented history
+  of being underspecified in `task.md`. If scaling past the pilot ever
+  surfaces a case that reads oddly under "higher = clearer", re-confirm
+  with the user rather than assuming the pilot answer generalizes silently.
 
 ## Thresholds and what to do below them
 
@@ -69,6 +72,21 @@ scored variants for that scene clear the thresholds (or have a justified
 `axis_na`). Don't flip it to `passed` with scores still below 4 sitting in
 `validation.naturalness`/`equivalence`/`ambiguity` — the dashboard lets you
 do this manually, the schema doesn't stop you, so it's a discipline thing.
+
+## What actually counted as "done" for pilot v0
+
+`task.md`'s QA pipeline says `LLM draft -> ручная доводка -> validate_frames.py
+-> native check -> freeze`, and the natural reading of "native check" is a
+formal per-scene walkthrough of `data/frames_review.html` with recorded
+scores. For the 20-scene pilot v0 freeze, the user explicitly decided his own
+informal review of the RU rephrasings (reading them in conversation/IDE, not
+a dashboard walkthrough with scores entered) was sufficient to count as the
+human-verified native check — `validation.author`/`validation.notes` in
+`frames_v0.jsonl` were updated to say so honestly (not "pending human
+review"). This was a v0-scale, explicit, one-time call by the user, not a
+new default. **Don't assume it applies automatically at ~200 scenes** —
+confirm with the user again whether an informal pass is still acceptable at
+that volume, or whether a real per-scene dashboard walkthrough is expected.
 
 ## Recording the pass
 

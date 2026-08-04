@@ -1,6 +1,6 @@
 ---
 name: slava-session-handoff
-description: Close out a SLAVA_dev session and prepare a clean start for the next chat — reconcile AGENTS.md's "Текущее состояние проекта" against actual repo/data state, sweep ALL existing skills (not just obviously-related ones) for staleness given this session's changes, update or add skills for new repeatable work, keep the skills list in sync, and write a self-contained starter prompt. Use when the user says they're moving to a new chat, wants a handoff, or asks to update AGENTS.md/skills at the end of a session.
+description: Close out a SLAVA_dev session and prepare a clean start for the next chat — reconcile AGENTS.md's "Текущее состояние проекта" against actual repo/data state, sweep ALL existing skills (not just obviously-related ones) for staleness given this session's changes, update or add skills for new repeatable work, keep the skills list in sync, write a self-contained starter prompt, and commit+push everything the next session needs (the next session may start from a fresh clone on another machine, e.g. a GPU server). Use when the user says they're moving to a new chat, wants a handoff, or asks to update AGENTS.md/skills at the end of a session.
 ---
 
 TRIGGER — load this skill whenever the user signals the session is ending,
@@ -137,10 +137,41 @@ you happened to make:
   prompt / AGENTS.md's "Git" paragraph claims is untracked — a file added
   mid-session is easy to forget to mention.
 
-## 7. Don't commit anything as part of a handoff
+## 7. Commit and push everything needed to continue on another machine
 
-Reconciling `AGENTS.md`/skills/starter-prompt is a documentation and
-planning act, not a signal to `git add`/`git commit` the session's work —
-this project only commits on the user's explicit instruction (see
-`AGENTS.md`'s own rule). Say what's still untracked in the handoff status,
-don't stage it.
+This overrides `AGENTS.md`'s general "only commit on explicit instruction"
+rule specifically for the handoff step: the user's standing instruction is
+that a session close commits and pushes whatever the next session needs,
+because that next session may start from a fresh `git clone` on a different
+machine (e.g. a rented GPU server) with no access to this conversation or
+this working tree. A handoff that leaves things uncommitted defeats its own
+purpose — the starter prompt tells the next agent to read `AGENTS.md`, but
+that only works if `AGENTS.md` (and the skills it points at) are actually on
+the remote.
+
+Concretely, at the end of every handoff:
+
+- `git status --short` — everything modified/untracked that represents
+  finished, already-discussed-with-the-user work (this handoff's `AGENTS.md`
+  and skill edits at minimum, but also any other session output the user
+  already approved the substance of during the conversation) gets staged and
+  committed. Don't re-litigate content the user already signed off on earlier
+  in the session just because it's now commit time.
+- Exclude what's deliberately not meant for git: check `AGENTS.md`'s own
+  "Git" paragraph and any `.gitignore` for things like
+  `data/HOPE_3D_models/` (large, intentionally untracked) or
+  `.venv-tokenizers/` (gitignored on creation) — don't sweep those in with a
+  broad `git add -A`.
+- If something in the diff is genuinely new/unapproved — work in progress
+  the user hasn't actually confirmed, not just "hasn't been asked about
+  committing specifically" — flag it and ask rather than silently including
+  or silently excluding it. The bar is "did the user already approve this
+  content", not "did they say the word commit".
+- Commit with a message describing what the handoff covers, then `git push`
+  (branch and any new tags, e.g. a freeze tag created earlier in the
+  session) to `origin`. A commit sitting local-only is just as unreachable
+  from a fresh clone as an uncommitted change.
+- Report in the handoff status what got pushed (commit hash, branch, tags)
+  and confirm `git status --short` is clean afterward (modulo the
+  deliberately-untracked exceptions above) — don't leave the user to
+  discover mid-server-setup that something didn't make it.
