@@ -155,8 +155,28 @@ class LerobotBackend:
         self.policy.to(self.device).eval()
         self.display_name = policy_cfg.type
 
+        # device_processor override (found 2026-08-05, debugging a pi0.5-only
+        # crash): without it, `RuntimeError: Expected all tensors to be on
+        # the same device, but found at least two devices, cuda:0 and cpu!`
+        # inside `embed_language_tokens` -> `get_input_embeddings()`. Root
+        # cause: pi0.5 builds its language tokens *inside the preprocessor*
+        # (state gets discretized and spliced into the text prompt before
+        # tokenization — see slava-lerobot-policies' architecture section),
+        # unlike pi0, which embeds state as a separate continuous tensor
+        # elsewhere. `predict_action()`'s own device move
+        # (`prepare_observation_for_inference(..., device)`) happens on the
+        # *result* of the preprocessor, so it can't fix tokens that were
+        # already created on the wrong device inside the preprocessor
+        # itself — the preprocessor's own device has to be set explicitly.
+        # Matches the exact override lerobot's own SmolVLA tutorial
+        # (`examples/tutorial/smolvla/using_smolvla_example.py`) uses, which
+        # we were missing. Harmless for pi0/SmolVLA (whose tokenization
+        # doesn't depend on preprocessor device the same way), but confirmed
+        # required for pi05.
         self.preprocessor, self.postprocessor = make_pre_post_processors(
-            policy_cfg, pretrained_path=checkpoint
+            policy_cfg,
+            pretrained_path=checkpoint,
+            preprocessor_overrides={"device_processor": {"device": str(self.device)}},
         )
 
         # NOTE: PolicyFeature.type is a FeatureType enum whose .value is the

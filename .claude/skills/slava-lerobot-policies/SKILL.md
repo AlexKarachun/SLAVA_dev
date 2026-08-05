@@ -445,6 +445,32 @@ collects fresh data under the same run_ids rather than being skipped by
 comparing each episode's first-frame mtime to the server file's mtime) as
 a defense-in-depth check for whenever the *next* server fix lands.
 
+## FIXED, found while rerunning pi0/pi0.5 SimplerEnv with the action-truncation fix (2026-08-05)
+
+**pi0.5 (not pi0) crashed on every single `/predict_chunk` call** with
+`RuntimeError: Expected all tensors to be on the same device, but found at
+least two devices, cuda:0 and cpu!`, traced (via direct reproduction against
+a live server, not guessed) to `embed_language_tokens` ->
+`get_input_embeddings()`. Root cause: our `LerobotBackend.__init__` called
+`make_pre_post_processors(policy_cfg, pretrained_path=checkpoint)` with no
+device override — lerobot's own SmolVLA tutorial
+(`examples/tutorial/smolvla/using_smolvla_example.py`) explicitly passes
+`preprocessor_overrides={"device_processor": {"device": str(device)}}`,
+which we were missing. This didn't matter for pi0 (or SmolVLA in our own
+usage) because `predict_action()`'s own device move happens on the
+*result* of the preprocessor — but pi0.5 builds its language tokens **inside
+the preprocessor itself** (state gets discretized and spliced into the text
+prompt before tokenization — see the architecture section above), so by the
+time `predict_action()` tries to move things to the right device, the
+tokens already exist on the wrong one. Fixed by adding the same
+`preprocessor_overrides` lerobot's own tutorial uses. **Applied to the
+source file but not yet confirmed against a live full rerun** (verified via
+a direct `/predict_chunk` reproduction against a manually-started server,
+which failed identically before the fix — but the actual pi0.5 SimplerEnv
+rerun in progress at handoff time was still running the pre-fix code, since
+model-servers don't hot-reload on file edit). Next session: check whether a
+fresh pi0.5 SimplerEnv rerun completes cleanly.
+
 ## Still open / not yet investigated
 
 - **NEW, unexplained (found 2026-08-05 once the camera-swap fix's full
