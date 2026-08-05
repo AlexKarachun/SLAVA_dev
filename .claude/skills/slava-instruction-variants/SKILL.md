@@ -144,6 +144,18 @@ that object.
   `slava-scene-roles`). The forbidden candidate must be genuinely confusable
   with the target (same rough category/plausible action target), not just
   "some other object in the scene."
+- **Exception: a target/reference role-swap negation** ("pick X, not Y"
+  where Y *is* the reference, e.g. `widowx_stack_cube`'s "возьми не желтый,
+  а зеленый... и поставь на желтый" — yellow is the placement surface, not
+  a distractor) needs **no** `forbidden` entry at all, and must NOT put the
+  reference in `forbidden` (see `slava-scene-roles`'s hard invariant —
+  reference in forbidden makes every legitimate success self-contradictory,
+  since completing the task requires touching the reference). This kind of
+  negation failure is caught by `target_grounding_error` (wrong first
+  contact), a different signal than `forbidden_object_touch` entirely.
+  `frames_schema.py`'s validator only demands non-empty `forbidden` for a
+  filled `ru_negation` when the scene has a spare object beyond target/
+  reference to name — a genuine 2-object scene is exempt.
 - `task.md`'s bad example: `не ошибись и возьми красную кружку` — this names
   no forbidden object, so there's nothing for `forbidden_object_touch` to
   measure. Good pattern: `не X, а Y <verb+relation>` where X is exactly the

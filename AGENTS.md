@@ -1066,58 +1066,307 @@ on SimplerEnv we used action_horizon=2", мы использовали 1) — н
 исправленным `greenvla_server.py`, скорее всего SR тоже вырастет.
 
 **Пользователь спросил про skill на каждую из моделей (OpenVLA-OFT, pi0,
-pi0.5, SmolVLA, GreenVLA) — не сделано в этой сессии** из-за нехватки
-времени, см. ответ в чате: имеет смысл, `slava-model-rollouts` уже большой и
-разнородный (общая архитектура + баги по 5 разным вендорам вперемешку) —
-разбить на `slava-model-rollouts` (общая архитектура/контракты, не меняется)
-+ по одному skill на модель/вендора (specific API, конвенции, известные
-баги/фиксы) было бы чище для будущих сессий. Кандидат для следующей сессии,
-не блокер.
+pi0.5, SmolVLA, GreenVLA)** — сделано позже в этой же сессии, см. следующий
+раздел.
 
-## Бэклог на следующую сессию (собран 05.08.2026 по итогам этой сессии)
+### Продолжение той же сессии: коммит/пуш, затем camera-swap баг у pi0/pi0.5/SmolVLA
 
-Приоритет ниже — по важности, не по порядку упоминания в диалоге.
+После первого коммита/пуша (docs/ + все фиксы) пользователь попросил
+продолжить по бэклогу. Сделано:
 
-1. **Перезапустить GreenVLA-R0/R1 с уже исправленным gripper-фиксом**
-   (`greenvla_server.py` — общий файл, фикс уже в коде, просто не
-   переисследован для R0/R1). Ожидание: SR должен вырасти так же, как у R2
-   (0% → реальные ненулевые числа). Самый быстрый следующий шаг с высокой
-   вероятностью успеха.
-2. **Досчитать GreenVLA-R2** до полных 28 эпизодов (на конец сессии — только
-   часть, SR по факту растёт от 0% к ~17-33% по мере накопления, ещё не
-   стабилизировался; сравнить с их заявленными 80.5% Entire Average).
-3. **pi0/pi0.5/SmolVLA — открытый, нерешённый вопрос:** 0%/1.6%/0% SR на
-   LIBERO даже на самых лёгких задачах (`libero_object`, где OpenVLA-OFT
-   берёт 100%). Проверили и исключили image-flip (A/B тест в обе стороны —
-   не изменило результат). Не проверяли: gripper range mismatch по аналогии
-   с только что найденным у GreenVLA (лёгкий кандидат — тот же класс бага,
-   стоит проверить в первую очередь), action-space scale/units в целом.
-4. **Разбить `slava-model-rollouts` skill** на общий (архитектура/контракты)
-   + по одному skill на модель/вендора (OpenVLA-OFT, lerobot pi0/pi0.5/
-   SmolVLA, GreenVLA) — обсуждено с пользователем, решение "делать в
-   следующей сессии".
-5. **Баг разметки D4-сцены `widowx_stack_cube`**: `slots.forbidden` в
-   `frames_v0.jsonl` совпадает с `reference`-объектом → ложный
-   `negation_error` при легитимном контакте с поверхностью размещения.
-   `frames_v0.jsonl` заморожен (`slava-pilot-v0` tag) — нужно решение
-   пользователя, чинить ли это точечно (и как) или оставить как
-   задокументированное ограничение auto-labeler'а.
+- **Report provenance-аудит** (по запросу пользователя "давай перепроверим,
+  что в метрики не попали статистики из багованных запусков"):
+  `generate_rollout_report.py` теперь сравнивает mtime первого сохранённого
+  кадра каждого эпизода с mtime файла model-server'а, который его
+  произвёл, и **исключает из всех агрегатов** модели, у которых часть
+  эпизодов собрана до последнего фикса того файла — pi0 (67/127), pi0.5
+  (58/127), SmolVLA (24/47) на тот момент были смешанной провенанс, OpenVLA-
+  OFT (99/99) и GreenVLA-R2 (28/28) — чистые. Секция "Валидность данных" в
+  отчёте показывает это явно, не молча.
+- **Галерея камер переделана в grid** по запросу пользователя ("побольше
+  видео... в таблице") — сетка по моделям, несколько эпизодов на разных
+  промпт-вариантах (round-robin, не почти-дубликаты) вместо одной колонки.
+- **GreenVLA-R0/R1 rerun с gripper-фиксом запущен** на всех 4 GPU (backlog
+  п.1) — 2 шарда на модель.
+- **Найден и исправлен реальный баг у pi0/pi0.5/SmolVLA на LIBERO: agentview
+  и wrist камеры были перепутаны местами.** Это и есть настоящая причина
+  0%/1.6%/0% SR на `libero_object` — не gripper range (гипотеза из
+  предыдущего бэклога) и не image orientation (уже проверено и исключено
+  ранее). Дерево доказательства: у всех трёх LIBERO-чекпойнтов
+  (`lerobot/pi0_libero_finetuned`, `pi05_libero_finetuned`,
+  `HuggingFaceVLA/smolvla_libero`) объявлены фичи с именами
+  `observation.images.image`/`image2` — без подстроки "wrist". Собственный
+  класс `LiberoEnv` в `huggingface/lerobot`
+  (`src/lerobot/envs/libero.py:158-159`) явно маппит
+  `agentview_image → "image"`, `robot0_eye_in_hand_image → "image2"` — т.е.
+  "image" это ГЛАВНАЯ камера, "image2" это wrist. Наш `_wrist_first` в
+  `lerobot_server.py` сортирует по подстроке "wrist" в имени — для этих
+  чекпойнтов это no-op, и код падал на позиционное присвоение
+  (`image_feature_names[0] <- real_cameras[0]`, где
+  `real_cameras=[wrist, agentview]`) — то есть wrist-камера уходила в слот
+  "image" (главная сцена), а agentview — в слот "image2" (wrist). Полностью
+  перепутано для КАЖДОГО эпизода pi0/pi0.5/SmolVLA на LIBERO, собранного до
+  этого фикса. Исправлено явным `_LIBERO_CAMERA_NAME_MAP` в
+  `lerobot_server.py`, специфичным для этих двух имён (не трогает
+  zero-shot SimplerEnv чекпойнты). Полная деривация — skill
+  `slava-lerobot-policies`.
+- **245 старых (баганых) эпизодов pi0/pi0.5/SmolVLA LIBERO вычищены** из
+  `rollout_annotations.jsonl` (архив директорий:
+  `rollouts/episodes_archived_lerobot_pre_camera_swap_fix/`, бэкап JSONL:
+  `.bak_before_lerobot_camera_swap_fix`) — чтобы rerun пересобрал их заново
+  под тем же run_id, а не был пропущен `load_completed_run_ids()`.
+- **Rerun pi0/pi0.5/SmolVLA запущен** на всех 4 GPU параллельно с
+  GreenVLA R0/R1 (GPU1 несёт 3 процесса — ~31.2/32.8GB, впритык, но
+  работает). **Первый же эпизод pi0 после фикса — реальный success**
+  (`en_canonical`, было 0% на сотнях эпизодов до этого) — сильное
+  подтверждение, что баг найден верно.
+- **Skill разбит**: `slava-model-rollouts` (общая архитектура, контракты,
+  process-management lessons) + `slava-openvla-oft` + `slava-lerobot-
+  policies` + `slava-greenvla` (каждый — API конкретного вендора + все
+  найденные баги для него).
+
+### Третья часть сессии: пользователь усомнился в R1-результате → найден настоящий баг + pure-upstream репро
+
+Пользователь: GreenVLA сам заявляет неплохой Entire Avg SR на SimplerEnv для
+R1 (72.9%), а у нас 0/28 (хоть и с реальным grounding) — попросил проверить
+все неочевидные места, а затем прямо воспроизвести их метрики их же кодом
+(клонировать репо, их checkpoint, их же SimplerEnv-код), выделив под это
+одну GPU, чтобы понять — модель объективно не справляется именно со
+stacking, или у нас баг.
+
+**Проверено и ИСКЛЮЧЕНО** (5 неочевидных мест, до нахождения реальной
+причины): TimeLimit/max_steps (корректно обрывается на 60, не 120 — было
+ложное подозрение на 138-шаговый эпизод, оказался склейкой 3 старых попыток
+в одном append-only файле), `prepackaged_config`/visual-matching (применяется
+корректно), success-condition в `evaluate()` (стандартная bbox+contact
+проверка), у GreenVLA нет отдельного SimplerEnv eval-скрипта вообще (только
+inference-примеры). Также обнаружено, что их README-число 72.9%/80.5% —
+**агрегат по всем 4 bridge-задачам**, не per-task для stacking специфично —
+сравнение с нашим числом на одной (вероятно самой сложной) задаче было
+нечестным независимо от корректности пайплайна.
+
+**Найден настоящий баг (6-е, неочевидное место): rotation representation
+mismatch.** `PDEEPoseController.compute_target_pose()`
+(`ManiSkill2_real2sim/agents/controllers/pd_ee_pose.py:195`) делает
+`Rotation.from_rotvec(action[3:6])` — контроллер ожидает **axis-angle**
+(rotation vector), не Euler-углы. GreenVLA же по своей документации выдаёт
+`[x,y,z,roll,pitch,yaw,gripper]` — именно Euler-конвенция (в отличие от
+LIBERO/OpenVLA-OFT, где явно "axis_angle" в терминологии для той же по сути
+величины — другая embodiment, другая конвенция). Подтверждено НЕ догадкой,
+а прямым чтением SimplerEnv's own эталонного RT1-wrapper'а
+(`simpler_env/policies/rt1/rt1_model.py`): там есть конкретно
+`action_rotation_mode == "rpy"` ветка, которая делает
+`euler2axangle(roll, pitch, yaw)` **перед** отправкой в тот же самый env —
+то есть эта конверсия — не наша придумка, а то, что валидированные модели в
+этом же харнессе обязаны делать. `greenvla_server.py` отправлял
+roll/pitch/yaw как есть, без конверсии — for малых углов axis-angle и Euler
+похожи (почему грубое дотягивание/захват всё же работал), но расходятся на
+реальных величинах — ровно то, что объясняет "хватает правильный кубик,
+никогда не стекает точно" (relation_binding_error вместо success).
+
+**Фикс:** `chunk[:,3:6] = euler2axangle(roll,pitch,yaw)` (через
+`transforms3d`, добавлен в `slava-greenvla` conda env) в
+`greenvla_server.py::predict_chunk()`, после существующего gripper-рескейла.
+
+**Pure-upstream репро (без единой строчки SLAVA_dev кода) — методология и
+статус:** новый conda env `greenvla-simpler-repro` (`/venv/greenvla-simpler-
+repro`), собран С НУЛЯ (не `conda create --clone` — попытки клонировать
+`slava-greenvla` И `slava-simpler` дважды падали на conda solver'е, который
+спотыкается о pip-only пакеты при клонировании смешанных conda+pip envs;
+известное ограничение conda, не наша ошибка). Установлено: `pip install -e
+ManiSkill2_real2sim -e SimplerEnv` (SimplerEnv's own env-side код) +
+`pip install -e .` из `greenvla_repo` (их же inference-код) в ОДИН env.
+**Реальный, воспроизводимый на этой машине баг найден по пути:**
+`sapien==2.2.2` (собран до numpy 2.0) segfault'ит на `env.step()` с numpy≥2 —
+подтверждено дифом версий пакетов между рабочим `slava-simpler` (numpy
+1.24.4) и падающим свежим env (numpy 2.4.6, подтянутый транзитивно через
+GreenVLA-стек). Фикс: `numpy==1.26.4` (граница — GreenVLA-стек, конкретно
+`pandas`/`datasets`, требует `>=1.26.0`, а `sapien==2.2.2` совместим только
+с numpy 1.x ABI — 1.26.4 последняя 1.x-версия, устраивает обе стороны).
+Скрипт-репро (не в репозитории, в scratchpad):
+воспроизводит ровно тот же generic client-server паттерн, что и остальные
+policy wrapper'ы в SimplerEnv (RT1Inference/OctoInference) — минимальный
+клей между их API, не переизобретение ни одной из сторон.
+**Первый прогон (R1-bridge, 20 эпизодов, с фиксами gripper+rotation,
+GPU3): уже 1/8 = реальный success (ep 3, 16 шагов) на момент записи**,
+прогон продолжается — сравнение "с фиксами vs без" и финальное число будет
+дописано сюда после завершения.
+
+**Параллельно (тот же вывод, что фикс работает) — R0/R1 rerun через НАШ
+собственный пайплайн с новым rotation-фиксом запущен на GPU1/GPU2** (старые
+28+28 pre-rotation-fix эпизода вычищены — архив
+`rollouts/episodes_archived_greenvla_r0_r1_pre_rotation_fix/`, бэкап
+`.bak_before_greenvla_rotation_fix` — иначе `load_completed_run_ids()`
+пропустил бы их как уже готовые). GPU0 занята SmolVLA (доигрывает шард 3,
+приостановленный ранее ради дебага — вернул на месте).
+
+## Бэклог (актуализирован 05.08.2026, конец сессии — читать вместо всех более старых версий этого раздела выше)
+
+Всё, что было в предыдущих версиях этого раздела и не повторено ниже, **уже
+сделано**. Это финальный срез на момент хэндоффа; см. "Продолжение сессии"
+подразделы выше (особенно "пользователь усомнился в R1-результате") для
+полной хронологии находок, если нужны подробности рассуждений.
+
+**ГЛАВНОЕ, что должен сделать новый агент первым делом**: на момент записи
+на GPU **всё ещё выполняются 5 фоновых процессов** (см. точный список в
+конце этого файла, раздел "Живые процессы на момент хэндоффа"). Не убивать
+их бездумно — сначала `ps aux | grep run_rollouts.py` и `nvidia-smi`, дать
+им доиграть (`load_completed_run_ids()` резюмит безопасно, если что-то
+всё-таки упадёт/зависнет). Когда все допишут, дальше по списку:
+
+1. **GreenVLA R0/R1/R2 rotation-фикс rerun** — R2 **готов раньше** (обычно
+   заканчивается первым, 28 эпизодов уже почти на месте), R0/R1 медленнее.
+   **Ключевая находка этой части сессии**: контроллер WidowX
+   (`Rotation.from_rotvec`) ждёт axis-angle, а GreenVLA выдаёт Euler-углы
+   (`roll,pitch,yaw`) без какой-либо конверсии — подтверждено чтением
+   `PDEEPoseController` + эталонного RT1-wrapper'а в SimplerEnv (у него есть
+   явная ветка `euler2axangle()` для моделей с Euler-выходом). Фикс:
+   `euler2axangle()` в `greenvla_server.py::predict_chunk()`, после
+   gripper-рескейла. **Подтверждено pure-upstream репро** (см. п.2) —
+   доверять этому фиксу, не перепроверять заново без новой причины.
+2. ~~Pure-upstream репро GreenVLA-R1 (их код + SimplerEnv's own eval,
+   БЕЗ единой строчки нашего кода)~~ — **готово, финальный результат: 2/20
+   = 10.0% SR** на `widowx_stack_cube`, R1-bridge, с обоими фиксами
+   (gripper + rotation). Подтверждает: баг был настоящий, фикс реально
+   работает, ненулевой success — воспроизводимый факт. 10% далеко от их
+   заявленных 72.9%/80.5% (Entire Avg) — но это **агрегат по всем 4
+   bridge-задачам** (spoon-on-towel, carrot-on-plate, **stack-cube**,
+   eggplant-in-basket), не число для stacking специально; stacking
+   объективно может быть заметно сложнее остальных трёх. Не путать это
+   число с числами нашего собственного пайплайна (п.1) — они собираются
+   отдельно и могут отличаться по чистой статистической случайности при
+   таком размере выборки, это не повод для тревоги само по себе. Метод и
+   находки по пути (сегфолт `sapien==2.2.2` vs numpy≥2, решён пином
+   `numpy==1.26.4`; `conda create --clone` не работает на смешанных
+   conda+pip env — известное ограничение conda) — в skill `slava-greenvla`.
+   Репро-скрипт и его env (`greenvla-simpler-repro`) — вне репозитория, в
+   scratchpad и в отдельном conda env; не привязывались к git, можно
+   удалить `conda env remove -n greenvla-simpler-repro` если больше не
+   нужен, либо оставить для будущих аналогичных проверок.
+3. **pi0/pi0.5 SimplerEnv rerun (base/wrist camera-фикс)** — запущен на
+   GPU0 после того, как SmolVLA LIBERO полностью досчитался (99/99).
+   **По пути найден и исправлен ещё один настоящий баг**: `lerobot/
+   pi0_base`/`pi05_base` — cross-embodiment BASE-чекпойнты, никогда не
+   файнтюненные на конкретного робота; их собственный `config.json`
+   реально объявляет `output_features["action"].shape == (32,)` (общий
+   padded-размер, не настоящий 7-dim WidowX). Наш код брал этот 32-мерный
+   вектор как есть → `AssertionError: ((32,), 7)` на каждом `/step`.
+   Исправлено усечением `action[:7]` в `lerobot_server.py::predict()` —
+   та же конвенция, что `GreenVLA`'s `BridgeOutputsTransform` для того же
+   embodiment. **Также хит по пути**: запуск pi0+pi0.5 одновременно на
+   одной GPU во время их ОБЩЕЙ фазы загрузки чекпойнта временно даёт CUDA
+   OOM (пиковая память двух ~3B PaliGemma-моделей одновременно > 32GB) —
+   решается запуском последовательно (дать одной полностью загрузиться,
+   потом стартовать вторую), не параллельно с нуля. Детали — skill
+   `slava-lerobot-policies`.
+4. **pi0 на LIBERO: `no_action_or_timeout` доминирует (90/99), pi0.5 —
+   нет** — новая, отдельная, необъяснённая находка (не то же самое, что
+   camera-swap, который уже исправлен и подтверждён для обоих). Не
+   расследовано в этой сессии. Кандидаты для следующей: сравнить
+   action-head/flow-matching конфиг pi0 vs pi0.5 (см. архитектурный
+   раздел в `slava-lerobot-policies` — они архитектурно НЕ идентичны,
+   у pi0.5 state идёт текстом в промпт, а не отдельным эмбеддингом),
+   либо прямой `curl` к живому pi0 model-server'у с реальным observation
+   для инспекции сырых предсказанных action-значений.
+5. **Архитектурные справки по всем 4 моделям — готово.** По просьбе
+   пользователя добавлены секции "Architecture reference" в
+   `slava-openvla-oft`/`slava-lerobot-policies`/`slava-greenvla` — backbone,
+   action head, inference pipeline шаг за шагом, код/псевдокод, точные
+   цитаты из официальных paper/репо (не выдумано). Весь прежний
+   накопленный опыт (баги, находки) сохранён без изменений, секции
+   добавлены сверху. Полезно перечитать перед следующим заходом на баг в
+   любой из этих моделей — многие находки этой сессии (rotation-фикс,
+   action-truncation-фикс) прямо предсказывались архитектурными деталями,
+   которые эти секции теперь документируют явно.
 6. **Ручная валидация первых 100 rollouts** (task.md, explicit
-   требование) — не выполнена, нужна пользователем лично.
-7. **Полное покрытие всех моделей × всех промптов** — не достигнуто ни для
-   одной модели кроме OpenVLA-OFT (99/99). pi0/pi0.5 дошли до 127/127 (но с
-   подозрительно низким SR, см. п.3), SmolVLA/GreenVLA — частично.
-8. **v0.1 (projection 3D→2D crosshair) и pointing-зонд GreenVLA** — не
+   требование) — **пользователь явно отложил до конца сборки данных**
+   ("Отложить до конца сборки данных") — сборка данных практически
+   закончена (см. п.1 выше), пора поднимать этот вопрос с пользователем.
+7. **Перегенерировать `docs/rollout_report.html` и закоммитить/запушить**
+   once все прогоны из п.1/3 закончатся. Команда:
+   `python3 scripts/generate_rollout_report.py --output docs/rollout_report.html --for-pages`.
+   Отчёт на момент хэндоффа НЕ перегенерирован после rotation/action-
+   truncation фиксов — числа в нём устарели.
+8. **Баг разметки D4/pi0-SimplerEnv-camera-fix zero-shot ambiguity
+   (smolvla camera1/2/3, pi0_base/pi05_base right_wrist_0_rgb дублирование
+   для бимануальных слотов)** — все известные варианты этого класса багов
+   исследованы и задокументированы в `slava-lerobot-policies`, ничего не
+   осталось открытым по этой линии на момент хэндоффа.
+9. **v0.1 (projection 3D→2D crosshair) и pointing-зонд GreenVLA** — не
    начаты, сознательно вне scope pilot v0 (task.md относит их к следующему
-   шагу).
-9. **Коммит/пуш в git** — не делались в этой сессии (по умолчанию не
-   коммитим без явной просьбы). Много несохранённых изменений: все фиксы
-   моделей, `run_rollouts.py` шардинг, `generate_rollout_report.py`,
-   `AGENTS.md`/skill-обновления, новые данные в `rollouts/`.
+   шагу). **Что это, если пользователь/агент спросит снова** (объяснялось
+   в чате 05.08.2026, task.md строки ~1160-1168, ~129): v0 (то, что у нас
+   есть) — RGB + sim handles + позы объектов + contacts. v0.1 добавляет
+   проекцию известной 3D-позы объекта (уже есть в `steps.jsonl`'s
+   `object_poses`) в 2D-точку на кадре ("crosshair") — ground-truth ответ
+   на "где на картинке объект X". Зачем: у GreenVLA отдельная VLM-голова,
+   которая умеет отвечать на "укажи на X" — с crosshair можно сравнить
+   pointing-accuracy VLM-головы (по-русски/по-английски) с тем, что
+   action-голова реально трогает первой в той же сцене (`first_contact_
+   object`, уже есть в v0). Точный pointing + неверное действие = прямое,
+   внутримодельное (без патчинга) доказательство H-binding-гипотезы
+   (понимание есть, связка "понимание→действие" рвётся) — уникально для
+   GreenVLA, у остальных 4 моделей нет pointing-головы для такого
+   сравнения. v1.0 (ещё дальше) — instance segmentation/bbox/masks.
 10. **`rollout_annotations.jsonl` со старого сервера** (77 эпизодов) — по
     решению пользователя НЕ переносился на эту машину, весь прогон здесь с
     нуля. Если понадобятся эти старые данные отдельно — они остались на
     предыдущей машине/в zip у пользователя.
+
+### Живые процессы на момент хэндоффа (05.08.2026, ~19:45 UTC)
+
+Снимок для возобновления — числа ниже растут в реальном времени, не
+переписывать этот блок, просто прочитать как "что было запущено и где" и
+перепроверить актуальные счётчики через
+`python3 -c "import json; from collections import Counter; c=Counter(); [c.update([json.loads(l)['model']]) for l in open('rollouts/rollout_annotations.jsonl')]; print(c)"`
+или аналогичный однострочник.
+
+```
+GPU0 (~16.7GB): pi0 SimplerEnv (rerun, camera+action-truncation фикс)
+                 env-worker :9601, model-server lerobot/pi0_base :9611
+                 pi05 SimplerEnv — оркестратор запущен, ещё в LIBERO skip-цикле
+                 (99 skip'ов), model-server пока не поднят — если завис
+                 дольше ~5 мин на этом этапе, проверить лог
+                 rollouts/logs/pi05_simplerenv_actiontrunc_fix_v2.log
+GPU1 (~11.8GB): GreenVLA-R0 rotation-fix rerun, env-worker :9301,
+                 model-server (R0-base) :9311
+GPU2 (~11.6GB): GreenVLA-R1-bridge rotation-fix rerun, env-worker :9302,
+                 model-server (R1-bridge) :9312
+GPU3 (~11.6GB): GreenVLA-R2-bridge rotation-fix rerun, env-worker :9401,
+                 model-server (R2-bridge) :9411
+```
+
+Счётчики на момент записи: GreenVLA-R0 0/17, GreenVLA-R1 0/18,
+GreenVLA-R2 3/9, pi0 SimplerEnv 0/25 (LIBERO часть 2/99 уже готова),
+pi0.5 SimplerEnv ещё не начат (LIBERO часть 0/99 уже готова).
+Логи оркестраторов: `rollouts/logs/{greenvla_r0,greenvla_r1,greenvla_r2}_rotationfix.log`,
+`rollouts/logs/pi0_simplerenv_actiontrunc_fix.log`,
+`rollouts/logs/pi05_simplerenv_actiontrunc_fix_v2.log`.
+
+**Если процессы всё ещё живы, когда начинается новая сессия** — просто дать
+доиграть (`ps aux | grep run_rollouts.py`, `tail -f` соответствующий лог).
+**Если умерли/зависли** — резюмить безопасно той же командой (без
+`--num-shards`, эти конкретные reruns шли одним шардом каждый):
+```
+CUDA_VISIBLE_DEVICES=<N> SLAVA_SIMPLERENV_PORT=<port> SLAVA_MODEL_PORT_<KEY>=<port> \
+  conda run -n slava-notebook python scripts/run_rollouts.py --models <model_key>
+```
+— подставить свободные порты (не пересекающиеся с ещё живыми процессами) и
+нужный `model_key` (`greenvla_r0`, `greenvla_r1_bridge`, `greenvla_r2_bridge`,
+`pi0`, `pi05`). `load_completed_run_ids()` продолжит с того места, где
+остановились — дублирования не будет.
+
+**Важно про pi0+pi0.5 на одной GPU**: если запускаете оба заново, дайте
+ПЕРВОМУ полностью загрузиться (`nvidia-smi` покажет стабильную память,
+модель-сервер начнёт отвечать 200 на `/predict_chunk`) ДО старта второго —
+одновременная загрузка двух ~3B PaliGemma-моделей может временно превысить
+32GB и упасть с CUDA OOM (уже случилось раз в этой сессии, решилось
+последовательным запуском).
+
+**После того как все 5 процессов выше допишут до конца** (проверить: ни
+одного `run_rollouts.py` в `ps aux`) — следующий шаг это п.6-7 бэклога
+выше (спросить пользователя про ручную валидацию, перегенерировать отчёт,
+закоммитить).
 
 ## Главный принцип: это VLA-бенчмарк
 
@@ -1753,15 +2002,33 @@ annotations и локальные рендеры нельзя восстанав
   пере-запуска `compute_token_len.py`/`export_prompts.py` после MT-прогона,
   как переключать MT-провайдера (уже было один раз: Google → DeepL) и общее
   правило безопасной передачи секретов в этом проекте;
-- `slava-model-rollouts` — client-server архитектура первых model rollouts
-  (env-worker/model-server split, почему один shared env-worker на среду, а
-  не на модель), реальные inference API всех 5 моделей (прочитаны из живых
-  клонов, не угаданы), контракт `rollout_annotations.jsonl`/авторазметка,
-  память GPU (одна модель резидентна за раз), как безопасно параллелить
-  SimplerEnv, и раздел "Real bugs found" — 10 реальных багов с root cause и
-  фиксом (в т.ч. пропущенный gripper post-processing у OpenVLA-OFT и
-  process-group termination для `conda run`), плюс техника обнаружения
-  "замёрзшей" политики через сравнение md5 последовательных кадров камеры;
+- `slava-model-rollouts` — **общая** (05.08.2026 разбита на 4 skill'а из-за
+  размера) client-server архитектура первых model rollouts (env-worker/
+  model-server split, почему один shared env-worker на среду, а не на
+  модель), контракт `rollout_annotations.jsonl`/авторазметка, память GPU
+  (одна модель резидентна за раз), как безопасно параллелить SimplerEnv,
+  общие process-management уроки (`conda run` не форвардит сигналы,
+  wrapper-vs-child PID). Модель-специфичные API/баги теперь в отдельных
+  skill'ах ниже — читать этот файл первым для контекста, затем нужный
+  из четырёх;
+- `slava-openvla-oft` — OpenVLA-OFT: architecture reference (Prismatic VLM,
+  SigLIP+DINOv2, parallel decoding vs vanilla autoregressive, L1-regression
+  action head), confirmed real API из `moojink/openvla-oft`, 4 реальных бага
+  с root cause (пропущенный gripper post-processing, chunk replay, image
+  mirroring, missing settle steps) — довели SR с 0% до 74.7%;
+- `slava-lerobot-policies` — pi0/pi0.5/SmolVLA (общий `lerobot_server.py`):
+  architecture reference для всех трёх (flow matching, action expert,
+  camera1/2/3 у SmolVLA — исследовано дважды, документирована и
+  подтверждена живыми чекпойнтами арбитрарность), cuDNN-фикс, camera-swap
+  баг (настоящая причина 0% на LIBERO, не gripper/orientation), base/wrist
+  camera-фикс для zero-shot `*_base` чекпойнтов на SimplerEnv,
+  action-truncation баг у `pi0_base`/`pi05_base` (32-dim vs реальный 7-dim);
+- `slava-greenvla` — GreenVLA R0/R1/R2: architecture reference (Qwen3-VL-4B
+  backbone, π0-style action expert, flow matching, R2's настоящий offline
+  RL curriculum — IQL + noise-actor), gripper-range-mismatch фикс,
+  **rotation representation mismatch фикс** (Euler vs axis-angle — самая
+  крупная находка сессии), pure-upstream репро методология и результат
+  (2/20=10% SR на stack_cube с обоими фиксами, их же код);
 - `slava-session-handoff` — процесс закрытия сессии и подготовки нового
   чата (на той же или другой машине/железе): сверка "Текущего состояния
   проекта" на противоречия (не просто дописывать абзац сверху), когда

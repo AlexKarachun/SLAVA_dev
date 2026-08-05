@@ -51,14 +51,33 @@ object with no matching `forbidden`/`ru_negation` entry is normal and
 expected — see the `forbidden` note above.
 
 `forbidden` is **not a fifth role**. It's an independent list of ids in
-`slots.forbidden` — the subset of (usually `distractor`, occasionally
-`reference`) objects that a specific `ru_negation` variant names as wrong.
-A `distractor` not in `forbidden` is a normal, expected state — it means
-"this object could plausibly be grabbed by mistake" without claiming the
-current instruction text calls it out by name. Don't inflate `forbidden` to
-cover every distractor "just in case" — it changes what
-`forbidden_object_touch` is diagnosing (see `slava-instruction-variants`'s
-`ru_negation` section).
+`slots.forbidden` — the subset of `distractor` objects that a specific
+`ru_negation` variant names as wrong. A `distractor` not in `forbidden` is a
+normal, expected state — it means "this object could plausibly be grabbed
+by mistake" without claiming the current instruction text calls it out by
+name. Don't inflate `forbidden` to cover every distractor "just in case" —
+it changes what `forbidden_object_touch` is diagnosing (see
+`slava-instruction-variants`'s `ru_negation` section).
+
+**Hard invariant, enforced by `validate_frames()` (found the hard way,
+2026-08-05): `reference` must never be in `forbidden`.** This doc used to
+say the forbidden subset was "usually distractor, occasionally reference" —
+that "occasionally reference" was itself the bug, not a valid case: it
+shipped in `widowx_stack_cube` (D4, `forbidden=[reference]`, a 2-object
+stack scene with no distractor at all) and caused every legitimate success
+— which necessarily involves contact with the reference object, since the
+task's own relation ("stack X **on** Y") is defined *in terms of* touching
+it — to auto-label as `negation_error` instead of `success`. The
+`touched_objects ∩ forbidden` check that drives `negation_error` cannot
+distinguish "touched the reference as required by the task" from "touched
+a genuinely forbidden object"; putting `reference` in `forbidden` at all
+makes the check self-contradictory (finishing the task correctly requires
+triggering it). A "pick X, not Y" negation where Y is the reference itself
+(a target/reference role-swap, not a third distractor) is correctly caught
+by `target_grounding_error` (wrong first contact) instead — it does not
+need `forbidden` at all, and `frames_schema.py`'s validator only requires
+`forbidden` non-empty for `ru_negation` when the scene actually has a spare
+object beyond target/reference for it to name.
 
 ## Composite / addressable objects (drawers, sub-parts of one physical thing)
 

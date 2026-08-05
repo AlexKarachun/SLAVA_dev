@@ -217,7 +217,15 @@ TEMPLATES: dict[str, dict[str, Any]] = {
     "widowx_stack_cube": {
         "action": "stack",
         "target_id": "baked_green_cube_3cm", "reference_id": "baked_yellow_cube_3cm", "relation": "on",
-        "forbidden_ids": ["baked_yellow_cube_3cm"],
+        # forbidden_ids intentionally empty (fixed 2026-08-05 — was
+        # ["baked_yellow_cube_3cm"], i.e. the reference itself): this
+        # 2-object scene has no distractor, and the task ("stack green on
+        # yellow") requires legitimate contact with the reference object as
+        # the placement surface. The previous value made every real success
+        # auto-label as negation_error — see frames_schema.py's new
+        # reference-not-in-forbidden validator check, which now catches this
+        # class of authoring mistake before it reaches frames_v0.jsonl again.
+        "forbidden_ids": [],
         "roles": {"baked_green_cube_3cm": "target", "baked_yellow_cube_3cm": "reference"},
         "en_paraphrase": "pick up the green block and place it on the yellow block",
         "ru_literal": "поставь зеленый кубик на желтый кубик",

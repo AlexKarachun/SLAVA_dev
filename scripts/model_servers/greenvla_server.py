@@ -116,6 +116,40 @@ class GreenVLABackend:
         # polarity already matches: GreenVLA's ~1=open maps to +1=open,
         # ~0=close maps to -1=close under this env's convention).
         chunk[:, -1] = 2.0 * chunk[:, -1] - 1.0
+        # Rotation representation fix (found 2026-08-05, debugging why R1/R2
+        # ground objects correctly but never complete a precise stack).
+        # GreenVLA's docs describe both the state AND the action as
+        # "[x,y,z,roll,pitch,yaw,gripper]" — genuine Euler-angle deltas
+        # (matching BridgeData/RT-X's documented action-space convention),
+        # confirmed by contrast with LIBERO/OpenVLA-OFT's proprioception,
+        # which explicitly says "axis_angle" instead of "roll,pitch,yaw" for
+        # the same kind of quantity — a different embodiment's docs
+        # deliberately using different terminology for a different
+        # representation. But SimplerEnv/ManiSkill2's WidowX controller
+        # (`PDEEPoseController.compute_target_pose`, `ManiSkill2_real2sim/
+        # agents/controllers/pd_ee_pose.py`) does
+        # `Rotation.from_rotvec(action[3:6])` — it expects an axis-angle
+        # ROTATION VECTOR, not three Euler angles. Confirmed this is a real,
+        # required conversion (not a guess) by reading SimplerEnv's own
+        # reference RT1 policy wrapper (`simpler_env/policies/rt1/
+        # rt1_model.py`), which explicitly supports an `action_rotation_mode
+        # == "rpy"` branch that does exactly `euler2axangle(roll, pitch,
+        # yaw)` before handing the result to this same env — i.e. *some*
+        # policies' native output is Euler and this conversion is exactly
+        # how SimplerEnv's own harness handles that. `env_worker_simpler.py`
+        # applies no such conversion (there's no per-model hook for it), so
+        # every roll/pitch/yaw delta GreenVLA ever produced was being
+        # interpreted as if it were already a rotation vector — for small
+        # angles the two representations are similar to first order (why
+        # rough reaching/grasping still worked), but they diverge enough at
+        # real magnitudes to plausibly explain "grabs the right cube,
+        # never quite stacks it precisely" (relation_binding_error) instead
+        # of a clean success.
+        from transforms3d.euler import euler2axangle
+
+        for row in chunk:
+            ax, angle = euler2axangle(row[3], row[4], row[5])
+            row[3:6] = ax * angle
         return chunk.tolist()
 
     def predict(self, instruction: str, obs: dict, meta: dict) -> list[float]:

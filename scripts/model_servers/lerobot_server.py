@@ -55,6 +55,55 @@ def _wrist_first(items):
     return sorted(items, key=lambda kv: 0 if "wrist" in kv[0].lower() else 1)
 
 
+# LIBERO-finetuned checkpoints (lerobot/pi0_libero_finetuned, pi05_libero_
+# finetuned, HuggingFaceVLA/smolvla_libero — confirmed identical across all
+# three via PreTrainedConfig.from_pretrained(...).input_features, 2026-08-05)
+# declare generic feature names "observation.images.image"/"...image2", which
+# contain no "wrist" substring, so `_wrist_first` was a silent no-op for them
+# and the code below fell through to positional (declaration-order)
+# assignment: image <- camera_idx 0, image2 <- camera_idx 1. That is backwards.
+# lerobot's OWN reference LIBERO env class defines the mapping directly
+# (src/lerobot/envs/libero.py, camera_name_mapping): "agentview_image": "image",
+# "robot0_eye_in_hand_image": "image2" — i.e. "image" is the MAIN/agentview
+# camera and "image2" is the WRIST camera. Our positional assignment had this
+# exactly swapped: the wrist closeup was fed into the "image" (main-view) slot
+# and the global scene view into "image2" (wrist slot) for every pi0/pi0.5/
+# SmolVLA LIBERO episode collected so far. A model reasoning about object
+# layout from what it believes is the main scene, while actually looking at a
+# wrist closeup, would plausibly never register contact with the right
+# object — consistent with the near-0% SR / "first_contact_object always
+# None" pattern on libero_object that image-orientation A/B testing (see
+# REVERTED block below) did not explain.
+_LIBERO_CAMERA_NAME_MAP = {
+    "observation.images.image": "agentview",
+    "observation.images.image2": "wrist",
+}
+
+# openpi's own reference input adapters (physical-intelligence/openpi,
+# src/openpi/policies/{droid,aloha}_policy.py — confirmed by reading them
+# directly, 2026-08-05) use this exact naming convention across every
+# embodiment: "base_0_rgb" is always the exterior/3rd-person camera,
+# "left_wrist_0_rgb"/"right_wrist_0_rgb" are wrist cameras (right_wrist only
+# for bimanual robots). `lerobot/pi0_base`/`pi05_base` inherit these names.
+# `_wrist_first` alone is not enough here: when there's no real wrist camera
+# at all (SimplerEnv/WidowX bridge — env_worker_simpler.py never sets
+# wrist_rgb), `_wrist_first` still sorts left_wrist_0_rgb ahead of
+# base_0_rgb, so the lone real (agentview) camera would be positionally
+# consumed by the WRIST slot, leaving base_0_rgb — the slot that should get
+# it — empty. Explicit mapping avoids this: base_0_rgb always gets the main
+# camera; the wrist slots only get a real frame if a real wrist camera
+# exists, otherwise they're omitted (see the `continue` fallback below,
+# which relies on lerobot's own `PI0Policy._preprocess_images()` treating
+# any declared image feature absent from the batch as "missing" and
+# auto-masking it with -1 padding — matching openpi's own missing-camera
+# handling, not a guess).
+_BASE_WRIST_CAMERA_NAME_MAP = {
+    "observation.images.base_0_rgb": "agentview",
+    "observation.images.left_wrist_0_rgb": "wrist",
+    "observation.images.right_wrist_0_rgb": "wrist",
+}
+
+
 class LerobotBackend:
     def __init__(self, checkpoint: str, device: str):
         from lerobot.policies.factory import (
@@ -185,15 +234,55 @@ class LerobotBackend:
                 c, h, w = self.image_features[name].shape
                 raw_obs[name] = np.zeros((h, w, c), dtype=np.uint8)
                 continue
+            if name in _LIBERO_CAMERA_NAME_MAP:
+                # Explicit LIBERO mapping (see _LIBERO_CAMERA_NAME_MAP above)
+                # overrides the generic positional fallback below — it's a
+                # known, checked mapping rather than a heuristic.
+                want = _LIBERO_CAMERA_NAME_MAP[name]
+                raw_obs[name] = wrist if (want == "wrist" and wrist is not None) else agentview
+                continue
+            if name in _BASE_WRIST_CAMERA_NAME_MAP:
+                # Explicit base/wrist mapping (see _BASE_WRIST_CAMERA_NAME_MAP
+                # above) — base_0_rgb always gets the main camera; a wrist
+                # slot only gets a real frame if a real wrist camera exists,
+                # otherwise it's omitted (auto-masked by the policy) rather
+                # than positionally stealing the main camera's frame.
+                want = _BASE_WRIST_CAMERA_NAME_MAP[name]
+                if want == "agentview":
+                    raw_obs[name] = agentview
+                elif wrist is not None:
+                    raw_obs[name] = wrist
+                # else: no real wrist camera for this slot — omit it.
+                continue
             if camera_idx < len(real_cameras):
                 raw_obs[name] = real_cameras[camera_idx]
                 camera_idx += 1
             else:
-                # More real (non-placeholder) camera slots than the env has
-                # real cameras — repeat the last available frame rather than
-                # crash. Distinct from the empty_camera_N case above, which
-                # must stay zero.
-                raw_obs[name] = real_cameras[-1]
+                # More declared (non-placeholder) camera slots than the env
+                # has real cameras — e.g. lerobot/pi0_base and pi05_base
+                # declare base_0_rgb + left_wrist_0_rgb + right_wrist_0_rgb
+                # (a bimanual-robot convention) but SimplerEnv/WidowX bridge
+                # has exactly one real camera and no wrist camera at all
+                # (env_worker_simpler.py never sets wrist_rgb). Previously
+                # this duplicated `real_cameras[-1]` into the extra slot(s)
+                # — a real (if lower-priority) bug of the same shape as the
+                # camera-swap one above: feeding a real frame into a slot
+                # the model was trained to treat as absent. Confirmed via
+                # openpi's own reference input adapters (`DroidInputs`/
+                # `AlohaInputs` in physical-intelligence/openpi,
+                # `src/openpi/policies/{droid,aloha}_policy.py`): missing
+                # cameras are left OUT of the observation entirely, zero-
+                # filled and explicitly masked (`image_mask=False`) by the
+                # model itself, not duplicated. lerobot's own
+                # `PI0Policy._preprocess_images()` (`modeling_pi0.py`)
+                # implements exactly this: it computes `missing_img_keys =
+                # [k for k in self.config.image_features if k not in
+                # batch]` and auto-masks those with `-1`-padding — i.e. we
+                # don't need to build the mask ourselves, we just need to
+                # NOT put a real frame in `raw_obs` for a camera that
+                # doesn't exist. Fixed: skip the key entirely rather than
+                # populating it.
+                continue
 
         expected_dim = self.state_feature.shape[0]
         if is_libero and expected_dim == 8 and len(obs.get("proprioception", [])) == 9:
@@ -232,7 +321,32 @@ class LerobotBackend:
             use_amp=False,
             task=instruction,
         )
-        return np.asarray(action.cpu(), dtype=float).reshape(-1).tolist()
+        action = np.asarray(action.cpu(), dtype=float).reshape(-1)
+        if not is_libero and action.shape[0] != 7:
+            # Found 2026-08-05: lerobot/pi0_base's own config.json declares
+            # output_features["action"].shape == (32,) — the generic
+            # max_action_dim padded space, NOT bridge/WidowX's real 7-dim
+            # action space. Unlike a checkpoint actually fine-tuned on a
+            # specific robot (e.g. pi0_libero_finetuned, whose own declared
+            # output dim is already correct), pi0_base/pi05_base are
+            # cross-embodiment BASE checkpoints that were never told what
+            # THIS robot's real action space is — predict_action()'s
+            # postprocessor has no way to know to truncate, since the
+            # checkpoint's own metadata says 32 is correct. Confirmed via
+            # `PreTrainedConfig.from_pretrained("lerobot/pi0_base").
+            # output_features` returning exactly `shape=(32,)` directly, not
+            # guessed — and via the crash this caused: SimplerEnv/WidowX's
+            # controller asserts `action.shape == (action_dim,)` with
+            # action_dim=7, raising `AssertionError: ((32,), 7)` on every
+            # single /step call. Training's own `pad_vector()` convention
+            # (documented in slava-lerobot-policies' architecture section)
+            # appends zeros AFTER the real action values, so the real 7
+            # values are the first 7 elements — truncating to `action[:7]`
+            # is the correct inverse, the same convention GreenVLA's own
+            # `BridgeOutputsTransform` uses (`actions[:, :7]`) for the exact
+            # same embodiment.
+            action = action[:7]
+        return action.tolist()
 
 
 def main() -> None:

@@ -1,9 +1,24 @@
 ---
 name: slava-model-rollouts
-description: Architecture, APIs, and decisions for the first model-rollout pass (5 models x LIBERO/SimplerEnv), producing rollout_annotations.jsonl per task.md.
+description: Shared architecture, contracts, and cross-model lessons for the SLAVA rollout pass (5 models x LIBERO/SimplerEnv), producing rollout_annotations.jsonl per task.md. Per-model debugging detail lives in slava-openvla-oft / slava-lerobot-policies / slava-greenvla.
 ---
 
 # SLAVA model rollouts — implementation notes
+
+**Split 2026-08-05** into this general skill (architecture, env-worker/
+model-server contracts, process management, cross-model lessons) plus one
+skill per model family, since the model-specific debugging history had
+grown large enough to bury the shared material:
+
+- `slava-openvla-oft` — OpenVLA-OFT API + its 4 found-and-fixed bugs.
+- `slava-lerobot-policies` — pi0/pi0.5/SmolVLA (shared `lerobot_server.py`)
+  API, cuDNN crash fix, and the camera-swap bug that was the real root
+  cause of their near-0% SR on LIBERO.
+- `slava-greenvla` — GreenVLA R0/R1/R2 (shared `greenvla_server.py`) API,
+  embodiment/norm_stats check, and the gripper-range-mismatch fix.
+
+Read this file first for the shared design, then whichever per-model skill
+matches what you're actually touching.
 
 Session: 2026-08-04, GPU server (Tesla V100-SXM2-32GB, driver 580.126.09,
 CUDA 13.0 max — Volta, fp16 tensor cores yes, **bf16 no**). User explained
@@ -122,123 +137,36 @@ into tool output, the same class of mistake as the `DEEPL_API_KEY`
 incident in `slava-mt-russian`. **User should consider rotating this HF
 token** since its value briefly entered the session transcript.
 
-## LIBERO inference for lerobot policies (π0/π0.5/SmolVLA) — CORRECTED after reading the real repos
+## Shared env-worker design (one per environment, used by every model)
 
-Originally planned to import lerobot's own `LiberoEnv` gym class
-(`src/lerobot/envs/libero.py` in `huggingface/lerobot`) for the LIBERO side
-of pi0/pi0.5/SmolVLA. **Reading that file showed it's a thin gymnasium
-wrapper around the exact same `libero.libero.envs.OffScreenRenderEnv` our
-own `env_worker_libero.py` already drives** (same `camera_names=
-["agentview_image","robot0_eye_in_hand_image"]`, same underlying robosuite
-env). There is no separate "lerobot LIBERO physics" to integrate.
+Originally planned per-model-family env duplication; corrected once the
+actual upstream APIs were read: `lerobot`'s own `LiberoEnv`
+(`src/lerobot/envs/libero.py`) turned out to be a thin gymnasium wrapper
+around the exact same `libero.libero.envs.OffScreenRenderEnv` our own
+`env_worker_libero.py` already drives (same `camera_names`, same
+underlying robosuite env) — there is no separate "lerobot LIBERO physics"
+to integrate, and no reason for a separate env-worker per model family.
 
-**Simplified, verified design: one shared env-worker per environment, used
-by every model that runs there.** `env_worker_libero.py` (port 8701, in
-`slava-libero`) serves OpenVLA-OFT, pi0, pi0.5, and SmolVLA on LIBERO alike.
-`env_worker_simpler.py` (port 8702, in `slava-simpler`) serves GreenVLA-R0/
-R1, pi0, pi0.5, and SmolVLA on SimplerEnv/bridge alike. Each model-server
-receives the env-worker's raw obs dict (`agentview_rgb`, `wrist_rgb`,
-`proprioception`, plus SimplerEnv-only `ee_pose`/`gripper_closedness`) over
-HTTP and adapts it to whatever its own checkpoint expects — the env side
-never needs to know which model is consuming it. This is cleaner than the
-originally-planned per-model-family env duplication and was not a user
-decision to re-confirm, just a code-quality correction once the actual APIs
-were visible — recorded here per the "log decisions for later review" rule.
+**One shared env-worker per environment, used by every model that runs
+there.** `env_worker_libero.py` (port 8701 default, in `slava-libero`)
+serves OpenVLA-OFT and all three lerobot models on LIBERO alike.
+`env_worker_simpler.py` (port 8702 default, in `slava-simpler`) serves
+GreenVLA and all three lerobot models on SimplerEnv/bridge alike. Each
+model-server receives the env-worker's raw obs dict (`agentview_rgb`,
+`wrist_rgb`, `proprioception`, plus SimplerEnv-only `ee_pose`/
+`gripper_closedness`) over HTTP and adapts it to whatever its own
+checkpoint expects — the env side never needs to know which model is
+consuming it. Per-model API details (which observation keys/layout each
+checkpoint actually wants) live in the per-model skills, not here.
 
-`slava-lerobot` therefore does **not** need the `[libero]` extra (that pulls
-`hf-libero` and its own env plumbing we don't use) — installed as
-`pip install -e "<lerobot_repo>[smolvla]"` (covers pi0/pi0.5 too, same
-package) instead.
+## Per-model APIs and bugs — see the per-model skills
 
-### Confirmed real API (read directly from `huggingface/lerobot`, not guessed)
-
-```python
-from lerobot.configs.policies import PreTrainedConfig      # NOT lerobot.common.*
-from lerobot.policies.factory import get_policy_class, make_pre_post_processors  # NOT lerobot.common.*
-from lerobot.common.control_utils import predict_action    # this one IS under .common
-
-policy_cfg = PreTrainedConfig.from_pretrained(checkpoint)
-policy = get_policy_class(policy_cfg.type).from_pretrained(checkpoint)
-preprocessor, postprocessor = make_pre_post_processors(policy_cfg, pretrained_path=checkpoint)
-action = predict_action(observation, policy, device, preprocessor, postprocessor, use_amp=False, task=instruction)
-```
-
-`policy_cfg.input_features` (dict of name -> `PolicyFeature`, `.type.value`
-`"visual"`/`"state"`) tells you exactly which raw observation keys and
-state dimensionality *this specific checkpoint* expects — `scripts/
-model_servers/lerobot_server.py` reads this at startup instead of
-hardcoding key names, because LIBERO-finetuned and bridge-zero-shot
-checkpoints do NOT necessarily share the same key names/dims.
-
-## GreenVLA inference — confirmed real API (from github.com/greenvla/GreenVLA directly)
-
-GreenVLA's own repo is an older *vendored* lerobot fork (its own
-`lerobot/common/policies/greenvla_policy/`, not related to the modern
-`huggingface/lerobot` above) — so `slava-greenvla` is its own env, built
-from `pip install -e .` inside a clone of that repo, not from
-`huggingface/lerobot`. Confirmed end-to-end from `examples/
-example_inference_bridge.py` + `docs/INFERENCE.md`:
-
-```python
-from lerobot.common.policies.factory import load_pretrained_policy
-policy, input_transforms, output_transforms = load_pretrained_policy(checkpoint, data_config_name="bridge")
-# raw obs: {"observation/state": float32[8] (x,y,z,roll,pitch,yaw,_pad_,gripper),
-#           "observation/image": uint8 HWC, "prompt": str}
-# policy.select_action(batch) -> normalized actions (action_horizon x 7)
-# output_transforms({"actions":..., "state":...}) -> real actions (x,y,z,roll,pitch,yaw,gripper)
-```
-
-The 8-dim state is **end-effector pose**, not joint qpos — `env_worker_simpler.py`
-exposes this separately as `obs["ee_pose"]` ([x,y,z,qw,qx,qy,qz], read from
-the `ee_gripper_link` global pose) + `obs["gripper_closedness"]`, alongside
-the joint-qpos-based `proprioception` field other backends use. Roll/pitch/
-yaw are derived from the quaternion via `scipy.spatial.transform.Rotation`
-in `scripts/model_servers/greenvla_server.py`.
-
-Only one action of the returned `action_horizon` is executed per `/predict`
-call (the orchestrator calls once per sim step) — action-chunk replay for
-speed is a later optimization, not needed to validate correctness first.
-GreenVLA's own benchmarking notes recommend `action_horizon=2` for Bridge
-and warn results vary ±6% run-to-run — expected, not a bug in our harness.
-
-## OpenVLA-OFT — confirmed real API (from github.com/moojink/openvla-oft directly)
-
-Note the real GitHub org is **`moojink/openvla-oft`**, not `openvla/openvla-oft`
-(that URL 404s/requires auth — don't reuse it). `LIBERO.md` confirms the
-released `moojink/openvla-7b-oft-finetuned-*` checkpoints just need the
-eval script's *default* `GenerateConfig` (`use_l1_regression=True`,
-`num_images_in_input=2`, `use_proprio=True`, `center_crop=True`) — our
-`scripts/model_servers/openvla_oft_server.py` imports their own
-`GenerateConfig`/`get_model`/`get_processor`/`get_action_head`/
-`get_proprio_projector`/`get_action` unchanged rather than reimplementing
-OFT's parallel-decoding + proprio-projector + L1-regression-head pipeline.
-
-Their `attn_implementation="flash_attention_2"` is already **commented out**
-in their own loading code — flash-attn is not required for inference,
-skip that (slow, sometimes fragile) build step entirely.
-
-Everything is hardcoded to `torch.bfloat16` in their code (not a flag we can
-easily override without patching). On this server's V100 (no bf16 tensor
-cores — see top of this doc) bf16 ops still run correctly, just slower
-(software-emulated, not broken) — accepted trade-off for a first pass, not
-worth forking their repo to force fp16 unless it proves to actually block
-the smoke test.
-
-`unnorm_key` is **keyed by LIBERO suite name** (`libero_spatial`/`_object`/
-`_goal`, with a `_no_noops` fallback) and must be set per-episode from the
-prompt's own `suite` field, not hardcoded — our combined `-spatial-object-goal-10`
-checkpoint covers all three of our LIBERO suites, but the unnorm stats are
-suite-specific. This is why the model-server `/predict` contract carries a
-`meta` dict (`{task_uid, suite, environment}`) alongside `obs`, not just
-pixels+proprioception — added specifically for this need but generically
-useful for any future model needing episode context beyond the raw
-observation.
-
-Their `prepare_observation()`/`get_action()` expect `state` = `eef_pos(3) +
-axis_angle(3) + gripper_qpos(2)` (8-dim) — converted in
-`openvla_oft_server.py` from `env_worker_libero.py`'s
-`[gripper_qpos(2), eef_pos(3), eef_quat(4)]` proprioception via
-`scipy.spatial.transform.Rotation.as_rotvec()`.
+`slava-openvla-oft` / `slava-lerobot-policies` / `slava-greenvla` each have
+their model's confirmed real upstream API (read from the actual vendor
+repo, not the quick-start docs) and every bug found getting that backend to
+actually work — several were not right on the first try, and re-deriving
+them from scratch would waste real time. Skim the relevant one before
+touching a model-server file.
 
 ## Env-worker internals (our own code, not vendored)
 
@@ -465,61 +393,6 @@ today, that rewrite risk isn't worth it for a first pilot pass — process-
 level parallelism was the lower-risk lever available and it was tried
 first.
 
-## OpenVLA-OFT: missing gripper action post-processing — real bug, not task difficulty
-
-Caught by the user's explicit request to sanity-check results, not by code
-review. Symptom: 13 straight OpenVLA-OFT episodes across **two different
-LIBERO tasks** (drawer-opening and plate-pushing) all failed with
-`no_action_or_timeout`, `gripper_state` hovering near 0 the entire episode
-in every one, `contacts` always empty despite the arm/proprioception clearly
-moving with normal-looking magnitudes (confirmed both from `steps.jsonl`
-action logs and camera frames — the arm moves, just apparently never
-actually grips or reaches the intended target). Two different tasks failing
-identically was the signal that this wasn't ordinary task difficulty
-(compare: OpenVLA-OFT reports ~97% SR on this exact combined checkpoint in
-their own paper).
-
-Root cause: `openvla_oft_server.py`'s `predict()` returned the raw output of
-`get_action()` directly. The reference `run_libero_eval.py` never does
-this — every action it gets from `get_action()` is piped through its own
-`process_action(action, cfg.model_family)` before `env.step()`:
-```python
-action = normalize_gripper_action(action, binarize=True)  # [0,1] -> [-1,+1]
-if model_family == "openvla":
-    action = invert_gripper_action(action)  # sign flip
-```
-Both functions live in `experiments/robot/robot_utils.py` and are
-documented there: the RLDS dataloader convention is gripper ∈ [0,1] with
-0=close/1=open, but the LIBERO env's OSC_POSE controller expects
-∈ [-1,+1] with -1=open/+1=close. Skipping this step meant every gripper
-command was both wrong-scale AND inverted — a close command could easily
-read as a small "open more" delta instead, so the gripper effectively never
-closed. This silently produces plausible-*looking* rollout data (a real
-episode, real physics, a real trajectory) with a systematically broken
-actuator — exactly the "results look fine but the model can't actually do
-what it should" failure mode that's hardest to catch from logs alone,
-easiest to catch from an actual behavioral pattern (universal failure
-across distinct tasks + a suspiciously flat gripper trace) or from
-comparing hard numbers against the paper's reported SR.
-
-**Fix:** `openvla_oft_server.py` now calls `normalize_gripper_action()` +
-`invert_gripper_action()` on the action before returning it, matching
-`process_action()` exactly. **The 13 episodes run before this fix were
-purged** from `rollout_annotations.jsonl` (backed up to
-`rollout_annotations.jsonl.bak_before_openvla_fix`) and their episode
-directories moved to `rollouts/episodes_archived_buggy_openvla_gripper/`
-(not deleted, kept for reference) rather than left in the dataset — do not
-resurrect them, they're gripper-inverted and not representative of the
-model's real behavior. The run resumed and correctly re-selected those 13
-prompts as not-yet-done.
-
-**Takeaway for reviewing the other 4 model-server backends similarly:**
-each vendor's reference eval script may apply action post-processing steps
-beyond what their "load model, call predict" quick-start docs show — always
-check the *eval loop*, not just the *inference call*, for a
-`process_action`/similar step before assuming the raw model output is
-ready to hand to `env.step()`.
-
 ## `conda run` does not forward termination signals to its child — real OOM caused by this
 
 Found live during the full run, not in review: `WorkerPool.stop_model()`/
@@ -550,305 +423,27 @@ already-running `run_rollouts.py` process has the old code in memory even
 after the source file is patched — it needed a restart to pick this up,
 which is what actually happened here).
 
-## Real bugs found once each backend actually ran (fixed, not hypothetical)
+## Per-model bugs — see the per-model skills
 
-Each of these was caught by actually invoking the backend against a live
-checkpoint, not by re-reading code — trust the smoke test over the plan
-above when they disagree.
+Several real bugs were only caught by actually invoking a backend against a
+live checkpoint, not by re-reading code — trust the smoke test over any
+written plan when they disagree. All model-specific ones (lerobot's
+`FeatureType` comparison bug, checkpoint-declared placeholder camera
+features, `compile_model`/cuDNN crashes, the camera-swap bug, GreenVLA's
+chunk-shape bug, OpenVLA-OFT's gripper/chunk/orientation bugs, etc.) now
+live in `slava-openvla-oft` / `slava-lerobot-policies` / `slava-greenvla` —
+read whichever matches the model you're touching rather than re-deriving
+these from scratch.
 
-1. **`lerobot_server.py` `FeatureType` comparison bug:** `PolicyFeature.type.value`
-   is the UPPERCASE string (`"VISUAL"`/`"STATE"`), not lowercase — comparing
-   against lowercase silently matched nothing, so `image_features` came back
-   empty for every checkpoint. Fixed by comparing against the enum members
-   (`FeatureType.VISUAL`/`FeatureType.STATE`) directly instead of `.value` strings.
-2. **`lerobot/pi0_libero_finetuned` declares 3 image input features, not 2:**
-   `observation.images.image`, `observation.images.image2`, and
-   `observation.images.empty_camera_0` (224×224, smaller than the two real
-   256×256 camera slots) — a placeholder the checkpoint always saw as a zero
-   image during training. `lerobot_server.py` now feeds `np.zeros(...)` for
-   any feature name containing `"empty_camera"` rather than duplicating a
-   real frame into it (a real frame there would be out-of-distribution input
-   the model never saw at that slot during training).
-3. **`compile_model=True` on `lerobot/pi0_libero_finetuned` crashes on this
-   server:** passing `compile_model=False` as a kwarg to `PreTrainedConfig.
-   from_pretrained()` does **nothing** — it silently falls into
-   `**policy_kwargs`, which that method only forwards as draccus
-   `cli_overrides` (a list of CLI-style strings), not arbitrary field
-   overrides. The real fix: load the config, mutate
-   `policy_cfg.compile_model = False` directly on the returned object (guarded
-   by `hasattr`, since not every policy config has this field), then call
-   `policy_cls.from_pretrained(checkpoint, config=policy_cfg)` — the explicit
-   `config=` kwarg is required, otherwise `from_pretrained` reloads its own
-   fresh (un-mutated) config internally and the override is lost anyway. Why
-   this matters: leaving `compile_model=True` makes `torch.compile(mode=
-   "max-autotune")` JIT-compile `sample_actions`/`forward` via Triton/Inductor
-   on first call — on this V100 (Volta) + this torch/Triton combination that
-   fails outright (`RuntimeError: PassManager::run failed`, an MLIR pass
-   crash), not just slow. If a future checkpoint hits this on a newer GPU
-   where Triton actually succeeds, it would just be slow-on-first-call, not
-   broken — but disabling it is still correct for us since we run n=1 episodes
-   sequentially (no amortization benefit from compiling).
-4. **`openvla_oft_server.py` needs the `libero` package importable but must
-   NOT `pip install -e` it in `slava-openvla`:** doing so hit a real conflict
-   between LIBERO's and openvla-oft's own PEP 660 editable-install import
-   finders (openvla-oft's `__editable__...finder.__path_hook__` on `sys.path`
-   ends up shadowing resolution for other editable packages — `pip show libero`
-   reports it installed, `import libero` 404s anyway). Fixed by plain
-   `sys.path.insert(0, LIBERO_ROOT)` instead of a pip install — this env never
-   touches LIBERO physics/rendering (that's `env_worker_libero.py`'s job in
-   the separate `slava-libero` env), so no install machinery is needed here,
-   just the module on the import path. Also needed (installed as plain,
-   mostly-unpinned pip packages — NOT the old pins from `LIBERO/requirements.txt`,
-   which would have downgraded openvla-oft's own numpy/transformers):
-   `robosuite==1.4.0` (pinned — a newer PyPI `robosuite` reorganized
-   `robosuite.environments.manipulation.single_arm_env` and breaks LIBERO's
-   benchmark import), `bddl==1.0.1`, `easydict==1.9`, plus unpinned `future`,
-   `hydra-core`, `wandb`, `robomimic`, `thop`, `matplotlib`, `cloudpickle`,
-   `gym` — all pulled in transitively just by importing `libero.libero.
-   benchmark` for its `GenerateConfig`/task-suite dict, not because
-   openvla-oft's actual inference path uses them.
-5. **`greenvla_server.py` returned a whole action chunk instead of one
-   action** — found only once the *full run* (not the smoke test, which
-   never touches GreenVLA) actually reached GreenVLA and crashed the env-
-   worker with `AssertionError: ((10, 7), 7)`. GreenVLA's own README example
-   does `actions[0]` to get "the first action" and calls that correct, but
-   that example has no explicit batch dimension in its printed shape — ours
-   does (`policy.select_action(batch)` returns `(batch=1, action_horizon,
-   7)`), so `actions[0]` was pulling the whole `(10, 7)` horizon instead of
-   one `(7,)` action. Fixed with `np.asarray(actions).reshape(-1, action_dim)[0]`,
-   which is correct whether or not a batch dim is present. **Lesson: a
-   vendor's own example script correctly matching its own printed shape
-   doesn't guarantee your call site has the same shape — checked this one
-   the hard way, by hitting the crash, not by re-reading the README more
-   carefully.**
-6. **Second HF_TOKEN leak incident in this same session** (see AGENTS.md
-   "Текущее состояние проекта" for the full note and the first incident from
-   the prior agent): writing `env HF_TOKEN=$HF_TOKEN <command>` as a literal
-   shell command leaks the resolved value into tool-call output/logs whenever
-   that command errors and gets echoed back (e.g. by `conda run`). Rule:
-   `export HF_TOKEN=...` as its own statement in the shell, then invoke
-   `conda run`/anything else without repeating the variable in that command's
-   own text — the child process still inherits it from the environment.
-
-## SR=0% root cause (found 2026-08-05, 3rd server/session) — three independent bugs, all fixed
-
-The 77-episode dataset from the previous session had 0/77 successes. The
-`AGENTS.md` handoff already ruled out an auto-labeling bug (`success` reads
-`env.check_success()`/native `info["success"]` directly) and flagged the
-missing open-loop chunk replay as the prime suspect for OpenVLA-OFT
-specifically. On the new GPU server, reading `moojink/openvla-oft`'s actual
-`experiments/robot/libero/run_libero_eval.py` line-by-line (not guessed)
-turned up **three** real, independent bugs in our OpenVLA-OFT path — fixing
-all three took the smoke-test SR from 0/21 (previous session, real episodes)
-to **2/2** on this session's `--smoke-test` run, at 33-76s/episode (down from
-~394s/episode before the chunk-replay fix — 5-8x faster too, expected since
-the model is now queried once per 8 steps instead of every step).
-
-7. **Missing open-loop action-chunk replay** (the one already flagged in the
-   handoff, now actually fixed). `get_action()` returns the full predicted
-   chunk (`NUM_ACTIONS_CHUNK=8` actions for LIBERO, confirmed by reading
-   `prismatic/vla/constants.py` — it auto-detects platform from `sys.argv`,
-   defaults to LIBERO when nothing matches, which is what our model-server's
-   argv gives it, so no explicit override needed). The reference script
-   queries the model once, pushes the whole chunk into a `deque`, and pops
-   one action per env step, **only requerying once the queue is empty** —
-   i.e. actions 1-7 of every chunk are executed completely open-loop, no new
-   observation involved. Our old code called `get_action()` fresh on every
-   single env step and only ever used `action[0]`, discarding the other 7 —
-   a different (always-closed-loop) execution strategy than what the
-   checkpoint was ever evaluated with. Fixed via a new generic
-   `/predict_chunk` endpoint (`base_server.py`, opt-in per backend via an
-   optional `predict_chunk()` method — falls back to a 1-action chunk built
-   from plain `predict()` for every other backend, so GreenVLA/lerobot are
-   byte-for-byte unaffected) and a `pending_actions` queue in
-   `run_rollouts.py::run_episode()` that drains one action per `env_client
-   .step()` call before requesting a new chunk. Camera-frame saving and
-   `success`/`done` checks still happen every single sim step (task.md
-   requirement), only the *model query* is now chunked.
-8. **Image mirrored left-right — independent of the chunk bug, likely the
-   bigger contributor.** `openvla-oft`'s own
-   `experiments/robot/libero/libero_utils.py::get_libero_image()` does
-   `img[::-1, ::-1]` on the raw `obs["agentview_image"]` (**both** axes
-   reversed = 180° rotation), commented "IMPORTANT: rotate 180 degrees to
-   match train preprocessing." Our shared `env_worker_libero.py::_build_obs()`
-   does `raw[::-1]` (axis 0 only — a vertical flip, chosen to produce a
-   human-legible image for the D1 screenshot review dashboard, matching
-   `scripts/collect_libero.py`'s same single-flip convention — correct for
-   *that* purpose). These are different transforms, not one a subset of the
-   other: composing them, every frame OpenVLA-OFT received was
-   `single_flip(raw)` where it needed `double_flip(raw)` — i.e. a **left-right
-   mirror** of what it was trained on (robot arm on the wrong side, spatial
-   relations flipped). This does not depend on instruction language at all,
-   so it would have suppressed EN and RU success equally — a real,
-   independent confound on top of the chunk bug. Fixed *scoped to
-   `openvla_oft_server.py` only* (`_build_observation()`'s docstring has the
-   full derivation) — one extra `[:, ::-1]` mirror applied to the
-   already-single-flipped `agentview_rgb`/`wrist_rgb` right before handing
-   them to `get_action()`. `env_worker_libero.py` itself is untouched and
-   stays neutral — pi0/pi0.5/SmolVLA on LIBERO have **not** been checked
-   against their own training image-orientation convention yet, do that
-   before trusting their LIBERO results (see "What's still open" below).
-9. **Missing `num_steps_wait=10` physics-settle steps.** The reference
-   `run_episode()` executes 10 steps of the dummy action `[0,0,0,0,0,0,-1]`
-   right after `env.set_init_state()`, *before* the policy is ever queried
-   ("let objects stabilize in sim") — these steps are not logged, not counted
-   against `TASK_MAX_STEPS`, and the model never sees them. Our env-worker
-   queried immediately after `set_init_state()`. Smaller effect than #8, but
-   free to fix: `env_worker_libero.py::/reset` now takes an optional
-   `num_steps_wait` payload field (default 0, so every other model's behavior
-   is unchanged) and runs that many dummy steps internally before building
-   the returned obs. Wired up from `run_rollouts.py` via a
-   `LIBERO_NUM_STEPS_WAIT = {"openvla_oft": 10}` lookup in
-   `build_reset_payload()` — opt-in per model, not a blanket change to every
-   LIBERO episode.
-
-**Verification note:** the smoke-test's `en_canonical` prompt for
-`open_the_middle_drawer_of_the_cabinet` ("open the middle drawer of the
-cabinet") is not just "close to" the original LIBERO task text — it's an
-**exact, word-for-word match** to `benchmark.get_benchmark_dict()
-["libero_goal"]().get_task(i).language` (confirmed by calling the real
-benchmark API, not by reading the `.bddl` file's own `:language` comment,
-which is a stale author note and does NOT match what the benchmark actually
-serves — e.g. it says "Open the middle layer of the drawer" for this same
-task, which is *not* what gets used anywhere in eval). So the 2/2 smoke-test
-success was already run on the literal, unmodified original dataset prompt,
-not a SLAVA paraphrase — ruling out "the pipeline only works on our reworded
-prompts" as an explanation for the earlier SR=0%.
-
-**Not yet done:** these fixes only touch the OpenVLA-OFT path. pi0/pi0.5/
-SmolVLA/GreenVLA have their own separate image-preprocessing and
-action-execution conventions that have NOT been checked against this same
-level of scrutiny (reading their actual reference eval/training code, not
-just the quick-start inference example) — do that before trusting their
-results, per the same methodology used here (read the reference eval loop,
-not just the "load model, call predict" quick-start).
-
-## pi0/pi0.5: cuDNN "no engine" crash on SigLIP conv2d (V100), found + fixed 2026-08-05
-
-Same session, after the OpenVLA-OFT fixes above. `lerobot_server.py` also
-needed two LIBERO-specific fixes mirroring the OpenVLA-OFT pattern (own
-docstring in that file has the full derivation): (1) lerobot's own
-`LiberoEnv._format_raw_obs()` (`lerobot.envs.libero`) feeds the policy the
-**raw, unflipped** camera frame — a third distinct orientation convention,
-different from both OpenVLA-OFT's 180°-rotation and our env-worker's
-single-flip — confirmed against `docs/source/libero.mdx` too; (2)
-proprioception needed the same `eef_pos(3)+axis_angle(3)+gripper_qpos(2)`
-conversion as OpenVLA-OFT, not env-worker's raw 9-dim quaternion layout.
-`[::-1].copy()` (not just `[::-1]`) required — `torch.from_numpy()` rejects
-negative-stride views outright. All confirmed working via SmolVLA's live
-run (different vision backbone, unaffected by the next bug below).
-
-pi0 and pi0.5 (both PaliGemma/SigLIP-based) additionally hit a **third, more
-stubborn bug** SmolVLA doesn't have: every `/predict_chunk` call crashed with
-`RuntimeError: GET was unable to find an engine to execute this computation`,
-traced (via direct reproduction against a live env-worker, not guessed) to
-SigLIP's patch-embedding `Conv2d` inside `paligemma.model.vision_tower` — a
-cuDNN "no kernel found for this op/dtype/shape on this hardware" error, not a
-memory or shape bug. **First attempted fix (didn't work): overriding
-`policy_cfg.dtype = "float32"`** — same mutate-then-`from_pretrained(...,
-config=policy_cfg)` pattern already used for `compile_model=False`. pi0.5's
-config actually defaults to `dtype="bfloat16"`, pi0's already defaults to
-`"float32"` — yet **both** kept crashing identically even after the override
-visibly took effect (checked `cfg.dtype` before/after). Something in cuDNN's
-own algorithm search still can't find an engine for this specific SigLIP
-conv on this GPU/cuDNN/torch combination, independent of the dtype the model
-ends up running in. **Actual fix:** `torch.backends.cudnn.enabled = False` at
-module import time in `lerobot_server.py`, before any model loads — forces
-PyTorch's native (non-cuDNN) conv2d fallback for the whole process. Blunter
-than pinning dtype, but the one that actually resolved it — confirmed via a
-live `predict_chunk` request returning 200 immediately after. Only affects
-this process; env-workers and other model-servers are separate
-processes/conda envs, untouched.
-
-**GreenVLA R0/R1 embodiment check (user question, answered from source
-2026-08-05).** Confirmed via `huggingface_hub.list_repo_files()` on both
-checkpoints (not guessed from the name): **both R0
-(`GreenVLA-5b-base-stride-1`) and R1 (`GreenVLA-5b-stride-1-R1-bridge`) ship
-a `norm_stats/bridge/norm_stats.json`**, so `load_pretrained_policy(...,
-data_config_name="bridge")` in `greenvla_server.py` resolves WidowX-bridge
-normalization for both — not Google Robot/fractal. The env is WidowX too
-(`widowx_stack_cube`, `ee_gripper_link` in `env_worker_simpler.py` is
-WidowX-specific). **But R0 is a cross-embodiment generalist base checkpoint**
-— its repo has norm_stats for 19 different robots (agibotworld, biplay,
-bridge, droid, fractal, galaxeaworld, rdt, several robocoin/robomind
-variants) — while **R1's repo has ONLY `norm_stats/bridge/`**, confirming
-it's the bridge-specialized fine-tune stage. This is a real, source-verified
-explanation (not speculation) for why R0 freezes more than R1: R0 was never
-specifically fine-tuned toward WidowX, it just has the right normalization
-stats to be *evaluated* on it — matches the R0-base → R1-bridge curriculum
-description already in AGENTS.md.
-
-**Deep audit of GreenVLA's actual transform factory (not just the quick-start
-example), same session — no new bug found.** User asked to re-check against
-GreenVLA's own source given R0/R1's low SR. Read
-`lerobot/common/policies/factory.py::load_pretrained_policy` (which our
-`greenvla_server.py` already calls directly — we are NOT reimplementing
-their pipeline, we use their real `input_transforms`/`output_transforms`),
-`lerobot/common/utils/inference_transforms.py::get_torch_{input,output}_
-transforms`, `lerobot/common/datasets/data_transforms/robots/bridge.py`
-(`BridgeInputsTransform`/`BridgeOutputsTransform`), and
-`lerobot/common/datasets/torch_transforms.py::parse_image_helper`. Findings:
-state layout (`[x,y,z,roll,pitch,yaw,pad,gripper]`, pad-masking) matches our
-`greenvla_server.py` exactly; the output pipeline is `Unnormalize(norm_stats)
-→ slice-to-7-dims`, nothing else, and we already do this via their own
-`output_transforms` callable; `parse_image_helper` does **no** flip/rotation
-at all (dtype/CHW→HWC only), so there's no hidden orientation expectation
-on their side to mismatch — consistent with `env_worker_simpler.py` not
-flipping. Quaternion→euler conversion in `greenvla_server.py` (SAPIEN `wxyz`
-→ scipy `xyzw` reorder) checked correct. **No further actionable bug
-surfaced this pass.** Current best explanation for R0/R1's ~0% SR remains:
-R0's genuine lack of WidowX-specific tuning (see above) plus SimplerEnv's
-SAPIEN-rendered visual domain gap vs the real camera frames both checkpoints
-were trained on (risk explicitly accepted by the user at project start, see
-AGENTS.md "Модели — 5, не 4" section) — not a code bug we've found evidence
-for after two independent audit passes.
-
-**Fourth bug, same session: lerobot LIBERO models also needed
-`num_steps_wait=10`.** `LIBERO_NUM_STEPS_WAIT` in `run_rollouts.py` originally
-only covered `openvla_oft`. Spotted a real pattern after ~15 episodes: pi0,
-pi0.5, and SmolVLA were all stuck on `no_action_or_timeout` on the exact same
-LIBERO-goal scene (`open_the_middle_drawer_of_the_cabinet`) that OpenVLA-OFT
-(which already had the settle-step fix) succeeded on repeatedly. Checked
-`huggingface/lerobot`'s own `LiberoEnv.__init__` (`src/lerobot/envs/
-libero.py`) again — it independently defaults to the identical
-`num_steps_wait: int = 10`, not something borrowed from OpenVLA-OFT. Added
-`pi0`/`pi05`/`smolvla` to the same dict (`10` each). All 3 running processes
-were killed and restarted to pick this up (module-level constant, doesn't
-apply retroactively to an already-running process) — not yet enough
-post-fix episodes at time of writing to say whether this changes their SR;
-check `data/rollout_report.html`'s per-model breakdown for the current
-numbers rather than trusting this note's absence of a verdict.
-
-**Fifth issue, still OPEN/unresolved: pi0/pi0.5 show 0% SR with `first_contact_
-object=None` on `libero_object` (the EASIEST LIBERO suite — OpenVLA-OFT gets
-6/6 on every task there).** Found 2026-08-05 while monitoring the live run:
-after ~65 episodes, pi0 hit `libero_object__pick_up_the_{butter,cream_cheese,
-milk}_and_place_it_in_the_basket` and went 0/18 with **zero contact ever**
-(not just wrong-object contact) — a cleaner, more systematic-looking pattern
-than the `libero_goal` failures (where at least `target_grounding_error`/real
-contact happened sometimes). Rendered the actual image pi0 was receiving
-(after the "undo env-worker's flip" logic above) and it looked genuinely
-upside-down/disoriented (arm at bottom, floor objects at top) — not a
-plausible robot-eye view. **Reverted the image-flip fix** (the `if False:`
-block in `lerobot_server.py` — kept, not deleted, with a note) back to
-passing through env-worker's existing upright orientation unchanged, and
-retested on a fresh `libero_object` episode. **Result: still 0% SR, still
-`first_contact_object=None`.** So the flip direction is NOT the (sole) root
-cause of this specific pattern — ruled out via direct A/B test on live data,
-not guessed. Action deltas in the raw `steps.jsonl` are non-degenerate
-(comparable magnitude to OpenVLA-OFT's successful episodes) but never
-accumulate into a decisive reach toward the object. **Not resolved — left
-running as-is (reverted/no-extra-flip state, since that matches the
-already-validated convention used everywhere else in the pipeline, absent
-positive evidence for the alternative) given the session's hard time budget
-and the user's explicit reprioritization toward GreenVLA-R0/R1 coverage.**
-Whoever picks this up next: the libero_goal vs libero_object asymmetry
-(*some* grounding on one, *zero* on the other) is the most promising lead —
-check whether libero_object's specific object set/scene geometry does
-something the proprioception or action-space conversion doesn't handle
-(different starting reach distances? different init state characteristics?),
-rather than re-litigating image orientation, which is now directly tested
-both ways.
+**HF_TOKEN leak lesson (generic, happened twice in one session):** writing
+`env HF_TOKEN=$HF_TOKEN <command>` as a literal shell command leaks the
+resolved value into tool-call output/logs whenever that command errors and
+gets echoed back (e.g. by `conda run`). Rule: `export HF_TOKEN=...` as its
+own statement in the shell, then invoke `conda run`/anything else without
+repeating the variable in that command's own text — the child process
+still inherits it from the environment. Extract the token with
+`awk -F'"' '/^export HF_TOKEN=/{print $2}' ~/.bashrc`, never `source
+~/.bashrc` or `grep` with context lines (same failure mode).
 
 **Process-management lesson from debugging this under time pressure:** don't
 let a `--models X` full run keep executing once you suspect every episode is

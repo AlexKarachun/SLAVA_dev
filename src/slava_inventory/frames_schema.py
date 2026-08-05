@@ -244,6 +244,14 @@ def validate_frame_record(record: dict[str, Any]) -> None:
             raise ValueError(f"slots.forbidden: {value!r} not in scene.objects")
     if slots["target"] in forbidden:
         raise ValueError("slots.forbidden: target must not be in forbidden")
+    if reference is not None and reference in forbidden:
+        # Found 2026-08-05: widowx_stack_cube (D4) had forbidden==[reference],
+        # so touching the placement surface — required by the task itself —
+        # was auto-labeled negation_error on every legitimate success. This
+        # check is the symmetric twin of the target check above, which
+        # existed but didn't cover reference — the actual gap that let the
+        # bad frame through `validate_frames()` unnoticed in the first place.
+        raise ValueError("slots.forbidden: reference must not be in forbidden")
     predicates = slots["success_predicates"]
     if not isinstance(predicates, list) or not predicates:
         raise ValueError("slots.success_predicates: expected a non-empty array")
@@ -294,7 +302,21 @@ def validate_frame_record(record: dict[str, Any]) -> None:
         _required_string(reason, f"axis_na.{key}")
         if variants.get(key) is not None:
             raise ValueError(f"axis_na.{key}: variant is filled, axis_na is not applicable")
-    if variants["ru_negation"] is not None and not forbidden:
+    # Relaxed 2026-08-05: this used to require forbidden non-empty whenever
+    # ru_negation is filled, on the assumption that every negation implies
+    # "don't touch a distractor". That's wrong for a target/reference
+    # role-swap negation ("pick X, not Y" where Y *is* the reference — e.g.
+    # widowx_stack_cube's "возьми не желтый, а зеленый... и поставь на
+    # желтый": yellow is legitimately touched as the placement surface
+    # either way, there's no third object to forbid). A wrong pick there is
+    # correctly caught by auto_label.py's target_grounding_error (first
+    # contact != target), not negation_error — forbidden isn't the only
+    # mechanism task.md's taxonomy has for a negation failure. The check
+    # still fires when the scene actually has a spare object that a
+    # distractor-avoidance negation could have been wired to but wasn't
+    # (the real authoring mistake this check exists to catch).
+    other_objects = ids - {slots["target"]} - ({reference} if reference else set())
+    if variants["ru_negation"] is not None and not forbidden and other_objects:
         raise ValueError("variants.ru_negation: filled but slots.forbidden is empty")
     if variants["ru_case_swap"] is None and "ru_case_swap" not in axis_na:
         raise ValueError("variants.ru_case_swap: must be filled or have an axis_na reason")
