@@ -21,6 +21,18 @@ properly at the end of a session — this skill is the checklist for that.
 
 ## 1. Reconcile "Текущее состояние проекта" against reality, not against what it said before
 
+**First, know what that section is for (changed 2026-08-05, when the repo was
+prepared for handoff to a researcher).** It is a *snapshot* — where the
+project stands, what is open, what needs the user — and it is meant to stay
+short enough that an agent actually reads it before working. It is **not** a
+session diary. The chronology of findings ("on date X we tried Y, it failed
+because Z") belongs in the per-topic `slava-*` skills, together with the
+evidence. The section previously was a running log and reached 1300+ lines,
+at which point nobody could read it in full; it was cut back to ~100. Do not
+regrow it. When you finish a session: put the *finding* in the right skill,
+and touch this section only if the project's status or open questions
+actually changed.
+
 Don't just append a new paragraph describing this session's changes on top
 of what's already there — that's how the section grows stale contradictions
 (this happened once: a `token_len` paragraph from an earlier session still

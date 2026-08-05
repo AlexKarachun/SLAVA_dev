@@ -25,6 +25,12 @@ from pathlib import Path
 from typing import Any, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Sibling-directory convention for third-party sim/model repos (LIBERO,
+# SimplerEnv, ...), same default as scripts/bootstrap*.sh's SLAVA_DEPS_DIR:
+# they live next to this repo, not at a machine-specific absolute path.
+# Override per-repo with LIBERO_ROOT/SIMPLERENV_ROOT, or all at once with
+# SLAVA_DEPS_DIR.
+DEPS_DIR = Path(os.environ.get("SLAVA_DEPS_DIR", str(PROJECT_ROOT.parent)))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from slava_rollout.auto_label import label_episode  # noqa: E402
@@ -162,9 +168,11 @@ class WorkerPool:
         ]
         env_overrides = {"PYTHONPATH": str(PROJECT_ROOT / "src")}
         if environment == "LIBERO":
-            env_overrides["LIBERO_ROOT"] = os.environ.get("LIBERO_ROOT", "/workspace/LIBERO")
+            env_overrides["LIBERO_ROOT"] = os.environ.get("LIBERO_ROOT", str(DEPS_DIR / "LIBERO"))
         else:
-            env_overrides["SIMPLERENV_ROOT"] = os.environ.get("SIMPLERENV_ROOT", "/workspace/SimplerEnv")
+            env_overrides["SIMPLERENV_ROOT"] = os.environ.get(
+                "SIMPLERENV_ROOT", str(DEPS_DIR / "SimplerEnv")
+            )
         # Port in the log filename (not just environment/model_key) so
         # multiple concurrent run_rollouts.py shards (multi-GPU sharding, see
         # --shard-index/--num-shards) each get their own log file instead of

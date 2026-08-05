@@ -423,6 +423,123 @@ Check `docs/rollout_report.html` / AGENTS.md's most recent session log for
 the actual resulting numbers from both — this file was updated mid-run,
 before either finished.
 
+## `normalization_mode`: real asymmetry in R0's config, real drift, but NOT the SR explanation (2026-08-05)
+
+Investigated after R0 finished its rotation-fix rerun at 0/28 with all 28
+episodes labeled `unclear` and `first_contact_object=null` — i.e. R0 never
+touched anything, while the paper (arXiv:2602.00919, Table 4) reports R0 at
+**91.7% pick / 33.3% success on Cubes**. That gap (91.7% pick → 0% contact)
+is not "a generalist checkpoint underperforms"; it demanded a mechanism.
+
+**Config diff, R0 vs R1** (`config.json` on the Hub, read directly, and the
+only three fields that differ at all):
+
+| field | R0 | R1 |
+| --- | --- | --- |
+| `normalization_mode` | `quantile` | `mean_std` |
+| `is_knowledge_insulation` | `false` | `true` |
+| `tokenizer_max_length` | `832` | `356` |
+
+`norm_stats/bridge/norm_stats.json` is **byte-identical** between R0 and R1
+(checked key by key, both `state` and `actions`) — so the difference is
+purely which formula consumes those stats.
+
+**The mechanism** (`UnnormalizeTorch` in
+`lerobot/common/datasets/torch_transforms.py`, read directly):
+```python
+# quantile
+return (data_tensor + 1.0) / 2.0 * ((q99 - q01) + 1e-6) + q01
+# mean_std
+return data_tensor * (std + 1e-6) + mean
+```
+mean_std maps raw 0 → `mean` (≈0 for delta actions: z-dim mean=0.0013).
+quantile maps raw 0 → `(q99+q01)/2`, the **midpoint of the quantile band**,
+which is only 0 if the band is symmetric. For the z-dimension it is not:
+`q01=-0.0252, q99=0.0427` → raw 0 unnormalizes to **+0.00875 m per step**.
+A policy whose raw output hovers near zero therefore gets a constant upward
+push instead of standing still.
+
+**Verified numerically, not inferred.** Measured R0's actual raw
+(pre-unnormalize) `select_action()` output on live steps: z-dim values sat
+in ≈[-0.10, +0.01]. Feeding those exact measured values through both
+formulas predicts **+0.45 m** cumulative z-drift over 60 steps under
+quantile vs **+0.05 m** under mean_std. Observed in real rollouts:
+**+0.26…+0.43 m** under R0's native quantile, **~0.01…0.03 m** with
+mean_std forced. Prediction matches observation; the arm visibly flies up
+out of frame by step 60 (confirmed on camera PNGs across 8/8 episodes).
+
+**But forcing `mean_std` does NOT restore success — this is the important
+negative result.** Ran, all with both existing fixes on:
+
+| run | n | SR |
+| --- | --- | --- |
+| R0 + `mean_std` override, plain seed loop | 20 | 0/20 |
+| R0 + `mean_std` override, real `prompts_v0.jsonl` grid | 28 | 0/28 |
+| R1 + `quantile` override (symmetric control) | 20 | 1/20 |
+
+With mean_std the arm stops flying away — and then just hovers, never
+reaching the cube. The symmetric control matters: forcing R1 into quantile
+does *not* reproduce R0's total failure (R1 still lands a success), so
+`normalization_mode` alone is not sufficient to explain a 0% SR.
+
+**Conclusion, and why the official numbers were left alone.** The quantile
+zero-point asymmetry is real, is R0-specific, and really does cause the
+drift. It is *not* our bug — it is what the checkpoint's own config asks
+for. Since overriding it does not recover success, there is no evidence the
+authors' config is wrong, and overriding it for the official run would mean
+benchmarking R0 under a protocol its authors never specified. Official
+R0/R1/R2 results are therefore reported as-configured, no override. Do not
+"fix" this without new evidence.
+
+**Ruled out in the same pass** (checked, not assumed): `is_knowledge_insulation`
+is dead code for us (only read when `model_mode == "mixed"`; all three of our
+checkpoints are `flow_matching`). `tokenizer_max_length` 832-vs-356 is a
+deliberate upstream choice documented in their own
+`conf/finetune_greenvla_bridge.yaml` ("for a bridge (there is a one image, we
+can reduce the amount of tokens)"), read from each checkpoint's config
+automatically. Tokenizers for all three stages resolve from
+`config.base_vlm_model` — identical across R0/R1/R2, not a source of divergence.
+
+## R0 fails on the EASY tasks too — the strongest open signal (2026-08-05)
+
+To separate "stacking is just hard" from "something systematic is broken",
+ran native R0 (no override, both fixes on) on the other bridge tasks via the
+pure-upstream harness:
+
+| task | our R0 | paper's R0 (Table 4, success) |
+| --- | --- | --- |
+| `widowx_put_eggplant_in_basket` | **0/10** | **88.5%** |
+| `widowx_carrot_on_plate` | **0/10** | 25.0% |
+| `widowx_stack_cube` | 0/20 | 33.3% |
+
+**Eggplant is the paper's easiest bridge task and we score zero on it.**
+A generalist checkpoint being weak does not produce 0/10 where the authors
+report 88.5%. Treat this as the strongest evidence that a systematic bug
+remains somewhere in the SimplerEnv path — shared by all three GreenVLA
+stages (R2's 21% would then be R2's RL-alignment partially compensating,
+not proof the path is correct).
+
+**Top lead, found but NOT yet tested** (2026-08-05, end of session):
+SimplerEnv's own reference wrapper for this exact embodiment
+(`simpler_env/policies/octo/octo_model.py`, `policy_setup == "widowx_bridge"`)
+**binarizes** the gripper:
+```python
+action["gripper"] = 2.0 * (raw_action["open_gripper"] > 0.5) - 1.0
+```
+Our `greenvla_server.py` instead passes the continuous value through
+`chunk[:, -1] = 2.0 * chunk[:, -1] - 1.0`. Same affine shape, but no
+threshold: a model output of 0.6 becomes a weak `+0.2` instead of a decisive
+`+1.0`, and 0.4 becomes `-0.2` instead of `-1.0` — the gripper never fully
+closes. **This is precisely the bug class already confirmed on OpenVLA-OFT**
+(see `slava-openvla-oft`: missing `normalize_gripper_action(binarize=True)`
+took it from 0% to 74.7%). The earlier "gripper range fix" note above got
+the *range* right and the *binarization* wrong. Test this first next
+session, on all three GreenVLA stages, and check whether the lerobot
+policies on SimplerEnv need the same treatment. Note the same file also
+shows the Google-robot branch using a *relative* (previous − current)
+sticky-gripper scheme — that one is embodiment-specific, do not copy it to
+WidowX.
+
 ## Still open
 
 - **R0/R1 rerun with the gripper fix completed (2026-08-05, 28/28 each) —

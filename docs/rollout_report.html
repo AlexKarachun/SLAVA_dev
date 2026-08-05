@@ -53,7 +53,7 @@
 <body>
 <header>
   <h1>SLAVA — pilot v0 rollout technical report</h1>
-  <p>Первые model rollouts на 5 моделях × LIBERO/SimplerEnv, по контракту task.md. 428 эпизодов размечено на момент генерации отчёта.</p>
+  <p>Первые model rollouts на 5 моделях × LIBERO/SimplerEnv, по контракту task.md. 551 эпизодов размечено на момент генерации отчёта.</p>
 </header>
 <main>
 
@@ -94,7 +94,7 @@
     <div class="stat"><b>127</b><span>промптов (task_uid × variant), LIBERO: 99, SimplerEnv: 28</span></div>
     <div class="stat"><b>1</b><span>повторов на (сцена × вариант × модель)</span></div>
     <div class="stat"><b>564</b><span>запланировано эпизодов (5 моделей)</span></div>
-    <div class="stat"><b>428</b><span>фактически размечено эпизодов</span></div>
+    <div class="stat"><b>551</b><span>фактически размечено эпизодов</span></div>
     <div class="stat"><b>LIBERO: 300, SimplerEnv: 120</b><span>лимит шагов на эпизод</span></div>
   </div>
   <table class="data-table"><thead><tr><th>Модель</th><th>Backbone</th><th>Среда(ы) и чекпойнт(ы)</th><th>Промптов</th></tr></thead>
@@ -111,7 +111,7 @@
   (<code>python scripts/generate_rollout_report.py</code>) против более полного
   <code>rollout_annotations.jsonl</code> в будущем без изменений кода.</div>
   <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
-  <tbody><tr><td>GreenVLA-R0</td><td>0 / 28</td><td><span class="badge fail">not started</span></td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>0 / 28</td><td><span class="badge fail">not started</span></td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>28 / 28</td><td><span class="badge success">complete</span></td></tr><tr><td>OpenVLA-OFT</td><td>99 / 99</td><td><span class="badge success">complete</span></td></tr><tr><td>pi0</td><td>127 / 127</td><td><span class="badge success">complete</span></td></tr><tr><td>pi0.5</td><td>127 / 127</td><td><span class="badge success">complete</span></td></tr><tr><td>SmolVLA</td><td>47 / 127</td><td><span class="badge ">partial</span></td></tr></tbody></table>
+  <tbody><tr><td>GreenVLA-R0</td><td>28 / 28</td><td><span class="badge success">complete</span></td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>28 / 28</td><td><span class="badge success">complete</span></td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>28 / 28</td><td><span class="badge success">complete</span></td></tr><tr><td>OpenVLA-OFT</td><td>99 / 99</td><td><span class="badge success">complete</span></td></tr><tr><td>pi0</td><td>127 / 127</td><td><span class="badge success">complete</span></td></tr><tr><td>pi0.5</td><td>127 / 127</td><td><span class="badge success">complete</span></td></tr><tr><td>SmolVLA</td><td>114 / 127</td><td><span class="badge ">partial</span></td></tr></tbody></table>
 </section>
 
 <section>
@@ -215,7 +215,7 @@
         <div class="gif-grid">
           <figure class="run-card">
             <div class="gif-pair">
-              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode004__seed000__code_switch__greenvla_r2_bridge__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode001__seed000__code_switch__greenvla_r2_bridge__seed000/agentview.gif" loading="lazy" title="agentview">
               
             </div>
             <figcaption>
@@ -226,7 +226,7 @@
           </figure>
           <figure class="run-card">
             <div class="gif-pair">
-              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode008__seed000__en_canonical__greenvla_r2_bridge__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode000__seed000__en_canonical__greenvla_r2_bridge__seed000/agentview.gif" loading="lazy" title="agentview">
               
             </div>
             <figcaption>
@@ -252,7 +252,7 @@
               
             </div>
             <figcaption>
-              <span class="badge fail">negation_error</span>
+              <span class="badge fail">target_grounding_error</span>
               <span class="vtag">mt_russian</span>
               <span class="instruction">&laquo;Поставьте зелёный кубик на жёлтый кубик&raquo;</span>
             </figcaption>
@@ -263,7 +263,7 @@
               
             </div>
             <figcaption>
-              <span class="badge fail">negation_error</span>
+              <span class="badge fail">target_grounding_error</span>
               <span class="vtag">ru_case_swap</span>
               <span class="instruction">&laquo;поставь желтый кубик на зеленый кубик&raquo;</span>
             </figcaption>
@@ -274,7 +274,7 @@
               
             </div>
             <figcaption>
-              <span class="badge fail">negation_error</span>
+              <span class="badge fail">relation_binding_error</span>
               <span class="vtag">ru_literal</span>
               <span class="instruction">&laquo;поставь зеленый кубик на желтый кубик&raquo;</span>
             </figcaption>
@@ -285,7 +285,7 @@
               
             </div>
             <figcaption>
-              <span class="badge fail">negation_error</span>
+              <span class="badge fail">relation_binding_error</span>
               <span class="vtag">ru_negation</span>
               <span class="instruction">&laquo;возьми не желтый, а зеленый кубик и поставь на желтый&raquo;</span>
             </figcaption>
@@ -296,7 +296,7 @@
               
             </div>
             <figcaption>
-              <span class="badge fail">negation_error</span>
+              <span class="badge fail">relation_binding_error</span>
               <span class="vtag">code_switch</span>
               <span class="instruction">&laquo;поставь green cube на yellow cube&raquo;</span>
             </figcaption>
@@ -310,31 +310,31 @@
               <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__code_switch__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
-              <span class="badge fail">no_action_or_timeout</span>
+              <span class="badge fail">target_grounding_error</span>
               <span class="vtag">code_switch</span>
               <span class="instruction">&laquo;открой middle drawer шкафа&raquo;</span>
             </figcaption>
           </figure>
           <figure class="run-card">
             <div class="gif-pair">
-              <img class="gif" src="report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__pi0__seed000/agentview.gif" loading="lazy" title="agentview">
-              <img class="gif" src="report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__pi0__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
               <span class="badge success">success</span>
               <span class="vtag">en_canonical</span>
-              <span class="instruction">&laquo;push the plate to the front of the stove&raquo;</span>
+              <span class="instruction">&laquo;open the middle drawer of the cabinet&raquo;</span>
             </figcaption>
           </figure>
           <figure class="run-card">
             <div class="gif-pair">
-              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_paraphrase__pi0__seed000/agentview.gif" loading="lazy" title="agentview">
-              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_paraphrase__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
+              <img class="gif" src="report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_paraphrase__pi0__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_paraphrase__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
-              <span class="badge fail">no_action_or_timeout</span>
+              <span class="badge success">success</span>
               <span class="vtag">en_paraphrase</span>
-              <span class="instruction">&laquo;pull open the cabinet's middle drawer&raquo;</span>
+              <span class="instruction">&laquo;slide the plate to the front of the stove&raquo;</span>
             </figcaption>
           </figure>
           <figure class="run-card">
@@ -343,7 +343,7 @@
               <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__mt_russian__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
-              <span class="badge fail">no_action_or_timeout</span>
+              <span class="badge fail">target_grounding_error</span>
               <span class="vtag">mt_russian</span>
               <span class="instruction">&laquo;откройте средний ящик шкафа&raquo;</span>
             </figcaption>
@@ -354,7 +354,7 @@
               <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__ru_literal__pi0__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
-              <span class="badge fail">no_action_or_timeout</span>
+              <span class="badge fail">target_grounding_error</span>
               <span class="vtag">ru_literal</span>
               <span class="instruction">&laquo;открой средний ящик шкафа&raquo;</span>
             </figcaption>
@@ -393,28 +393,144 @@
             </figcaption>
           </figure>
         </div>
-        <h3>SmolVLA <span class="muted">— SR 0/47 = 0.0%</span></h3>
+        <h3>SmolVLA <span class="muted">— SR 1/114 = 0.9%</span></h3>
         <div class="gif-grid">
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_paraphrase__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_paraphrase__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+            </div>
+            <figcaption>
+              <span class="badge fail">no_action_or_timeout</span>
+              <span class="vtag">en_paraphrase</span>
+              <span class="instruction">&laquo;pull open the cabinet's middle drawer&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__mt_russian__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__mt_russian__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+            </div>
+            <figcaption>
+              <span class="badge fail">no_action_or_timeout</span>
+              <span class="vtag">mt_russian</span>
+              <span class="instruction">&laquo;откройте средний ящик шкафа&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+            </div>
+            <figcaption>
+              <span class="badge success">success</span>
+              <span class="vtag">en_canonical</span>
+              <span class="instruction">&laquo;push the plate to the front of the stove&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__ru_literal__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__ru_literal__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+            </div>
+            <figcaption>
+              <span class="badge fail">no_action_or_timeout</span>
+              <span class="vtag">ru_literal</span>
+              <span class="instruction">&laquo;открой средний ящик шкафа&raquo;</span>
+            </figcaption>
+          </figure>
           <figure class="run-card">
             <div class="gif-pair">
               <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__code_switch__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
               <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__code_switch__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
-              <span class="badge fail">target_grounding_error</span>
+              <span class="badge fail">no_action_or_timeout</span>
               <span class="vtag">code_switch</span>
               <span class="instruction">&laquo;открой middle drawer шкафа&raquo;</span>
             </figcaption>
           </figure>
           <figure class="run-card">
             <div class="gif-pair">
-              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
-              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__ru_negation__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__ru_negation__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
               <span class="badge fail">no_action_or_timeout</span>
+              <span class="vtag">ru_negation</span>
+              <span class="instruction">&laquo;открой не верхний, а средний ящик шкафа&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__ru_case_swap__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__ru_case_swap__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+            </div>
+            <figcaption>
+              <span class="badge fail">relation_binding_error</span>
+              <span class="vtag">ru_case_swap</span>
+              <span class="instruction">&laquo;поставь тарелку на черную миску по центру стола&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init034__en_paraphrase__smolvla__seed000/agentview.gif" loading="lazy" title="agentview">
+              <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init034__en_paraphrase__smolvla__seed000/wrist.gif" loading="lazy" title="wrist">
+            </div>
+            <figcaption>
+              <span class="badge fail">no_action_or_timeout</span>
+              <span class="vtag">en_paraphrase</span>
+              <span class="instruction">&laquo;pull open the cabinet's middle drawer&raquo;</span>
+            </figcaption>
+          </figure>
+        </div>
+        <h3>GreenVLA-R0 <span class="muted">— SR 0/28 = 0.0%</span></h3>
+        <div class="gif-grid">
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode000__seed000__code_switch__greenvla_r0__seed000/agentview.gif" loading="lazy" title="agentview">
+              
+            </div>
+            <figcaption>
+              <span class="badge fail">unclear</span>
+              <span class="vtag">code_switch</span>
+              <span class="instruction">&laquo;поставь green cube на yellow cube&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode000__seed000__en_canonical__greenvla_r0__seed000/agentview.gif" loading="lazy" title="agentview">
+              
+            </div>
+            <figcaption>
+              <span class="badge fail">unclear</span>
               <span class="vtag">en_canonical</span>
-              <span class="instruction">&laquo;open the middle drawer of the cabinet&raquo;</span>
+              <span class="instruction">&laquo;stack the green block on the yellow block&raquo;</span>
+            </figcaption>
+          </figure>
+        </div>
+        <h3>GreenVLA-R1 (bridge) <span class="muted">— SR 0/28 = 0.0%</span></h3>
+        <div class="gif-grid">
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode000__seed000__code_switch__greenvla_r1_bridge__seed000/agentview.gif" loading="lazy" title="agentview">
+              
+            </div>
+            <figcaption>
+              <span class="badge fail">unclear</span>
+              <span class="vtag">code_switch</span>
+              <span class="instruction">&laquo;поставь green cube на yellow cube&raquo;</span>
+            </figcaption>
+          </figure>
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="report_assets/simpler__widowx_stack_cube__episode000__seed000__en_canonical__greenvla_r1_bridge__seed000/agentview.gif" loading="lazy" title="agentview">
+              
+            </div>
+            <figcaption>
+              <span class="badge fail">relation_binding_error</span>
+              <span class="vtag">en_canonical</span>
+              <span class="instruction">&laquo;stack the green block on the yellow block&raquo;</span>
             </figcaption>
           </figure>
         </div>
@@ -437,7 +553,7 @@
               <img class="gif" src="report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__pi05__seed000/wrist.gif" loading="lazy" title="wrist">
             </div>
             <figcaption>
-              <span class="badge fail">target_grounding_error</span>
+              <span class="badge fail">no_action_or_timeout</span>
               <span class="vtag">en_canonical</span>
               <span class="instruction">&laquo;open the middle drawer of the cabinet&raquo;</span>
             </figcaption>
@@ -452,7 +568,7 @@
   в одну выборку — и они прямо конфаундят кросс-лингвальное сравнение, которое сопоставляет
   промпт-варианты <em>внутри</em> одной модели. Такие модели исключены из всех агрегатов ниже.</p>
   <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
-  <tbody><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>28</td><td><span class="badge success">валидно</span> все эпизоды на финальном коде</td></tr><tr><td>OpenVLA-OFT</td><td>99</td><td><span class="badge success">валидно</span> все эпизоды на финальном коде</td></tr><tr><td>SmolVLA</td><td>47</td><td><span class="badge fail">исключено</span> 24/47 эпизодов собраны до последнего фикса inference-кода — смешаны две конфигурации</td></tr><tr><td>pi0</td><td>127</td><td><span class="badge fail">исключено</span> 67/127 эпизодов собраны до последнего фикса inference-кода — смешаны две конфигурации</td></tr><tr><td>pi0.5</td><td>127</td><td><span class="badge fail">исключено</span> 58/127 эпизодов собраны до последнего фикса inference-кода — смешаны две конфигурации</td></tr></tbody></table>
+  <tbody><tr><td>GreenVLA-R0</td><td>28</td><td><span class="badge success">валидно</span> все эпизоды на финальном коде</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>28</td><td><span class="badge success">валидно</span> все эпизоды на финальном коде</td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>28</td><td><span class="badge success">валидно</span> все эпизоды на финальном коде</td></tr><tr><td>OpenVLA-OFT</td><td>99</td><td><span class="badge success">валидно</span> все эпизоды на финальном коде</td></tr><tr><td>SmolVLA</td><td>114</td><td><span class="badge fail">исключено</span> 114/114 эпизодов собраны до последнего фикса inference-кода — смешаны две конфигурации</td></tr><tr><td>pi0</td><td>127</td><td><span class="badge fail">исключено</span> 127/127 эпизодов собраны до последнего фикса inference-кода — смешаны две конфигурации</td></tr><tr><td>pi0.5</td><td>127</td><td><span class="badge fail">исключено</span> 99/127 эпизодов собраны до последнего фикса inference-кода — смешаны две конфигурации</td></tr></tbody></table>
   <div class="warn"><b>3 модели исключены из метрик</b> — их числа в этом отчёте не приводятся; требуется перезапуск на финальном коде (см. §6).</div>
 </section>
 
@@ -462,7 +578,7 @@
   <table class="data-table"><thead><tr>
     <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
     <th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>
-  </tr></thead><tbody><tr><td>en_canonical</td><td>20</td><td>80.0%</td><td>85.0%</td><td>0.0%</td><td>80.0%</td><td>5.0%</td></tr><tr><td>en_paraphrase</td><td>20</td><td>95.0%</td><td>80.0%</td><td>0.0%</td><td>95.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>20</td><td>45.0%</td><td>50.0%</td><td>10.0%</td><td>45.0%</td><td>15.0%</td></tr><tr><td>ru_literal</td><td>20</td><td>45.0%</td><td>50.0%</td><td>20.0%</td><td>45.0%</td><td>15.0%</td></tr><tr><td>ru_free_order</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_case_swap</td><td>8</td><td>50.0%</td><td>50.0%</td><td>50.0%</td><td>50.0%</td><td>50.0%</td></tr><tr><td>ru_negation</td><td>19</td><td>42.1%</td><td>47.4%</td><td>10.5%</td><td>42.1%</td><td>10.5%</td></tr><tr><td>code_switch</td><td>20</td><td>75.0%</td><td>75.0%</td><td>5.0%</td><td>75.0%</td><td>20.0%</td></tr></tbody></table>
+  </tr></thead><tbody><tr><td>en_canonical</td><td>28</td><td>60.7%</td><td>75.0%</td><td>0.0%</td><td>60.7%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>28</td><td>64.3%</td><td>71.4%</td><td>0.0%</td><td>64.3%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>28</td><td>32.1%</td><td>42.9%</td><td>10.7%</td><td>32.1%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>28</td><td>32.1%</td><td>46.4%</td><td>14.3%</td><td>32.1%</td><td>0.0%</td></tr><tr><td>ru_free_order</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_case_swap</td><td>16</td><td>25.0%</td><td>25.0%</td><td>43.8%</td><td>25.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>27</td><td>29.6%</td><td>48.1%</td><td>0.0%</td><td>29.6%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>28</td><td>53.6%</td><td>64.3%</td><td>3.6%</td><td>53.6%</td><td>3.6%</td></tr></tbody></table>
 
   <div class="warn"><b>Важная оговорка:</b> модель→среда матрица асимметрична (task.md), поэтому пуллинг по
   вариантам смешивает разные подмножества моделей/сцен для разных строк (например, en_canonical для
@@ -470,7 +586,7 @@
   более честный источник для интерпретации отдельной модели.</div>
 
   <h3>Разбивка по моделям</h3>
-  <h3>GreenVLA-R2 (bridge, RL-aligned)</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>4</td><td>25.0%</td><td>100.0%</td><td>0.0%</td><td>25.0%</td><td>25.0%</td></tr><tr><td>en_paraphrase</td><td>4</td><td>100.0%</td><td>100.0%</td><td>0.0%</td><td>100.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>4</td><td>0.0%</td><td>50.0%</td><td>50.0%</td><td>0.0%</td><td>75.0%</td></tr><tr><td>ru_literal</td><td>4</td><td>0.0%</td><td>50.0%</td><td>50.0%</td><td>0.0%</td><td>75.0%</td></tr><tr><td>ru_case_swap</td><td>4</td><td>0.0%</td><td>0.0%</td><td>100.0%</td><td>0.0%</td><td>100.0%</td></tr><tr><td>ru_negation</td><td>4</td><td>0.0%</td><td>25.0%</td><td>50.0%</td><td>0.0%</td><td>50.0%</td></tr><tr><td>code_switch</td><td>4</td><td>25.0%</td><td>100.0%</td><td>0.0%</td><td>25.0%</td><td>75.0%</td></tr></tbody></table><h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>93.8%</td><td>81.2%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>16</td><td>93.8%</td><td>75.0%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>16</td><td>56.2%</td><td>50.0%</td><td>0.0%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>16</td><td>56.2%</td><td>50.0%</td><td>12.5%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_case_swap</td><td>4</td><td>100.0%</td><td>100.0%</td><td>0.0%</td><td>100.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>15</td><td>53.3%</td><td>53.3%</td><td>0.0%</td><td>53.3%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>16</td><td>87.5%</td><td>68.8%</td><td>6.2%</td><td>87.5%</td><td>6.2%</td></tr></tbody></table>
+  <h3>GreenVLA-R0</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_case_swap</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr></tbody></table><h3>GreenVLA-R1 (bridge)</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>4</td><td>0.0%</td><td>100.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>4</td><td>0.0%</td><td>100.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>4</td><td>0.0%</td><td>50.0%</td><td>25.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>4</td><td>0.0%</td><td>50.0%</td><td>25.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_case_swap</td><td>4</td><td>0.0%</td><td>0.0%</td><td>75.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>4</td><td>0.0%</td><td>75.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>4</td><td>0.0%</td><td>75.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr></tbody></table><h3>GreenVLA-R2 (bridge, RL-aligned)</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>4</td><td>50.0%</td><td>100.0%</td><td>0.0%</td><td>50.0%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>4</td><td>75.0%</td><td>100.0%</td><td>0.0%</td><td>75.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>4</td><td>0.0%</td><td>50.0%</td><td>50.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>4</td><td>0.0%</td><td>75.0%</td><td>25.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_case_swap</td><td>4</td><td>0.0%</td><td>0.0%</td><td>100.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>4</td><td>0.0%</td><td>50.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>4</td><td>25.0%</td><td>100.0%</td><td>0.0%</td><td>25.0%</td><td>0.0%</td></tr></tbody></table><h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>93.8%</td><td>81.2%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>16</td><td>93.8%</td><td>75.0%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>16</td><td>56.2%</td><td>50.0%</td><td>0.0%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>16</td><td>56.2%</td><td>50.0%</td><td>12.5%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_case_swap</td><td>4</td><td>100.0%</td><td>100.0%</td><td>0.0%</td><td>100.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>15</td><td>53.3%</td><td>53.3%</td><td>0.0%</td><td>53.3%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>16</td><td>87.5%</td><td>68.8%</td><td>6.2%</td><td>87.5%</td><td>6.2%</td></tr></tbody></table>
 </section>
 
 <section>
@@ -480,11 +596,11 @@
   объяснить простым перефразированием на английском (en_paraphrase) — то есть эффект специфичен для языка,
   не просто "непривычная формулировка".</p>
   <table class="data-table"><thead><tr><th>Effect</th><th>Formula</th><th>Value</th></tr></thead>
-  <tbody><tr><td>gap_en_paraphrase</td><td><code>SR_en_canonical − SR_en_paraphrase</code></td><td class="neg">-15.0 pp</td></tr><tr><td>gap_ru_literal</td><td><code>SR_en_canonical − SR_ru_literal</code></td><td class="pos">+35.0 pp</td></tr><tr><td>Δlang_ru_literal</td><td><code>gap_ru_literal − gap_en_paraphrase</code></td><td class="pos">+50.0 pp</td></tr><tr><td>Δlang_ru_free_order</td><td><code>gap_ru_free_order − gap_en_paraphrase</code></td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td><code>gap_ru_negation − gap_en_paraphrase</code></td><td class="pos">+52.9 pp</td></tr><tr><td>Δlang_code_switch</td><td><code>gap_code_switch − gap_en_paraphrase</code></td><td class="pos">+20.0 pp</td></tr></tbody></table>
+  <tbody><tr><td>gap_en_paraphrase</td><td><code>SR_en_canonical − SR_en_paraphrase</code></td><td class="neg">-3.6 pp</td></tr><tr><td>gap_ru_literal</td><td><code>SR_en_canonical − SR_ru_literal</code></td><td class="pos">+28.6 pp</td></tr><tr><td>Δlang_ru_literal</td><td><code>gap_ru_literal − gap_en_paraphrase</code></td><td class="pos">+32.1 pp</td></tr><tr><td>Δlang_ru_free_order</td><td><code>gap_ru_free_order − gap_en_paraphrase</code></td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td><code>gap_ru_negation − gap_en_paraphrase</code></td><td class="pos">+34.7 pp</td></tr><tr><td>Δlang_code_switch</td><td><code>gap_code_switch − gap_en_paraphrase</code></td><td class="pos">+10.7 pp</td></tr></tbody></table>
 
   <h3>Δlang по моделям</h3>
   <p class="muted">Пуллинг по вариантам в таблице выше смешивает разные подмножества моделей/сцен (см. оговорку в разделе 4) — разбивка по модели ниже честнее для интерпретации.</p>
-  <h3>GreenVLA-R2 (bridge, RL-aligned)</h3><table class="data-table"><thead><tr><th>Effect</th><th>Value</th></tr></thead><tbody><tr><td>gap_en_paraphrase</td><td class="neg">-75.0 pp</td></tr><tr><td>gap_ru_literal</td><td class="pos">+25.0 pp</td></tr><tr><td>Δlang_ru_literal</td><td class="pos">+100.0 pp</td></tr><tr><td>Δlang_ru_free_order</td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td class="pos">+100.0 pp</td></tr><tr><td>Δlang_code_switch</td><td class="pos">+75.0 pp</td></tr></tbody></table><h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Effect</th><th>Value</th></tr></thead><tbody><tr><td>gap_en_paraphrase</td><td class="">0.0 pp</td></tr><tr><td>gap_ru_literal</td><td class="pos">+37.5 pp</td></tr><tr><td>Δlang_ru_literal</td><td class="pos">+37.5 pp</td></tr><tr><td>Δlang_ru_free_order</td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td class="pos">+40.4 pp</td></tr><tr><td>Δlang_code_switch</td><td class="pos">+6.2 pp</td></tr></tbody></table>
+  <h3>GreenVLA-R0</h3><table class="data-table"><thead><tr><th>Effect</th><th>Value</th></tr></thead><tbody><tr><td>gap_en_paraphrase</td><td class="">0.0 pp</td></tr><tr><td>gap_ru_literal</td><td class="">0.0 pp</td></tr><tr><td>Δlang_ru_literal</td><td class="">0.0 pp</td></tr><tr><td>Δlang_ru_free_order</td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td class="">0.0 pp</td></tr><tr><td>Δlang_code_switch</td><td class="">0.0 pp</td></tr></tbody></table><h3>GreenVLA-R1 (bridge)</h3><table class="data-table"><thead><tr><th>Effect</th><th>Value</th></tr></thead><tbody><tr><td>gap_en_paraphrase</td><td class="">0.0 pp</td></tr><tr><td>gap_ru_literal</td><td class="">0.0 pp</td></tr><tr><td>Δlang_ru_literal</td><td class="">0.0 pp</td></tr><tr><td>Δlang_ru_free_order</td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td class="">0.0 pp</td></tr><tr><td>Δlang_code_switch</td><td class="">0.0 pp</td></tr></tbody></table><h3>GreenVLA-R2 (bridge, RL-aligned)</h3><table class="data-table"><thead><tr><th>Effect</th><th>Value</th></tr></thead><tbody><tr><td>gap_en_paraphrase</td><td class="neg">-25.0 pp</td></tr><tr><td>gap_ru_literal</td><td class="pos">+50.0 pp</td></tr><tr><td>Δlang_ru_literal</td><td class="pos">+75.0 pp</td></tr><tr><td>Δlang_ru_free_order</td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td class="pos">+75.0 pp</td></tr><tr><td>Δlang_code_switch</td><td class="pos">+50.0 pp</td></tr></tbody></table><h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Effect</th><th>Value</th></tr></thead><tbody><tr><td>gap_en_paraphrase</td><td class="">0.0 pp</td></tr><tr><td>gap_ru_literal</td><td class="pos">+37.5 pp</td></tr><tr><td>Δlang_ru_literal</td><td class="pos">+37.5 pp</td></tr><tr><td>Δlang_ru_free_order</td><td class="">—</td></tr><tr><td>Δlang_ru_negation</td><td class="pos">+40.4 pp</td></tr><tr><td>Δlang_code_switch</td><td class="pos">+6.2 pp</td></tr></tbody></table>
 </section>
 
 <section>

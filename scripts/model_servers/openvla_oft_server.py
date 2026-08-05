@@ -29,7 +29,14 @@ from scipy.spatial.transform import Rotation
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from base_server import base_arg_parser, serve  # noqa: E402
 
-OPENVLA_OFT_ROOT = Path(os.environ.get("OPENVLA_OFT_ROOT", "/workspace/openvla_oft_repo"))
+# Third-party repos live next to this one by default (same sibling-directory
+# convention as scripts/bootstrap*.sh's SLAVA_DEPS_DIR); override with
+# SLAVA_DEPS_DIR, or per-repo with OPENVLA_OFT_ROOT / LIBERO_ROOT.
+_DEPS_DIR = Path(
+    os.environ.get("SLAVA_DEPS_DIR", str(Path(__file__).resolve().parents[2].parent))
+)
+
+OPENVLA_OFT_ROOT = Path(os.environ.get("OPENVLA_OFT_ROOT", str(_DEPS_DIR / "openvla_oft_repo")))
 sys.path.insert(0, str(OPENVLA_OFT_ROOT))
 
 # experiments/robot/libero/run_libero_eval.py imports `from libero.libero import
@@ -38,11 +45,11 @@ sys.path.insert(0, str(OPENVLA_OFT_ROOT))
 # 660 editable-install import finder (its __editable__ finder on sys.path shadows
 # resolution for other editable packages; `import libero` silently 404s even
 # though `pip show libero` reports it installed). Sidestepping via plain
-# sys.path injection instead of `pip install -e /workspace/LIBERO` — this env
+# sys.path injection instead of `pip install -e <LIBERO>` — this env
 # never touches LIBERO's actual physics/rendering (that's env_worker_libero.py's
 # job, in the separate `slava-libero` env), so no editable-install machinery is
 # needed here at all, just the plain package on the import path.
-LIBERO_ROOT = Path(os.environ.get("LIBERO_ROOT", "/workspace/LIBERO"))
+LIBERO_ROOT = Path(os.environ.get("LIBERO_ROOT", str(_DEPS_DIR / "LIBERO")))
 sys.path.insert(0, str(LIBERO_ROOT))
 
 
