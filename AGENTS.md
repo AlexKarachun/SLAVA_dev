@@ -1322,12 +1322,10 @@ GPU3): уже 1/8 = реальный success (ep 3, 16 шагов) на моме
 или аналогичный однострочник.
 
 ```
-GPU0 (~16.7GB): pi0 SimplerEnv (rerun, camera+action-truncation фикс)
-                 env-worker :9601, model-server lerobot/pi0_base :9611
-                 pi05 SimplerEnv — оркестратор запущен, ещё в LIBERO skip-цикле
-                 (99 skip'ов), model-server пока не поднят — если завис
-                 дольше ~5 мин на этом этапе, проверить лог
-                 rollouts/logs/pi05_simplerenv_actiontrunc_fix_v2.log
+GPU0 (~free again): pi0 FINISHED (28/28 SimplerEnv + 99/99 LIBERO — full
+                 coverage, action-truncation fix confirmed working, process
+                 exited cleanly). pi05 SimplerEnv still running: env-worker
+                 :9602, model-server lerobot/pi05_base :9612.
 GPU1 (~11.8GB): GreenVLA-R0 rotation-fix rerun, env-worker :9301,
                  model-server (R0-base) :9311
 GPU2 (~11.6GB): GreenVLA-R1-bridge rotation-fix rerun, env-worker :9302,
@@ -1336,11 +1334,13 @@ GPU3 (~11.6GB): GreenVLA-R2-bridge rotation-fix rerun, env-worker :9401,
                  model-server (R2-bridge) :9411
 ```
 
-Счётчики на момент записи: GreenVLA-R0 0/17, GreenVLA-R1 0/18,
-GreenVLA-R2 3/9, pi0 SimplerEnv 0/25 (LIBERO часть 2/99 уже готова),
-pi0.5 SimplerEnv ещё не начат (LIBERO часть 0/99 уже готова).
-Логи оркестраторов: `rollouts/logs/{greenvla_r0,greenvla_r1,greenvla_r2}_rotationfix.log`,
-`rollouts/logs/pi0_simplerenv_actiontrunc_fix.log`,
+Счётчики на момент записи (последнее обновление, формат success/total):
+GreenVLA-R0 0/18, GreenVLA-R1 0/20, GreenVLA-R2 3/10, OpenVLA-OFT 74/99
+(полное покрытие 99/99 эпизодов, 74 из них успешны), **pi0 — полное
+покрытие 127/127 эпизодов, 2 успешны** (LIBERO 99/99 + SimplerEnv 28/28),
+pi0.5 SimplerEnv ещё не начат (LIBERO часть 99/99 уже готова, 0 успехов).
+Логи оркестраторов:
+`rollouts/logs/{greenvla_r0,greenvla_r1,greenvla_r2}_rotationfix.log`,
 `rollouts/logs/pi05_simplerenv_actiontrunc_fix_v2.log`.
 
 **Если процессы всё ещё живы, когда начинается новая сессия** — просто дать
