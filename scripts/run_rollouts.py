@@ -66,14 +66,34 @@ ENV_WORKER_SPEC = {
     },
 }
 
-MODEL_SERVER_SPEC = {
-    "greenvla_r0": {"conda_env": "slava-greenvla", "script": "greenvla_server.py", "port": 8801},
-    "greenvla_r1_bridge": {"conda_env": "slava-greenvla", "script": "greenvla_server.py", "port": 8802},
-    "openvla_oft": {"conda_env": "slava-openvla", "script": "openvla_oft_server.py", "port": 8803},
-    "pi0": {"conda_env": "slava-lerobot", "script": "lerobot_server.py", "port": 8804},
-    "pi05": {"conda_env": "slava-lerobot", "script": "lerobot_server.py", "port": 8805},
-    "smolvla": {"conda_env": "slava-lerobot", "script": "lerobot_server.py", "port": 8806},
+# Default ports, overridable per model_key via SLAVA_MODEL_PORT_<MODEL_KEY_UPPER>
+# (e.g. SLAVA_MODEL_PORT_OPENVLA_OFT=8813) — needed so multiple concurrent
+# run_rollouts.py processes running the SAME model (multi-GPU sharding, see
+# --shard-index/--num-shards) don't collide on one hardcoded port. Mirrors the
+# existing SLAVA_LIBERO_PORT/SLAVA_SIMPLERENV_PORT pattern for env-workers.
+_DEFAULT_MODEL_PORTS = {
+    "greenvla_r0": 8801,
+    "greenvla_r1_bridge": 8802,
+    "openvla_oft": 8803,
+    "pi0": 8804,
+    "pi05": 8805,
+    "smolvla": 8806,
+    "greenvla_r2_bridge": 8807,
 }
+
+MODEL_SERVER_SPEC = {
+    "greenvla_r0": {"conda_env": "slava-greenvla", "script": "greenvla_server.py"},
+    "greenvla_r1_bridge": {"conda_env": "slava-greenvla", "script": "greenvla_server.py"},
+    "openvla_oft": {"conda_env": "slava-openvla", "script": "openvla_oft_server.py"},
+    "pi0": {"conda_env": "slava-lerobot", "script": "lerobot_server.py"},
+    "pi05": {"conda_env": "slava-lerobot", "script": "lerobot_server.py"},
+    "smolvla": {"conda_env": "slava-lerobot", "script": "lerobot_server.py"},
+    "greenvla_r2_bridge": {"conda_env": "slava-greenvla", "script": "greenvla_server.py"},
+}
+for _key, _default_port in _DEFAULT_MODEL_PORTS.items():
+    MODEL_SERVER_SPEC[_key]["port"] = int(
+        os.environ.get(f"SLAVA_MODEL_PORT_{_key.upper()}", _default_port)
+    )
 
 
 def load_prompts() -> list[dict[str, Any]]:
@@ -145,7 +165,11 @@ class WorkerPool:
             env_overrides["LIBERO_ROOT"] = os.environ.get("LIBERO_ROOT", "/workspace/LIBERO")
         else:
             env_overrides["SIMPLERENV_ROOT"] = os.environ.get("SIMPLERENV_ROOT", "/workspace/SimplerEnv")
-        proc = start_subprocess(cmd, self.logs_dir / f"env_worker_{environment}.log", env_overrides)
+        # Port in the log filename (not just environment/model_key) so
+        # multiple concurrent run_rollouts.py shards (multi-GPU sharding, see
+        # --shard-index/--num-shards) each get their own log file instead of
+        # interleaving writes into the same one.
+        proc = start_subprocess(cmd, self.logs_dir / f"env_worker_{environment}_{spec['port']}.log", env_overrides)
         self.processes[f"env:{environment}"] = proc
         base_url = f"http://127.0.0.1:{spec['port']}"
         wait_for_health(base_url)
@@ -163,7 +187,7 @@ class WorkerPool:
             "python", str(script_path), "--checkpoint", checkpoint, "--port", str(spec["port"]),
         ]
         env_overrides = {"PYTHONPATH": str(PROJECT_ROOT / "src")}
-        proc = start_subprocess(cmd, self.logs_dir / f"model_server_{model_key}.log", env_overrides)
+        proc = start_subprocess(cmd, self.logs_dir / f"model_server_{model_key}_{spec['port']}.log", env_overrides)
         self.processes[f"model:{model_key}"] = proc
         base_url = f"http://127.0.0.1:{spec['port']}"
         wait_for_health(base_url, timeout_s=600.0)  # model weights download/load can be slow
@@ -194,7 +218,18 @@ class WorkerPool:
             stop_process(proc, timeout_s=15.0)
 
 
-def build_reset_payload(prompt: dict[str, Any]) -> dict[str, Any]:
+# Physics-settle steps before the first policy query, per model. openvla_oft
+# matches openvla-oft's own run_libero_eval.py `num_steps_wait=10`. Extended
+# 2026-08-05 to pi0/pi05/smolvla too, after independently confirming
+# huggingface/lerobot's OWN reference LiberoEnv (src/lerobot/envs/libero.py)
+# defaults to the identical `num_steps_wait: int = 10` — same convention, not
+# a guess. Found while investigating a real pattern: all 3 lerobot models
+# stuck on `no_action_or_timeout` on the same LIBERO_goal scene that
+# OpenVLA-OFT (which already had this fix) succeeded on repeatedly.
+LIBERO_NUM_STEPS_WAIT = {"openvla_oft": 10, "pi0": 10, "pi05": 10, "smolvla": 10}
+
+
+def build_reset_payload(prompt: dict[str, Any], model_key: str) -> dict[str, Any]:
     if prompt["environment"] == "LIBERO":
         return {
             "bddl_file": prompt["bddl_file"],
@@ -202,6 +237,7 @@ def build_reset_payload(prompt: dict[str, Any]) -> dict[str, Any]:
             "task_name": prompt["task_name"],
             "init_state_id": prompt["init_state_id"],
             "reset_seed": prompt.get("reset_seed") or 0,
+            "num_steps_wait": LIBERO_NUM_STEPS_WAIT.get(model_key, 0),
         }
     return {
         "task_name": prompt["task_name"],
@@ -227,7 +263,7 @@ def run_episode(
     steps_file = steps_path(run_id)
     max_steps = MAX_EPISODE_STEPS[environment]
 
-    reset_resp = env_client.reset(build_reset_payload(prompt))
+    reset_resp = env_client.reset(build_reset_payload(prompt, model_key))
     obs = reset_resp["obs"]
     meta = {"task_uid": prompt["task_uid"], "suite": prompt.get("suite"), "environment": environment}
 
@@ -236,6 +272,13 @@ def run_episode(
     final_object_poses: dict[str, list[float]] = {}
     env_success = False
     step_count = 0
+    # Action-chunk queue: drained one env-step at a time; refilled by a new
+    # /predict_chunk call once empty. Length 1 for every backend except
+    # OpenVLA-OFT (see clients.py::predict_chunk / openvla_oft_server.py) —
+    # so this is a no-op-equivalent for the other 4 models (still one predict
+    # call per env step, unchanged behavior), and real open-loop chunk replay
+    # only for OpenVLA-OFT.
+    pending_actions: list[list[float]] = []
 
     with open(steps_file, "a", encoding="utf-8") as steps_handle:
         for step_count in range(1, max_steps + 1):
@@ -243,7 +286,9 @@ def run_episode(
             if has_wrist and obs.get("wrist_rgb"):
                 save_png(decode_png_b64(obs["wrist_rgb"]), camera_dir(run_id, "wrist") / f"step_{step_count:04d}.png")
 
-            action = model_client.predict(prompt["instruction"], obs, meta)
+            if not pending_actions:
+                pending_actions = list(model_client.predict_chunk(prompt["instruction"], obs, meta))
+            action = pending_actions.pop(0)
             step_resp = env_client.step(action)
             obs = step_resp["obs"]
             info = step_resp["info"]
@@ -339,12 +384,38 @@ def select_prompts(
     return [p for p in filtered if p["task_uid"] in seen_task_uids and p["variant"] == "en_canonical"]
 
 
+def _handle_sigterm(signum: int, frame: Any) -> None:
+    # A bare SIGTERM to this process does NOT run `finally` blocks (unlike a
+    # caught exception) — found 2026-08-05 manually stopping a shard during
+    # multi-GPU rebalancing: the orchestrator died but its env-worker/model-
+    # server children (each its own process group via start_new_session=True,
+    # see start_subprocess()) were left orphaned holding GPU memory, same
+    # symptom as the `conda run` signal-forwarding bug this file already works
+    # around, just via a different mechanism. Translating SIGTERM into
+    # SystemExit here makes main()'s `finally: pool.stop_all()` actually run,
+    # so `kill <pid>` (or the user's own Ctrl+C during a real run) cleans up
+    # properly instead of requiring a manual `kill -TERM -<pgid>` per child.
+    raise SystemExit(143)  # 128 + SIGTERM(15), conventional exit code
+
+
 def main() -> None:
+    signal.signal(signal.SIGTERM, _handle_sigterm)
     parser = argparse.ArgumentParser()
     parser.add_argument("--models", nargs="+", choices=list(MODEL_REGISTRY.keys()), default=list(MODEL_REGISTRY.keys()))
     parser.add_argument("--smoke-test", action="store_true", help="2 scenes/model, en_canonical only")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--num-shards", type=int, default=1,
+        help="Split each model's selected episodes across N independent processes for "
+             "multi-GPU parallelism. Each shard must be launched as its own process with "
+             "a distinct --shard-index, a distinct CUDA_VISIBLE_DEVICES, and distinct "
+             "SLAVA_LIBERO_PORT/SLAVA_SIMPLERENV_PORT/SLAVA_MODEL_PORT_<KEY> env vars "
+             "(else concurrent env-worker/model-server instances collide — see SKILL.md).",
+    )
+    parser.add_argument("--shard-index", type=int, default=0, help="This process's shard, in [0, num_shards).")
     args = parser.parse_args()
+    if not (0 <= args.shard_index < args.num_shards):
+        parser.error("--shard-index must be in [0, num_shards)")
 
     prompts = load_prompts()
     completed = load_completed_run_ids()
@@ -353,7 +424,16 @@ def main() -> None:
     try:
         for model_key in args.models:
             selected = select_prompts(prompts, model_key, args.smoke_test)
-            print(f"[{model_key}] {len(selected)} episodes selected", flush=True)
+            if args.num_shards > 1:
+                # Round-robin by index: every row is an independent (task_uid,
+                # variant) episode with its own reset/run_id, so any disjoint
+                # partition is safe — no shard needs to see another's rows.
+                selected = selected[args.shard_index :: args.num_shards]
+            print(
+                f"[{model_key}] {len(selected)} episodes selected"
+                + (f" (shard {args.shard_index}/{args.num_shards})" if args.num_shards > 1 else ""),
+                flush=True,
+            )
             for prompt in selected:
                 run_id = build_run_id(model_key, prompt["prompt_id"], args.seed)
                 if run_id in completed:

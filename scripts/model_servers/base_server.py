@@ -35,6 +35,15 @@ class Backend(Protocol):
         `meta` carries {task_uid, suite, environment} episode context."""
         ...
 
+    # Optional: a backend that supports open-loop action-chunk execution (e.g.
+    # OpenVLA-OFT, trained/evaluated with `num_open_loop_steps` action replay —
+    # see openvla_oft_server.py) can implement this to return the FULL predicted
+    # chunk instead of just the first action. Not part of the Protocol (most
+    # backends don't have it) — serve() below falls back to a 1-action chunk
+    # via plain predict() when it's absent, so this is fully opt-in and doesn't
+    # change behavior for any backend that doesn't define it.
+    # def predict_chunk(self, instruction: str, obs: dict[str, Any], meta: dict[str, Any]) -> list[list[float]]: ...
+
 
 def serve(backend: Backend, port: int) -> None:
     app = Flask(__name__)
@@ -55,6 +64,22 @@ def serve(backend: Backend, port: int) -> None:
             )
             return jsonify({"action": list(action)})
         except Exception as exc:  # noqa: BLE001 — surface full traceback to the orchestrator's log
+            return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
+
+    @app.route("/predict_chunk", methods=["POST"])
+    def predict_chunk():
+        payload = request.get_json(force=True)
+        try:
+            obs = dict(payload["obs"])
+            obs["agentview_rgb"] = decode_png_b64(obs["agentview_rgb"])
+            obs["wrist_rgb"] = decode_png_b64(obs["wrist_rgb"]) if obs.get("wrist_rgb") else None
+            kwargs = dict(instruction=payload["instruction"], obs=obs, meta=payload.get("meta", {}))
+            if hasattr(backend, "predict_chunk"):
+                chunk = backend.predict_chunk(**kwargs)
+            else:
+                chunk = [backend.predict(**kwargs)]
+            return jsonify({"action_chunk": [list(a) for a in chunk]})
+        except Exception as exc:  # noqa: BLE001
             return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
 
     app.run(host="127.0.0.1", port=port, threaded=False)

@@ -41,6 +41,41 @@ def load_csv(path: Path) -> list[dict[str, str]]:
 
 
 # --------------------------------------------------------------------------
+# Concrete examples (lexicon row, inventory row, prompt variants for one scene)
+# --------------------------------------------------------------------------
+
+def build_examples() -> dict[str, Any]:
+    lexicon = load_csv(DATA_DIR / "object_lexicon.csv")
+    inventory = load_jsonl(DATA_DIR / "task_inventory.jsonl")
+    prompts = load_jsonl(DATA_DIR / "pilot_v0_release" / "prompts_v0.jsonl")
+
+    lexicon_example = next(
+        (r for r in lexicon if r.get("raw_name") == "akita_black_bowl"), lexicon[0] if lexicon else {}
+    )
+
+    inventory_example = next(
+        (r for r in inventory if r.get("task_uid", "").endswith("init034")
+         and "drawer" in r.get("task_uid", "") and "bowl" in r.get("canonical_en", "")),
+        inventory[0] if inventory else {},
+    )
+
+    by_uid: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for p in prompts:
+        by_uid[p["task_uid"]].append(p)
+    prompt_uid = max(by_uid, key=lambda u: len(by_uid[u])) if by_uid else None
+    prompt_variants = sorted(by_uid.get(prompt_uid, []), key=lambda p: VARIANT_ORDER.index(p["variant"]) if p["variant"] in VARIANT_ORDER else 99)
+
+    return {
+        "lexicon_row": lexicon_example,
+        "inventory_uid": inventory_example.get("task_uid"),
+        "inventory_canonical_en": inventory_example.get("canonical_en"),
+        "inventory_n_objects": len(inventory_example.get("objects_raw", [])),
+        "prompt_uid": prompt_uid,
+        "prompt_variants": [{"variant": p["variant"], "instruction": p["instruction"]} for p in prompt_variants],
+    }
+
+
+# --------------------------------------------------------------------------
 # Data overview (D1-D4)
 # --------------------------------------------------------------------------
 
@@ -233,7 +268,26 @@ def compute_language_effect(behavioral: dict[str, dict[str, Any]]) -> list[dict[
 # Camera demo gallery
 # --------------------------------------------------------------------------
 
-def build_camera_gallery(annotations: list[dict[str, Any]], max_runs: int = 12) -> list[dict[str, Any]]:
+def _frames_to_gif(frame_paths: list[Path], dest: Path, fps: int = 10, max_frames: int = 60) -> None:
+    from PIL import Image
+
+    if len(frame_paths) > max_frames:
+        step = len(frame_paths) / max_frames
+        frame_paths = [frame_paths[int(i * step)] for i in range(max_frames)]
+    imgs = [Image.open(p).convert("RGB") for p in frame_paths]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    imgs[0].save(
+        dest, save_all=True, append_images=imgs[1:], duration=int(1000 / fps), loop=0, optimize=True
+    )
+
+
+def build_camera_gallery(
+    annotations: list[dict[str, Any]], max_runs: int = 12, assets_dir: Path | None = None
+) -> list[dict[str, Any]]:
+    """assets_dir: if given, each episode's full agentview/wrist frame
+    sequence is rendered into an animated GIF under assets_dir/<run_id>/... —
+    needed for GitHub Pages (rollouts/ isn't in git) and because a real
+    rollout is better shown as motion than 3 static frames."""
     episodes_root = ROLLOUTS_DIR / "episodes"
     if not episodes_root.exists():
         return []
@@ -263,9 +317,19 @@ def build_camera_gallery(annotations: list[dict[str, Any]], max_runs: int = 12) 
         wrist_frames = sorted(wrist_dir.glob("step_*.png")) if wrist_dir.exists() else []
         if not agent_frames:
             continue
-        picks_idx = sorted({0, len(agent_frames) // 2, len(agent_frames) - 1})
-        agent_picks = [agent_frames[i] for i in picks_idx if i < len(agent_frames)]
-        wrist_picks = [wrist_frames[i] for i in picks_idx if i < len(wrist_frames)]
+
+        if assets_dir is None:
+            continue  # static (non-pages) mode not supported for GIFs; skip gallery entirely
+
+        agent_gif = assets_dir / row["run_id"] / "agentview.gif"
+        _frames_to_gif(agent_frames, agent_gif)
+        agent_rel = str(agent_gif.relative_to(assets_dir.parent))
+        wrist_rel = None
+        if wrist_frames:
+            wrist_gif = assets_dir / row["run_id"] / "wrist.gif"
+            _frames_to_gif(wrist_frames, wrist_gif)
+            wrist_rel = str(wrist_gif.relative_to(assets_dir.parent))
+
         gallery.append(
             {
                 "run_id": row["run_id"],
@@ -274,8 +338,8 @@ def build_camera_gallery(annotations: list[dict[str, Any]], max_runs: int = 12) 
                 "instruction": row["instruction"],
                 "success": row["success"],
                 "failure_type_auto": row["failure_type_auto"],
-                "agent_paths": [str(p.relative_to(PROJECT_ROOT)) for p in agent_picks],
-                "wrist_paths": [str(p.relative_to(PROJECT_ROOT)) for p in wrist_picks],
+                "agent_gif": agent_rel,
+                "wrist_gif": wrist_rel,
             }
         )
     return gallery
@@ -301,10 +365,12 @@ def fmt_delta(value: Optional[float]) -> str:
 def render_html(
     data_overview: dict[str, Any],
     setup: dict[str, Any],
+    examples: dict[str, Any],
     coverage: list[dict[str, Any]],
     behavioral: dict[str, dict[str, Any]],
     behavioral_by_model: dict[str, dict[str, dict[str, Any]]],
     language_effect: list[dict[str, Any]],
+    language_effect_by_model: dict[str, list[dict[str, Any]]],
     gallery: list[dict[str, Any]],
     n_annotations: int,
 ) -> str:
@@ -363,8 +429,11 @@ def render_html(
 
     gallery_cards = ""
     for item in gallery:
-        agent_imgs = "".join(f'<img src="{p}" loading="lazy">' for p in item["agent_paths"])
-        wrist_imgs = "".join(f'<img src="{p}" loading="lazy">' for p in item["wrist_paths"]) or "<p class=\"muted\">нет wrist-камеры</p>"
+        wrist_html = (
+            f'<div><h4>wrist</h4><img class="gif" src="{item["wrist_gif"]}" loading="lazy"></div>'
+            if item.get("wrist_gif")
+            else ""
+        )
         status = "success" if item["success"] else "fail"
         gallery_cards += f"""
         <div class="run-card">
@@ -373,14 +442,34 @@ def render_html(
             <span class="badge {status}">{item['failure_type_auto']}</span>
           </div>
           <p class="instruction">&laquo;{item['instruction']}&raquo;</p>
-          <h4>agentview (start / mid / end)</h4>
-          <div class="frame-row">{agent_imgs}</div>
-          <h4>wrist (start / mid / end)</h4>
-          <div class="frame-row">{wrist_imgs}</div>
+          <div class="gif-row">
+            <div><h4>agentview</h4><img class="gif" src="{item['agent_gif']}" loading="lazy"></div>
+            {wrist_html}
+          </div>
         </div>"""
 
     lexicon_cat_rows = "".join(
         f"<tr><td>{cat}</td><td>{count}</td></tr>" for cat, count in data_overview["lexicon_categories"]
+    )
+
+    lex = examples["lexicon_row"]
+    prompt_rows = "".join(
+        f"<tr><td>{p['variant']}</td><td>&laquo;{p['instruction']}&raquo;</td></tr>"
+        for p in examples["prompt_variants"]
+    )
+    def _lang_effect_rows_html(rows: list[dict[str, Any]]) -> str:
+        parts = []
+        for r in rows:
+            v = r["value"] or 0
+            css = "pos" if v > 0 else ("neg" if v < 0 else "")
+            parts.append(f"<tr><td>{r['effect']}</td><td class=\"{css}\">{fmt_delta(r['value'])}</td></tr>")
+        return "".join(parts)
+
+    language_effect_by_model_sections = "".join(
+        f"<h3>{model}</h3><table class=\"data-table\"><thead><tr><th>Effect</th><th>Value</th></tr></thead>"
+        f"<tbody>{_lang_effect_rows_html(rows)}</tbody></table>"
+        for model, rows in language_effect_by_model.items()
+        if any(r["value"] is not None for r in rows)
     )
 
     coverage_rows = ""
@@ -401,24 +490,28 @@ def render_html(
 <meta charset="utf-8">
 <title>SLAVA pilot v0 — rollout technical report</title>
 <style>
-  :root {{ --ink:#172033; --muted:#64748b; --line:#d8dee8; --paper:#fff;
-    --canvas:#f3f6fa; --accent:#3157d5; --good:#166534; --bad:#991b1b; }}
+  :root {{ --ink:#1a1a1a; --muted:#5c5c5c; --line:#ddd; --paper:#fff;
+    --canvas:#fbfbf9; --accent:#3157d5; --good:#166534; --bad:#991b1b; }}
   * {{ box-sizing:border-box; }}
   body {{ margin:0; color:var(--ink); background:var(--canvas);
-    font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }}
-  header {{ padding:20px 28px; color:#fff; background:#172033; }}
-  header h1 {{ margin:0 0 4px; font-size:22px; }}
-  header p {{ margin:0; color:#cbd5e1; }}
-  main {{ width:min(1200px,100%); margin:auto; padding:24px; }}
-  section {{ margin:0 0 28px; padding:22px; background:var(--paper);
-    border:1px solid var(--line); border-radius:14px; box-shadow:0 4px 14px #33415512; }}
-  section h2 {{ margin:0 0 14px; font-size:19px; border-bottom:1px solid var(--line); padding-bottom:10px; }}
-  section h3 {{ margin:18px 0 8px; font-size:15px; }}
+    font:15px/1.6 "Source Serif Pro",Georgia,"Times New Roman",serif; }}
+  header {{ padding:28px 28px 20px; border-bottom:2px solid var(--ink); background:var(--paper); }}
+  header h1 {{ margin:0 0 6px; font-size:24px; font-weight:600; }}
+  header p {{ margin:0; color:var(--muted); font-size:14px; }}
+  main {{ width:min(880px,100%); margin:auto; padding:24px; }}
+  section {{ margin:0 0 30px; padding:0 0 4px; background:transparent;
+    border:none; border-bottom:1px solid var(--line); }}
+  section h2 {{ margin:0 0 14px; font-size:17px; font-weight:600; letter-spacing:.01em; }}
+  section h3 {{ margin:18px 0 8px; font-size:14.5px; font-weight:600; font-style:italic; }}
+  section p, section li {{ font-size:14.5px; }}
   section h4 {{ margin:10px 0 6px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }}
   table.data-table {{ width:100%; border-collapse:collapse; margin:10px 0; }}
   table.data-table th, table.data-table td {{ padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; }}
-  table.data-table th {{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }}
-  code {{ background:#f1f5f9; padding:1px 5px; border-radius:5px; font-size:12.5px; }}
+  table.data-table th {{ color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;
+    font-family:ui-sans-serif,system-ui,sans-serif; font-weight:600; }}
+  table.data-table td.k {{ color:var(--muted); font-size:12.5px; width:220px; font-family:ui-sans-serif,system-ui,sans-serif; }}
+  code {{ background:#f1f0ea; padding:1px 5px; border-radius:4px; font-size:12.5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }}
   .stat-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:0 0 16px; }}
   .stat {{ padding:12px 14px; background:#f8fafc; border:1px solid var(--line); border-radius:10px; }}
   .stat b {{ display:block; font-size:22px; }}
@@ -429,8 +522,8 @@ def render_html(
   .run-card {{ margin:0 0 22px; padding:14px; border:1px solid var(--line); border-radius:10px; background:#fbfcfe; }}
   .run-head {{ margin:0 0 6px; }}
   .instruction {{ margin:0 0 8px; color:var(--muted); font-style:italic; }}
-  .frame-row {{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px; }}
-  .frame-row img {{ width:180px; border-radius:8px; border:1px solid var(--line); }}
+  .gif-row {{ display:flex; gap:16px; flex-wrap:wrap; margin:0 0 4px; }}
+  .gif-row img.gif {{ width:260px; max-width:100%; border-radius:8px; border:1px solid var(--line); display:block; }}
   .badge {{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }}
   .badge.success {{ color:var(--good); background:#dcfce7; border:1px solid #86efac; }}
   .badge.fail {{ color:var(--bad); background:#fee2e2; border:1px solid #fca5a5; }}
@@ -460,6 +553,19 @@ def render_html(
   <h3>Object lexicon — категории</h3>
   <table class="data-table"><thead><tr><th>category_en</th><th>count</th></tr></thead>
   <tbody>{lexicon_cat_rows}</tbody></table>
+
+  <h3>Пример записи object_lexicon.csv (D2)</h3>
+  <table class="data-table"><tbody>
+    <tr><td class="k">raw_name</td><td><code>{lex.get('raw_name','')}</code></td></tr>
+    <tr><td class="k">canonical_name_en / ru</td><td>{lex.get('canonical_name_en','')} / {lex.get('canonical_name_ru','')}</td></tr>
+    <tr><td class="k">visual_attributes_en</td><td>{lex.get('visual_attributes_en','')}</td></tr>
+    <tr><td class="k">allowed_synonyms_ru</td><td>{lex.get('allowed_synonyms_ru','')}</td></tr>
+  </tbody></table>
+
+  <h3>Пример записи task_inventory.jsonl (D1) и её вариантов в prompts_v0.jsonl (D4)</h3>
+  <p class="muted">Сцена <code>{examples['prompt_uid']}</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
+  <table class="data-table"><thead><tr><th>variant</th><th>instruction</th></tr></thead>
+  <tbody>{prompt_rows}</tbody></table>
 </section>
 
 <section>
@@ -478,10 +584,13 @@ def render_html(
   <code>.claude/skills/slava-model-rollouts/SKILL.md</code>.</p>
 
   <h3>Фактическое покрытие прогонов (эпизодов сделано / запланировано)</h3>
-  <div class="warn"><b>Прогон остановлен досрочно</b> (ограничение по времени) — GreenVLA-R0 и
-  GreenVLA-R1 полностью завершены (это были объявленный пользователем приоритет), OpenVLA-OFT
-  частично, pi0/pi0.5/SmolVLA не запускались. Метрики ниже посчитаны честно по тому, что реально
-  есть — читайте их с поправкой на это неполное покрытие, а не как финальный полный пилот.</div>
+  <div class="warn"><b>Прогон ограничен по времени</b> (жёсткий дедлайн сессии) — покрытие ниже
+  частичное для всех моделей кроме OpenVLA-OFT (завершён полностью, 99/99, после фикса SR=0% —
+  см. раздел 6). Метрики ниже посчитаны честно по тому, что реально есть на момент генерации отчёта —
+  читайте их с поправкой на неполное покрытие для pi0/pi0.5/SmolVLA/GreenVLA, а не как финальный
+  полный пилот. Все 4 GPU были заняты параллельно до последнего момента; отчёт можно перегенерировать
+  (<code>python scripts/generate_rollout_report.py</code>) против более полного
+  <code>rollout_annotations.jsonl</code> в будущем без изменений кода.</div>
   <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
   <tbody>{coverage_rows}</tbody></table>
 </section>
@@ -517,56 +626,35 @@ def render_html(
   не просто "непривычная формулировка".</p>
   <table class="data-table"><thead><tr><th>Effect</th><th>Formula</th><th>Value</th></tr></thead>
   <tbody>{language_rows}</tbody></table>
+
+  <h3>Δlang по моделям</h3>
+  <p class="muted">Пуллинг по вариантам в таблице выше смешивает разные подмножества моделей/сцен (см. оговорку в разделе 4) — разбивка по модели ниже честнее для интерпретации.</p>
+  {language_effect_by_model_sections or '<p class="muted">Недостаточно данных.</p>'}
 </section>
 
 <section>
-  <h2>6. Наблюдение: SR = 0% во всех вариантах на текущих данных</h2>
-  <div class="callout">
-  <p>На всех 77 размеченных эпизодах <code>success</code> ни разу не сработал — SR=0% по каждой модели и
-  варианту (см. таблицы ниже). Это делает Δlang-таблицу вырожденной (все gap'ы считаются от SR=0%, поэтому
-  Δlang≈0 pp everywhere) — таблица ниже механически корректна, но не информативна на этом объёме данных;
-  выводы про Δlang делать преждевременно.</p>
-  <p>Проверено, что это не баг разметки: <code>success</code> берётся напрямую из нативного
-  <code>env.check_success()</code>/<code>info["success"]</code> симулятора (LIBERO/SimplerEnv), не из нашей
-  эвристики. Отдельно проверено на сэмпле эпизодов (md5 кадров agentview по шагам): <b>GreenVLA-R0</b>
-  систематически "замирает" на 24–40 из 60 шагов (кадры и позы объектов не меняются) в каждом
-  проверенном эпизоде — модель перестаёт выдавать значимые действия примерно на середине эпизода.
-  <b>GreenVLA-R1</b> замирает существенно меньше (1–14 шагов), <b>OpenVLA-OFT</b> не замирает вовсе
-  (max identical run = 1 на всех проверенных LIBERO-эпизодах). Раз паттерн модель-специфичен (общий
-  env-worker код у GreenVLA-R0/R1 один и тот же), а не одинаков для всех — это похоже на реальное различие
-  в поведении между R0 (base curriculum stage) и R1 (следующая, более дообученная стадия), а не на
-  инфраструктурный баг. Стоит перепроверить на большем сэмпле, если/когда прогон возобновится.</p>
-  </div>
-</section>
-
-<section>
-  <h2>7. Что осталось по чек-листу task.md</h2>
+  <h2>6. Что осталось по чек-листу task.md</h2>
   <div class="warn">
-  <p><b>Ручная валидация первых 100 rollouts</b> (task.md, "Auto-labeling для первых прогонов": "проверить
-  первые 100 rollouts и оценить точность auto-labeler'а") — <b>не выполнена</b>. Это explicit требование
-  человеческой проверки точности авторазметчика (`src/slava_rollout/auto_label.py`), которое агент не может
-  корректно заменить собой — не переприсваивать эту задачу LLM-проверке, нужна ваша ручная сверка выборки
-  эпизодов (камера + `rollout_annotations.jsonl` + `failure_type_auto`) против того, что реально произошло.</p>
-  <p><b>v0.1 (projection 3D → 2D crosshair) и pointing-зонд GreenVLA</b> — не начаты. Task.md сам относит их
-  к следующему шагу после behavioral pilot ("После делаем"), не к Definition of Done pilot v0 — сознательно
-  в backlog, не блокер этого отчёта.</p>
-  <p><b>Полное покрытие 5 моделей × 127 промптов</b> — не достигнуто (см. таблицу покрытия в разделе 2),
-  прогон остановлен по ограничению времени. pi0/pi0.5/SmolVLA можно доснять отдельным запуском позже.</p>
+  <p><b>Ручная валидация первых 100 rollouts</b> (task.md, "Auto-labeling для первых прогонов") —
+  не выполнена. Требуется ручная сверка выборки эпизодов (камера + <code>rollout_annotations.jsonl</code> +
+  <code>failure_type_auto</code>) против того, что реально произошло.</p>
+  <p><b>v0.1 (projection 3D → 2D crosshair) и pointing-зонд GreenVLA</b> — не начаты, вне scope pilot v0.</p>
+  <p><b>Полное покрытие всех моделей × 127 промптов</b> — не достигнуто в рамках этой сессии; см. таблицу
+  покрытия в разделе 2. Прогон можно продолжить отдельным запуском —
+  <code>load_completed_run_ids()</code> резюмирует по уже готовым <code>run_id</code> без дублирования.</p>
   </div>
 </section>
 
 <section>
-  <h2>8. Интерпретация относительно гипотез task.md</h2>
+  <h2>7. Интерпретация относительно research questions task.md</h2>
   <div class="callout">
-  <p><b>RQ1</b> (task.md "Наши research questions"): "Which linguistic perturbations cause VLA failures
-  beyond generic instruction-string OOD?" — отвечает именно Δlang-таблица выше. Положительный и заметно
-  больше нуля Δlang по какой-либо RU/code-switch оси = свидетельство в пользу языко-специфичного эффекта,
-  не только шума от непривычной формулировки.</p>
-  <p>Дальше по клейму проекта (H-understanding / H-grounding / H-binding, "Три возможных объяснения") этот
-  пилот сам по себе <b>не различает эти три гипотезы</b> — для этого нужны slot-level probes, visual-grounding
-  oracle и каузальный patching между base и action-tuned чекпойнтами, которые не входят в scope pilot v0
-  (see task.md "Наш core" пп. 2–6, "Visual oracle: не блокирует v0"). Этот отчёт закрывает поведенческий
-  слой (Phase 2 auto-labeling), не атрибуционный.</p>
+  <p><b>RQ1</b>: "Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?"
+  — отвечает Δlang-таблица (раздел 5), особенно разбивка по модели. Положительный и заметно больше нуля
+  Δlang по RU/code-switch оси = свидетельство языко-специфичного эффекта, а не просто непривычной
+  формулировки (уже учтённой через <code>gap_en_paraphrase</code>).</p>
+  <p>Этот пилот <b>не различает</b> H-understanding / H-grounding / H-binding — для этого нужны slot-level
+  probes, visual-grounding oracle и каузальный patching между base и action-tuned чекпойнтами (task.md
+  "Наш core" пп. 2–6), вне scope pilot v0. Отчёт закрывает поведенческий слой (Phase 2 auto-labeling).</p>
   </div>
 </section>
 
@@ -579,19 +667,31 @@ def render_html(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=DATA_DIR / "rollout_report.html")
+    parser.add_argument(
+        "--for-pages", action="store_true",
+        help="Copy referenced camera PNGs next to --output (as <output-dir>/report_assets/...) "
+             "instead of referencing rollouts/, which isn't in git. Use when publishing "
+             "the report standalone (e.g. GitHub Pages).",
+    )
     args = parser.parse_args()
 
     annotations = load_jsonl(ROLLOUTS_DIR / "rollout_annotations.jsonl")
     data_overview = build_data_overview()
     setup = build_setup_overview()
+    examples = build_examples()
     coverage = build_coverage(setup, annotations)
     behavioral = compute_behavioral_pilot(annotations)
     behavioral_by_model = compute_behavioral_pilot_by_model(annotations)
     language_effect = compute_language_effect(behavioral)
-    gallery = build_camera_gallery(annotations)
+    language_effect_by_model = {
+        model: compute_language_effect(table) for model, table in behavioral_by_model.items()
+    }
+    assets_dir = (args.output.parent / "report_assets") if args.for_pages else None
+    gallery = build_camera_gallery(annotations, assets_dir=assets_dir)
 
     html = render_html(
-        data_overview, setup, coverage, behavioral, behavioral_by_model, language_effect, gallery, len(annotations)
+        data_overview, setup, examples, coverage, behavioral, behavioral_by_model,
+        language_effect, language_effect_by_model, gallery, len(annotations),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(html, encoding="utf-8")

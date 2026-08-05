@@ -103,6 +103,18 @@ def reset():
     init_states = suite.get_task_init_states(task_id)
     obs = env.set_init_state(init_states[init_state_id])
 
+    # Optional physics-settle steps before the first obs is handed to a model,
+    # matching openvla-oft's run_libero_eval.py `num_steps_wait` convention
+    # ("Do nothing for the first few timesteps to let objects stabilize in
+    # sim"), found 2026-08-05 while investigating SR=0%. Uses their exact
+    # dummy action [0,0,0,0,0,0,-1] (gripper held open, no motion). Opt-in via
+    # payload (default 0 = previous behavior, unchanged for models that don't
+    # request it) rather than a blanket change to every LIBERO episode for
+    # every model — only the orchestrator decides which models need this.
+    num_steps_wait = int(payload.get("num_steps_wait", 0))
+    for _ in range(num_steps_wait):
+        obs, _, _, _ = env.step(np.array([0, 0, 0, 0, 0, 0, -1], dtype=np.float32))
+
     obj_body_id = dict(env.env.obj_body_id)
     tracker = LiberoContactTracker(env, obj_body_id)
 

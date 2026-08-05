@@ -64,6 +64,28 @@ MODEL_REGISTRY: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "greenvla_r2_bridge": {
+        # Found 2026-08-05 (user recalled it from example_inference_bridge.py's
+        # docstring, not in the original AGENTS.md checkpoint table) — the
+        # "RL-aligned" final stage of the R0-base -> R1-bridge -> R2-bridge
+        # curriculum. Its own HF model card reports SimplerEnv WidowX Bridge
+        # SR: Partial Average 94.5%, Entire Average 80.5% — dramatically
+        # higher than R0/R1, and specifically benchmarked on our exact target
+        # (SimplerEnv/WidowX), unlike R0/R1's numbers which aren't published
+        # per-stage this clearly. A strong test of whether our pipeline is
+        # sound: if we get anywhere near their reported SR, that validates
+        # the infra; if still ~0%, that's much stronger evidence of a real
+        # remaining bug than R0/R1's results were.
+        "display_name": "GreenVLA-R2 (bridge, RL-aligned)",
+        "backbone": "Qwen3-VL-4B-Instruct",
+        "environments": {
+            "SimplerEnv": {
+                "checkpoint": "SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge",
+                "data_config_name": "bridge",
+                "zero_shot": False,
+            },
+        },
+    },
     "openvla_oft": {
         "display_name": "OpenVLA-OFT",
         "backbone": "Prismatic (openvla-7b)",

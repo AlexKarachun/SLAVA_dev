@@ -418,6 +418,43 @@ via `--models`, a second process runs just that model with
 own model-server port 8802 — no clash). GPU util went 25% → 50% with this,
 ~20GB still free, confirming the idle-GPU theory rather than guessing.
 
+**Tried and reverted 2026-08-05: 2 OpenVLA-OFT processes on one GPU.** Unlike
+the SimplerEnv/GreenVLA precedent above (small models, genuinely idle GPU
+compute), OpenVLA-OFT is a 7B checkpoint using ~16.5GB/32GB per instance —
+memory, not compute, is the binding constraint here. Ran two full model-
+servers on one V100 anyway (user's explicit call, to verify empirically
+rather than guess): GPU hit 32.4/32.8GB total, and the second instance
+degraded to 100%-failure-rate on every `/predict_chunk` call (500 errors,
+fast/uniform cadence — no crash traceback surfaces through Flask's caught-
+exception JSON response, had to `curl` the endpoint directly with a real
+observation to see `torch`'s actual CUDA OOM underneath) before eventually
+dying outright a few minutes in. Its own orchestrator process cleaned up
+correctly on this natural exit (unlike the SIGTERM case below). No corrupted
+data — episodes that error before completion are logged as `[error]` and
+never reach `append_annotation`, so nothing bad landed in
+`rollout_annotations.jsonl`, just ~16 wasted episode-attempts and a few
+minutes of wall-clock. **Multi-GPU sharding (1 process per physical GPU) is
+fine and confirmed working** (3-way concurrent LIBERO across 3 separate
+V100s, no cross-talk, no errors — this was the previously-unconfirmed risk
+flagged in the paragraph above, now checked); doubling up processes on the
+*same* GPU only makes sense for models small enough to leave real headroom
+after a second full weight+activation footprint, check actual `nvidia-smi`
+memory (not just utilization%) before trying it for any given model.
+
+**Also found while rebalancing shards: killing `run_rollouts.py`'s own PID
+directly (not its process group) skips its `finally: pool.stop_all()`
+cleanup**, since a bare SIGTERM to a Python process doesn't run `finally`
+blocks the way a caught exception does — orphans its env-worker/model-server
+children exactly like the `conda run` signal-forwarding bug above, just via
+a different mechanism (killing the wrong *level* of the tree, not signal
+forwarding). Hit this 3 times in a row during manual shard rebalancing before
+fixing it properly: `main()` now installs a `signal.SIGTERM` handler
+(`_handle_sigterm`) that raises `SystemExit`, which — unlike a raw kill —
+*does* run `finally` blocks, so `pool.stop_all()` executes and children are
+torn down correctly. Plain `kill <pid>` (or the user's own Ctrl+C on a real
+run) now cleans up properly; no more need to manually `kill -TERM -<pgid>`
+each child by hand.
+
 Considered and explicitly **not** doing right now: true batched inference
 (N environments stepped in lockstep, one batched model forward pass per
 step) — more GPU-efficient per FLOP, but needs env-worker support for
@@ -592,3 +629,247 @@ above when they disagree.
    `export HF_TOKEN=...` as its own statement in the shell, then invoke
    `conda run`/anything else without repeating the variable in that command's
    own text — the child process still inherits it from the environment.
+
+## SR=0% root cause (found 2026-08-05, 3rd server/session) — three independent bugs, all fixed
+
+The 77-episode dataset from the previous session had 0/77 successes. The
+`AGENTS.md` handoff already ruled out an auto-labeling bug (`success` reads
+`env.check_success()`/native `info["success"]` directly) and flagged the
+missing open-loop chunk replay as the prime suspect for OpenVLA-OFT
+specifically. On the new GPU server, reading `moojink/openvla-oft`'s actual
+`experiments/robot/libero/run_libero_eval.py` line-by-line (not guessed)
+turned up **three** real, independent bugs in our OpenVLA-OFT path — fixing
+all three took the smoke-test SR from 0/21 (previous session, real episodes)
+to **2/2** on this session's `--smoke-test` run, at 33-76s/episode (down from
+~394s/episode before the chunk-replay fix — 5-8x faster too, expected since
+the model is now queried once per 8 steps instead of every step).
+
+7. **Missing open-loop action-chunk replay** (the one already flagged in the
+   handoff, now actually fixed). `get_action()` returns the full predicted
+   chunk (`NUM_ACTIONS_CHUNK=8` actions for LIBERO, confirmed by reading
+   `prismatic/vla/constants.py` — it auto-detects platform from `sys.argv`,
+   defaults to LIBERO when nothing matches, which is what our model-server's
+   argv gives it, so no explicit override needed). The reference script
+   queries the model once, pushes the whole chunk into a `deque`, and pops
+   one action per env step, **only requerying once the queue is empty** —
+   i.e. actions 1-7 of every chunk are executed completely open-loop, no new
+   observation involved. Our old code called `get_action()` fresh on every
+   single env step and only ever used `action[0]`, discarding the other 7 —
+   a different (always-closed-loop) execution strategy than what the
+   checkpoint was ever evaluated with. Fixed via a new generic
+   `/predict_chunk` endpoint (`base_server.py`, opt-in per backend via an
+   optional `predict_chunk()` method — falls back to a 1-action chunk built
+   from plain `predict()` for every other backend, so GreenVLA/lerobot are
+   byte-for-byte unaffected) and a `pending_actions` queue in
+   `run_rollouts.py::run_episode()` that drains one action per `env_client
+   .step()` call before requesting a new chunk. Camera-frame saving and
+   `success`/`done` checks still happen every single sim step (task.md
+   requirement), only the *model query* is now chunked.
+8. **Image mirrored left-right — independent of the chunk bug, likely the
+   bigger contributor.** `openvla-oft`'s own
+   `experiments/robot/libero/libero_utils.py::get_libero_image()` does
+   `img[::-1, ::-1]` on the raw `obs["agentview_image"]` (**both** axes
+   reversed = 180° rotation), commented "IMPORTANT: rotate 180 degrees to
+   match train preprocessing." Our shared `env_worker_libero.py::_build_obs()`
+   does `raw[::-1]` (axis 0 only — a vertical flip, chosen to produce a
+   human-legible image for the D1 screenshot review dashboard, matching
+   `scripts/collect_libero.py`'s same single-flip convention — correct for
+   *that* purpose). These are different transforms, not one a subset of the
+   other: composing them, every frame OpenVLA-OFT received was
+   `single_flip(raw)` where it needed `double_flip(raw)` — i.e. a **left-right
+   mirror** of what it was trained on (robot arm on the wrong side, spatial
+   relations flipped). This does not depend on instruction language at all,
+   so it would have suppressed EN and RU success equally — a real,
+   independent confound on top of the chunk bug. Fixed *scoped to
+   `openvla_oft_server.py` only* (`_build_observation()`'s docstring has the
+   full derivation) — one extra `[:, ::-1]` mirror applied to the
+   already-single-flipped `agentview_rgb`/`wrist_rgb` right before handing
+   them to `get_action()`. `env_worker_libero.py` itself is untouched and
+   stays neutral — pi0/pi0.5/SmolVLA on LIBERO have **not** been checked
+   against their own training image-orientation convention yet, do that
+   before trusting their LIBERO results (see "What's still open" below).
+9. **Missing `num_steps_wait=10` physics-settle steps.** The reference
+   `run_episode()` executes 10 steps of the dummy action `[0,0,0,0,0,0,-1]`
+   right after `env.set_init_state()`, *before* the policy is ever queried
+   ("let objects stabilize in sim") — these steps are not logged, not counted
+   against `TASK_MAX_STEPS`, and the model never sees them. Our env-worker
+   queried immediately after `set_init_state()`. Smaller effect than #8, but
+   free to fix: `env_worker_libero.py::/reset` now takes an optional
+   `num_steps_wait` payload field (default 0, so every other model's behavior
+   is unchanged) and runs that many dummy steps internally before building
+   the returned obs. Wired up from `run_rollouts.py` via a
+   `LIBERO_NUM_STEPS_WAIT = {"openvla_oft": 10}` lookup in
+   `build_reset_payload()` — opt-in per model, not a blanket change to every
+   LIBERO episode.
+
+**Verification note:** the smoke-test's `en_canonical` prompt for
+`open_the_middle_drawer_of_the_cabinet` ("open the middle drawer of the
+cabinet") is not just "close to" the original LIBERO task text — it's an
+**exact, word-for-word match** to `benchmark.get_benchmark_dict()
+["libero_goal"]().get_task(i).language` (confirmed by calling the real
+benchmark API, not by reading the `.bddl` file's own `:language` comment,
+which is a stale author note and does NOT match what the benchmark actually
+serves — e.g. it says "Open the middle layer of the drawer" for this same
+task, which is *not* what gets used anywhere in eval). So the 2/2 smoke-test
+success was already run on the literal, unmodified original dataset prompt,
+not a SLAVA paraphrase — ruling out "the pipeline only works on our reworded
+prompts" as an explanation for the earlier SR=0%.
+
+**Not yet done:** these fixes only touch the OpenVLA-OFT path. pi0/pi0.5/
+SmolVLA/GreenVLA have their own separate image-preprocessing and
+action-execution conventions that have NOT been checked against this same
+level of scrutiny (reading their actual reference eval/training code, not
+just the quick-start inference example) — do that before trusting their
+results, per the same methodology used here (read the reference eval loop,
+not just the "load model, call predict" quick-start).
+
+## pi0/pi0.5: cuDNN "no engine" crash on SigLIP conv2d (V100), found + fixed 2026-08-05
+
+Same session, after the OpenVLA-OFT fixes above. `lerobot_server.py` also
+needed two LIBERO-specific fixes mirroring the OpenVLA-OFT pattern (own
+docstring in that file has the full derivation): (1) lerobot's own
+`LiberoEnv._format_raw_obs()` (`lerobot.envs.libero`) feeds the policy the
+**raw, unflipped** camera frame — a third distinct orientation convention,
+different from both OpenVLA-OFT's 180°-rotation and our env-worker's
+single-flip — confirmed against `docs/source/libero.mdx` too; (2)
+proprioception needed the same `eef_pos(3)+axis_angle(3)+gripper_qpos(2)`
+conversion as OpenVLA-OFT, not env-worker's raw 9-dim quaternion layout.
+`[::-1].copy()` (not just `[::-1]`) required — `torch.from_numpy()` rejects
+negative-stride views outright. All confirmed working via SmolVLA's live
+run (different vision backbone, unaffected by the next bug below).
+
+pi0 and pi0.5 (both PaliGemma/SigLIP-based) additionally hit a **third, more
+stubborn bug** SmolVLA doesn't have: every `/predict_chunk` call crashed with
+`RuntimeError: GET was unable to find an engine to execute this computation`,
+traced (via direct reproduction against a live env-worker, not guessed) to
+SigLIP's patch-embedding `Conv2d` inside `paligemma.model.vision_tower` — a
+cuDNN "no kernel found for this op/dtype/shape on this hardware" error, not a
+memory or shape bug. **First attempted fix (didn't work): overriding
+`policy_cfg.dtype = "float32"`** — same mutate-then-`from_pretrained(...,
+config=policy_cfg)` pattern already used for `compile_model=False`. pi0.5's
+config actually defaults to `dtype="bfloat16"`, pi0's already defaults to
+`"float32"` — yet **both** kept crashing identically even after the override
+visibly took effect (checked `cfg.dtype` before/after). Something in cuDNN's
+own algorithm search still can't find an engine for this specific SigLIP
+conv on this GPU/cuDNN/torch combination, independent of the dtype the model
+ends up running in. **Actual fix:** `torch.backends.cudnn.enabled = False` at
+module import time in `lerobot_server.py`, before any model loads — forces
+PyTorch's native (non-cuDNN) conv2d fallback for the whole process. Blunter
+than pinning dtype, but the one that actually resolved it — confirmed via a
+live `predict_chunk` request returning 200 immediately after. Only affects
+this process; env-workers and other model-servers are separate
+processes/conda envs, untouched.
+
+**GreenVLA R0/R1 embodiment check (user question, answered from source
+2026-08-05).** Confirmed via `huggingface_hub.list_repo_files()` on both
+checkpoints (not guessed from the name): **both R0
+(`GreenVLA-5b-base-stride-1`) and R1 (`GreenVLA-5b-stride-1-R1-bridge`) ship
+a `norm_stats/bridge/norm_stats.json`**, so `load_pretrained_policy(...,
+data_config_name="bridge")` in `greenvla_server.py` resolves WidowX-bridge
+normalization for both — not Google Robot/fractal. The env is WidowX too
+(`widowx_stack_cube`, `ee_gripper_link` in `env_worker_simpler.py` is
+WidowX-specific). **But R0 is a cross-embodiment generalist base checkpoint**
+— its repo has norm_stats for 19 different robots (agibotworld, biplay,
+bridge, droid, fractal, galaxeaworld, rdt, several robocoin/robomind
+variants) — while **R1's repo has ONLY `norm_stats/bridge/`**, confirming
+it's the bridge-specialized fine-tune stage. This is a real, source-verified
+explanation (not speculation) for why R0 freezes more than R1: R0 was never
+specifically fine-tuned toward WidowX, it just has the right normalization
+stats to be *evaluated* on it — matches the R0-base → R1-bridge curriculum
+description already in AGENTS.md.
+
+**Deep audit of GreenVLA's actual transform factory (not just the quick-start
+example), same session — no new bug found.** User asked to re-check against
+GreenVLA's own source given R0/R1's low SR. Read
+`lerobot/common/policies/factory.py::load_pretrained_policy` (which our
+`greenvla_server.py` already calls directly — we are NOT reimplementing
+their pipeline, we use their real `input_transforms`/`output_transforms`),
+`lerobot/common/utils/inference_transforms.py::get_torch_{input,output}_
+transforms`, `lerobot/common/datasets/data_transforms/robots/bridge.py`
+(`BridgeInputsTransform`/`BridgeOutputsTransform`), and
+`lerobot/common/datasets/torch_transforms.py::parse_image_helper`. Findings:
+state layout (`[x,y,z,roll,pitch,yaw,pad,gripper]`, pad-masking) matches our
+`greenvla_server.py` exactly; the output pipeline is `Unnormalize(norm_stats)
+→ slice-to-7-dims`, nothing else, and we already do this via their own
+`output_transforms` callable; `parse_image_helper` does **no** flip/rotation
+at all (dtype/CHW→HWC only), so there's no hidden orientation expectation
+on their side to mismatch — consistent with `env_worker_simpler.py` not
+flipping. Quaternion→euler conversion in `greenvla_server.py` (SAPIEN `wxyz`
+→ scipy `xyzw` reorder) checked correct. **No further actionable bug
+surfaced this pass.** Current best explanation for R0/R1's ~0% SR remains:
+R0's genuine lack of WidowX-specific tuning (see above) plus SimplerEnv's
+SAPIEN-rendered visual domain gap vs the real camera frames both checkpoints
+were trained on (risk explicitly accepted by the user at project start, see
+AGENTS.md "Модели — 5, не 4" section) — not a code bug we've found evidence
+for after two independent audit passes.
+
+**Fourth bug, same session: lerobot LIBERO models also needed
+`num_steps_wait=10`.** `LIBERO_NUM_STEPS_WAIT` in `run_rollouts.py` originally
+only covered `openvla_oft`. Spotted a real pattern after ~15 episodes: pi0,
+pi0.5, and SmolVLA were all stuck on `no_action_or_timeout` on the exact same
+LIBERO-goal scene (`open_the_middle_drawer_of_the_cabinet`) that OpenVLA-OFT
+(which already had the settle-step fix) succeeded on repeatedly. Checked
+`huggingface/lerobot`'s own `LiberoEnv.__init__` (`src/lerobot/envs/
+libero.py`) again — it independently defaults to the identical
+`num_steps_wait: int = 10`, not something borrowed from OpenVLA-OFT. Added
+`pi0`/`pi05`/`smolvla` to the same dict (`10` each). All 3 running processes
+were killed and restarted to pick this up (module-level constant, doesn't
+apply retroactively to an already-running process) — not yet enough
+post-fix episodes at time of writing to say whether this changes their SR;
+check `data/rollout_report.html`'s per-model breakdown for the current
+numbers rather than trusting this note's absence of a verdict.
+
+**Fifth issue, still OPEN/unresolved: pi0/pi0.5 show 0% SR with `first_contact_
+object=None` on `libero_object` (the EASIEST LIBERO suite — OpenVLA-OFT gets
+6/6 on every task there).** Found 2026-08-05 while monitoring the live run:
+after ~65 episodes, pi0 hit `libero_object__pick_up_the_{butter,cream_cheese,
+milk}_and_place_it_in_the_basket` and went 0/18 with **zero contact ever**
+(not just wrong-object contact) — a cleaner, more systematic-looking pattern
+than the `libero_goal` failures (where at least `target_grounding_error`/real
+contact happened sometimes). Rendered the actual image pi0 was receiving
+(after the "undo env-worker's flip" logic above) and it looked genuinely
+upside-down/disoriented (arm at bottom, floor objects at top) — not a
+plausible robot-eye view. **Reverted the image-flip fix** (the `if False:`
+block in `lerobot_server.py` — kept, not deleted, with a note) back to
+passing through env-worker's existing upright orientation unchanged, and
+retested on a fresh `libero_object` episode. **Result: still 0% SR, still
+`first_contact_object=None`.** So the flip direction is NOT the (sole) root
+cause of this specific pattern — ruled out via direct A/B test on live data,
+not guessed. Action deltas in the raw `steps.jsonl` are non-degenerate
+(comparable magnitude to OpenVLA-OFT's successful episodes) but never
+accumulate into a decisive reach toward the object. **Not resolved — left
+running as-is (reverted/no-extra-flip state, since that matches the
+already-validated convention used everywhere else in the pipeline, absent
+positive evidence for the alternative) given the session's hard time budget
+and the user's explicit reprioritization toward GreenVLA-R0/R1 coverage.**
+Whoever picks this up next: the libero_goal vs libero_object asymmetry
+(*some* grounding on one, *zero* on the other) is the most promising lead —
+check whether libero_object's specific object set/scene geometry does
+something the proprioception or action-space conversion doesn't handle
+(different starting reach distances? different init state characteristics?),
+rather than re-litigating image orientation, which is now directly tested
+both ways.
+
+**Process-management lesson from debugging this under time pressure:** don't
+let a `--models X` full run keep executing once you suspect every episode is
+failing — burned through dozens of wasted (fast-failing, ~2-4s each so not
+much wall-clock, but still noise in the logs and confusing on resume) episode
+attempts on pi0.5 before killing it, when a single direct `curl`/`requests`
+reproduction against the live model-server (bypassing the orchestrator
+entirely) would have shown the real traceback in seconds. Prefer: at the
+first `[error]` on a *new* model, pause and reproduce directly rather than
+watching several more `[error]` lines scroll by first.
+
+**Second process-management lesson: `kill -TERM <pid>` on the PID printed by
+your own `nohup ... &` isn't always the orchestrator.** `CONDA_BIN run
+--no-capture-output -n <env> python scripts/run_rollouts.py ...` backgrounded
+with `&` gives you the **`conda run` wrapper's** PID, not the actual
+`python scripts/run_rollouts.py` process it launches as a child (a different
+PID, visible via `ps aux | grep run_rollouts.py`) — same wrapper-vs-child
+split documented above for the `conda run` signal-forwarding bug, but this
+time it bit via *manual* `kill`, not the orchestrator's own child cleanup.
+The SIGTERM handler (`_handle_sigterm`) lives inside the inner python
+process — signaling the outer wrapper PID does nothing to it, leaves the
+whole run (env-worker, model-server, everything) still running. Always
+`ps aux | grep run_rollouts.py` first and target the actual
+`python scripts/run_rollouts.py --models ...` PID, not the `conda run` one.

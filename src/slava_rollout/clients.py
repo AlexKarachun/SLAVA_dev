@@ -71,3 +71,24 @@ class ModelClient:
         )
         resp.raise_for_status()
         return resp.json()["action"]
+
+    def predict_chunk(self, instruction: str, obs: dict[str, Any], meta: dict[str, Any]) -> list[list[float]]:
+        """Like `predict`, but returns the backend's full predicted action chunk
+        (length 1 for backends without open-loop chunk support — see
+        base_server.py's `/predict_chunk` fallback). The orchestrator drains
+        this queue one env-step at a time before requesting a new chunk, which
+        is what makes this real open-loop replay for backends that support it
+        (currently OpenVLA-OFT) and a no-op-equivalent re-prediction-every-step
+        for backends that don't (unchanged behavior)."""
+        resp = requests.post(
+            f"{self.base_url}/predict_chunk",
+            json={
+                "instruction": instruction,
+                "images": {"agentview": obs["agentview_rgb"], "wrist": obs.get("wrist_rgb")},
+                "obs": obs,
+                "meta": meta,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()["action_chunk"]
