@@ -1,6 +1,6 @@
 ---
 name: slava-session-handoff
-description: Close out a SLAVA_dev session and prepare a clean start for the next chat — reconcile AGENTS.md's "Текущее состояние проекта" against actual repo/data state, sweep ALL existing skills (not just obviously-related ones) for staleness given this session's changes, update or add skills for new repeatable work, keep the skills list in sync, write a self-contained starter prompt, and commit+push everything the next session needs (the next session may start from a fresh clone on another machine, e.g. a GPU server). Use when the user says they're moving to a new chat, wants a handoff, or asks to update AGENTS.md/skills at the end of a session.
+description: Close out a SLAVA_dev session and prepare a clean start for the next chat — reconcile AGENTS.md's "Текущее состояние проекта" against actual repo/data state, sweep ALL existing skills (not just obviously-related ones) for staleness given this session's changes, update or add skills for new repeatable work, keep the skills list in sync, write a self-contained starter prompt and hand it to the user directly, and commit+push everything the next session needs (the next session may start from a fresh clone on different hardware in either direction — a GPU server, a local laptop, whatever's next). Use when the user says they're moving to a new chat, a new machine, wants a handoff, or asks to update AGENTS.md/skills at the end of a session.
 ---
 
 TRIGGER — load this skill whenever the user signals the session is ending,
@@ -175,3 +175,39 @@ Concretely, at the end of every handoff:
   and confirm `git status --short` is clean afterward (modulo the
   deliberately-untracked exceptions above) — don't leave the user to
   discover mid-server-setup that something didn't make it.
+- If this session also produced large data the next session needs but that
+  deliberately isn't going into git (raw rollout output, generated datasets,
+  anything the "exclude what's deliberately not meant for git" bullet above
+  applies to), don't just leave it implicit that "it's on this machine
+  somewhere" — package it (a zip is the default unless the user asks for
+  something else) and give the exact retrieval command (`scp`/`rsync` over
+  the machine's own SSH port is usually simplest for a single user — see
+  this image's `vast_agents`/README for the concrete host/port on a Vast.ai
+  box). State plainly whether the machine's disk is ephemeral (check
+  whatever this environment's equivalent of `workspace_is_volume` is) — if
+  it is, the human needs to know the data disappears on
+  stop/recycle/destroy, not just that it's "also available as a zip."
+
+## 8. Deliver the starter prompt directly to the user, and call out environment differences
+
+The starter prompt from step 5 is not a filing task — the user has to
+physically carry it into the next session themselves (paste it into a new
+chat window, hand it to a different tool, carry it to different hardware
+entirely). Always put the final version directly in the chat response as a
+copy-pasteable block, in addition to anything durable like AGENTS.md — a
+prompt that exists only inside a commit is invisible to someone about to
+open a blank chat with no history.
+
+Before finalizing it, check whether the *environment* the next session will
+run in differs from this one — not just the project stage. Concrete signals:
+different OS/hardware (a rented GPU server vs. a local laptop, x86 vs. Apple
+silicon), a capability this session relied on that won't exist there (CUDA,
+a specific conda env, a background service left running), or a different
+starting filesystem state (fresh `git clone` vs. this exact working tree,
+data that lives only on this machine's disk and has to be fetched
+separately). If any of these differ, say so explicitly and near the top of
+the prompt, in concrete terms — "this part of the pipeline needs CUDA and
+won't run on your machine" beats leaving the new agent to discover it by
+trying and failing. A prompt that silently assumes environment parity with
+the session that wrote it wastes the new agent's first real stretch of work
+rediscovering the difference the hard way.
