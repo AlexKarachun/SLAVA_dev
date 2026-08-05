@@ -265,84 +265,191 @@ def compute_language_effect(behavioral: dict[str, dict[str, Any]]) -> list[dict[
 
 
 # --------------------------------------------------------------------------
+# Data provenance
+# --------------------------------------------------------------------------
+
+# Each model family is served by one model-server file. Episodes collected
+# *before* that file's last bug fix were produced by different inference code
+# than episodes collected after it, so pooling them measures nothing well
+# defined — and it specifically confounds the cross-lingual comparison, which
+# contrasts prompt variants *within* one model. The last-modified time of the
+# server file is the cutoff; an episode's provenance is the mtime of its first
+# saved frame (frames are rewritten whenever an episode is re-run, so this
+# survives directory reuse, unlike the episode directory's own mtime).
+MODEL_SERVER_FILE = {
+    "OpenVLA-OFT": "openvla_oft_server.py",
+    "pi0": "lerobot_server.py",
+    "pi0.5": "lerobot_server.py",
+    "SmolVLA": "lerobot_server.py",
+    "GreenVLA-R0": "greenvla_server.py",
+    "GreenVLA-R1 (bridge)": "greenvla_server.py",
+    "GreenVLA-R2 (bridge, RL-aligned)": "greenvla_server.py",
+}
+
+
+def annotate_provenance(annotations: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Tag each annotation with `_stale` (collected before its model-server's
+    last fix) and return per-model {n, n_stale} counts."""
+    servers_dir = PROJECT_ROOT / "scripts" / "model_servers"
+    cutoff: dict[str, float] = {}
+    for model, fname in MODEL_SERVER_FILE.items():
+        path = servers_dir / fname
+        if path.exists():
+            cutoff[model] = path.stat().st_mtime
+
+    episodes_root = ROLLOUTS_DIR / "episodes"
+    stats: dict[str, dict[str, int]] = {}
+    for row in annotations:
+        model = row["model"]
+        entry = stats.setdefault(model, {"n": 0, "n_stale": 0})
+        entry["n"] += 1
+        row["_stale"] = False
+        if model not in cutoff:
+            continue
+        frames = sorted((episodes_root / row["run_id"] / "camera" / "agentview").glob("step_*.png"))
+        if not frames:
+            continue  # no evidence either way; don't accuse it of being stale
+        if frames[0].stat().st_mtime < cutoff[model]:
+            row["_stale"] = True
+            entry["n_stale"] += 1
+    return stats
+
+
+# --------------------------------------------------------------------------
 # Camera demo gallery
 # --------------------------------------------------------------------------
 
-def _frames_to_gif(frame_paths: list[Path], dest: Path, fps: int = 10, max_frames: int = 60) -> None:
+def _frames_to_gif(
+    frame_paths: list[Path], dest: Path, fps: int = 10, max_frames: int = 40, size: int = 192
+) -> None:
+    """Subsample + downscale before encoding: the gallery now shows many more
+    episodes than it used to, so per-GIF weight matters for page load (the
+    whole report ships as static assets on GitHub Pages)."""
     from PIL import Image
 
     if len(frame_paths) > max_frames:
         step = len(frame_paths) / max_frames
         frame_paths = [frame_paths[int(i * step)] for i in range(max_frames)]
-    imgs = [Image.open(p).convert("RGB") for p in frame_paths]
+    imgs = [
+        Image.open(p).convert("RGB").resize((size, size), Image.LANCZOS) for p in frame_paths
+    ]
     dest.parent.mkdir(parents=True, exist_ok=True)
     imgs[0].save(
         dest, save_all=True, append_images=imgs[1:], duration=int(1000 / fps), loop=0, optimize=True
     )
 
 
-def build_camera_gallery(
-    annotations: list[dict[str, Any]], max_runs: int = 12, assets_dir: Path | None = None
-) -> list[dict[str, Any]]:
-    """assets_dir: if given, each episode's full agentview/wrist frame
-    sequence is rendered into an animated GIF under assets_dir/<run_id>/... —
-    needed for GitHub Pages (rollouts/ isn't in git) and because a real
-    rollout is better shown as motion than 3 static frames."""
-    episodes_root = ROLLOUTS_DIR / "episodes"
-    if not episodes_root.exists():
-        return []
+def _pick_runs_for_model(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Pick up to `limit` episodes for one model, maximising prompt-variant
+    diversity: round-robin over distinct variants so we never show `limit`
+    near-identical runs of the same prompt. Within a variant, successes come
+    first (a working model is best demonstrated by a completed task), so a
+    mixed set of outcomes is shown when both exist."""
+    by_variant: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        by_variant.setdefault(row["variant"], []).append(row)
+    for variant_rows in by_variant.values():
+        variant_rows.sort(key=lambda r: (not r.get("success"), r["run_id"]))
 
-    seen_models: set[str] = set()
-    gallery = []
-    # Prefer one run per model for variety, then fill up to max_runs: first
-    # pass takes the first row seen for each distinct model, second pass
-    # fills any remaining slots from the rest, in original order.
-    first_per_model, rest = [], []
-    for row in annotations:
-        if row["model"] not in seen_models:
-            seen_models.add(row["model"])
-            first_per_model.append(row)
-        else:
-            rest.append(row)
-    ordered = first_per_model + rest
-    for row in ordered:
-        if len(gallery) >= max_runs:
+    picked: list[dict[str, Any]] = []
+    variants = sorted(by_variant, key=lambda v: (-len(by_variant[v]), v))
+    depth = 0
+    while len(picked) < limit:
+        added = False
+        for variant in variants:
+            if depth < len(by_variant[variant]):
+                picked.append(by_variant[variant][depth])
+                added = True
+                if len(picked) >= limit:
+                    break
+        if not added:
             break
-        run_dir = episodes_root / row["run_id"]
-        agent_dir = run_dir / "camera" / "agentview"
-        wrist_dir = run_dir / "camera" / "wrist"
-        if not agent_dir.exists():
+        depth += 1
+    return picked
+
+
+def build_camera_gallery(
+    annotations: list[dict[str, Any]],
+    assets_dir: Path | None = None,
+    per_working_model: int = 8,
+    per_broken_model: int = 2,
+) -> list[dict[str, Any]]:
+    """Render episode camera streams as animated GIFs, grouped per model.
+
+    assets_dir: if given, each episode's agentview/wrist frame sequence is
+    written to assets_dir/<run_id>/*.gif — needed for GitHub Pages (rollouts/
+    isn't in git) and because a rollout reads better as motion than as stills.
+
+    Models with a non-zero SR get `per_working_model` episodes across different
+    prompt variants (they're the ones whose behaviour is worth inspecting);
+    models still stuck at 0% get only `per_broken_model` illustrative runs.
+    Returns a list of per-model groups, each with its own list of episodes.
+    """
+    episodes_root = ROLLOUTS_DIR / "episodes"
+    if not episodes_root.exists() or assets_dir is None:
+        return []  # static (non-pages) mode not supported for GIFs
+
+    by_model: dict[str, list[dict[str, Any]]] = {}
+    for row in annotations:
+        by_model.setdefault(row["model"], []).append(row)
+
+    groups = []
+    # Models with real successes first — they are the report's actual result.
+    order = sorted(
+        by_model,
+        key=lambda m: (
+            -sum(1 for r in by_model[m] if r.get("success")) / max(len(by_model[m]), 1),
+            m,
+        ),
+    )
+    for model in order:
+        rows = by_model[model]
+        n_ok = sum(1 for r in rows if r.get("success"))
+        # Only consider episodes whose frames actually exist on disk.
+        have_frames = [
+            r for r in rows if (episodes_root / r["run_id"] / "camera" / "agentview").exists()
+        ]
+        if not have_frames:
             continue
-        agent_frames = sorted(agent_dir.glob("step_*.png"))
-        wrist_frames = sorted(wrist_dir.glob("step_*.png")) if wrist_dir.exists() else []
-        if not agent_frames:
-            continue
+        limit = per_working_model if n_ok else per_broken_model
+        items = []
+        for row in _pick_runs_for_model(have_frames, limit):
+            run_dir = episodes_root / row["run_id"]
+            agent_frames = sorted((run_dir / "camera" / "agentview").glob("step_*.png"))
+            if not agent_frames:
+                continue
+            wrist_dir = run_dir / "camera" / "wrist"
+            wrist_frames = sorted(wrist_dir.glob("step_*.png")) if wrist_dir.exists() else []
 
-        if assets_dir is None:
-            continue  # static (non-pages) mode not supported for GIFs; skip gallery entirely
+            agent_gif = assets_dir / row["run_id"] / "agentview.gif"
+            _frames_to_gif(agent_frames, agent_gif)
+            wrist_rel = None
+            if wrist_frames:
+                wrist_gif = assets_dir / row["run_id"] / "wrist.gif"
+                _frames_to_gif(wrist_frames, wrist_gif)
+                wrist_rel = str(wrist_gif.relative_to(assets_dir.parent))
 
-        agent_gif = assets_dir / row["run_id"] / "agentview.gif"
-        _frames_to_gif(agent_frames, agent_gif)
-        agent_rel = str(agent_gif.relative_to(assets_dir.parent))
-        wrist_rel = None
-        if wrist_frames:
-            wrist_gif = assets_dir / row["run_id"] / "wrist.gif"
-            _frames_to_gif(wrist_frames, wrist_gif)
-            wrist_rel = str(wrist_gif.relative_to(assets_dir.parent))
-
-        gallery.append(
-            {
-                "run_id": row["run_id"],
-                "model": row["model"],
-                "variant": row["variant"],
-                "instruction": row["instruction"],
-                "success": row["success"],
-                "failure_type_auto": row["failure_type_auto"],
-                "agent_gif": agent_rel,
-                "wrist_gif": wrist_rel,
-            }
-        )
-    return gallery
+            items.append(
+                {
+                    "run_id": row["run_id"],
+                    "model": row["model"],
+                    "variant": row["variant"],
+                    "instruction": row["instruction"],
+                    "success": row["success"],
+                    "failure_type_auto": row["failure_type_auto"],
+                    "agent_gif": str(agent_gif.relative_to(assets_dir.parent)),
+                    "wrist_gif": wrist_rel,
+                }
+            )
+        if items:
+            groups.append(
+                {
+                    "model": model,
+                    "sr": f"{n_ok}/{len(rows)} = {100.0 * n_ok / len(rows):.1f}%",
+                    "items": items,
+                }
+            )
+    return groups
 
 
 # --------------------------------------------------------------------------
@@ -373,7 +480,22 @@ def render_html(
     language_effect_by_model: dict[str, list[dict[str, Any]]],
     gallery: list[dict[str, Any]],
     n_annotations: int,
+    provenance: dict[str, dict[str, int]] | None = None,
 ) -> str:
+    provenance_rows = ""
+    n_excluded = 0
+    for model, s in sorted((provenance or {}).items(), key=lambda kv: (kv[1]["n_stale"] > 0, kv[0])):
+        if s["n_stale"]:
+            n_excluded += 1
+            verdict = (
+                f'<span class="badge fail">исключено</span> '
+                f'{s["n_stale"]}/{s["n"]} эпизодов собраны до последнего фикса '
+                f'inference-кода — смешаны две конфигурации'
+            )
+        else:
+            verdict = '<span class="badge success">валидно</span> все эпизоды на финальном коде'
+        provenance_rows += f"<tr><td>{model}</td><td>{s['n']}</td><td>{verdict}</td></tr>"
+
     models_rows = ""
     for m in setup["models"]:
         env_lines = "<br>".join(
@@ -428,24 +550,30 @@ def render_html(
             )
 
     gallery_cards = ""
-    for item in gallery:
-        wrist_html = (
-            f'<div><h4>wrist</h4><img class="gif" src="{item["wrist_gif"]}" loading="lazy"></div>'
-            if item.get("wrist_gif")
-            else ""
-        )
-        status = "success" if item["success"] else "fail"
+    for group in gallery:
+        cards = ""
+        for item in group["items"]:
+            wrist_html = (
+                f'<img class="gif" src="{item["wrist_gif"]}" loading="lazy" title="wrist">'
+                if item.get("wrist_gif")
+                else ""
+            )
+            status = "success" if item["success"] else "fail"
+            cards += f"""
+          <figure class="run-card">
+            <div class="gif-pair">
+              <img class="gif" src="{item['agent_gif']}" loading="lazy" title="agentview">
+              {wrist_html}
+            </div>
+            <figcaption>
+              <span class="badge {status}">{item['failure_type_auto']}</span>
+              <span class="vtag">{item['variant']}</span>
+              <span class="instruction">&laquo;{item['instruction']}&raquo;</span>
+            </figcaption>
+          </figure>"""
         gallery_cards += f"""
-        <div class="run-card">
-          <div class="run-head">
-            <b>{item['model']}</b> · {item['variant']} ·
-            <span class="badge {status}">{item['failure_type_auto']}</span>
-          </div>
-          <p class="instruction">&laquo;{item['instruction']}&raquo;</p>
-          <div class="gif-row">
-            <div><h4>agentview</h4><img class="gif" src="{item['agent_gif']}" loading="lazy"></div>
-            {wrist_html}
-          </div>
+        <h3>{group['model']} <span class="muted">— SR {group['sr']}</span></h3>
+        <div class="gif-grid">{cards}
         </div>"""
 
     lexicon_cat_rows = "".join(
@@ -519,11 +647,16 @@ def render_html(
   .pos {{ color:var(--good); font-weight:700; }}
   .neg {{ color:var(--bad); font-weight:700; }}
   .muted {{ color:var(--muted); }}
-  .run-card {{ margin:0 0 22px; padding:14px; border:1px solid var(--line); border-radius:10px; background:#fbfcfe; }}
-  .run-head {{ margin:0 0 6px; }}
-  .instruction {{ margin:0 0 8px; color:var(--muted); font-style:italic; }}
-  .gif-row {{ display:flex; gap:16px; flex-wrap:wrap; margin:0 0 4px; }}
-  .gif-row img.gif {{ width:260px; max-width:100%; border-radius:8px; border:1px solid var(--line); display:block; }}
+  .gif-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+    gap:14px; margin:0 0 26px; }}
+  .run-card {{ margin:0; padding:8px; border:1px solid var(--line); border-radius:10px; background:#fbfcfe; }}
+  .gif-pair {{ display:flex; gap:4px; }}
+  .gif-pair img.gif {{ width:0; flex:1 1 0; min-width:0; aspect-ratio:1/1;
+    border-radius:6px; border:1px solid var(--line); display:block; }}
+  .run-card figcaption {{ margin:7px 1px 0; font-size:11.5px; line-height:1.45; }}
+  .vtag {{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+    color:var(--muted); margin-left:5px; }}
+  .instruction {{ display:block; margin:3px 0 0; color:var(--muted); font-style:italic; }}
   .badge {{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }}
   .badge.success {{ color:var(--good); background:#dcfce7; border:1px solid #86efac; }}
   .badge.fail {{ color:var(--bad); background:#fee2e2; border:1px solid #fca5a5; }}
@@ -597,12 +730,25 @@ def render_html(
 
 <section>
   <h2>3. Камерные записи роллаутов</h2>
-  <p class="muted">По одному эпизоду на модель (где данные уже есть), кадры agentview/wrist на старте, середине и конце эпизода. Полный просмотр — <code>notebooks/02_rollout_camera_dashboard.ipynb</code>.</p>
+  <p class="muted">Анимация полного эпизода (agentview слева, wrist справа), для моделей с ненулевым SR —
+  по нескольку запусков на разных промпт-вариантах. Полный просмотр —
+  <code>notebooks/02_rollout_camera_dashboard.ipynb</code>.</p>
   {gallery_cards or '<p class="muted">Камерные записи пока не сгенерированы для загруженных эпизодов.</p>'}
 </section>
 
 <section>
-  <h2>4. Метрики — Table: behavioral pilot</h2>
+  <h2>4. Валидность данных (provenance)</h2>
+  <p class="muted">Каждое семейство моделей обслуживается своим model-server. Эпизоды, собранные до
+  последнего исправления этого файла, произведены другим inference-кодом, поэтому их нельзя объединять
+  в одну выборку — и они прямо конфаундят кросс-лингвальное сравнение, которое сопоставляет
+  промпт-варианты <em>внутри</em> одной модели. Такие модели исключены из всех агрегатов ниже.</p>
+  <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
+  <tbody>{provenance_rows}</tbody></table>
+  {'<div class="warn"><b>' + str(n_excluded) + ' модели исключены из метрик</b> — их числа в этом отчёте не приводятся; требуется перезапуск на финальном коде (см. §6).</div>' if n_excluded else ''}
+</section>
+
+<section>
+  <h2>5. Метрики — Table: behavioral pilot</h2>
   <p class="muted">Формат и метрики строго по task.md "Table - behavioral pilot" — агрегировано по всем моделям, производившим соответствующий вариант.</p>
   <table class="data-table"><thead><tr>
     <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
@@ -619,7 +765,7 @@ def render_html(
 </section>
 
 <section>
-  <h2>5. Метрики — Table: cleaned language effect (Δlang)</h2>
+  <h2>6. Метрики — Table: cleaned language effect (Δlang)</h2>
   <p class="muted">Главная метрика пилота (task.md): отделяет языковой эффект от instruction-string OOD.
   Положительный Δlang значит, что соответствующая RU/code-switch ось теряет SR сильнее, чем можно было бы
   объяснить простым перефразированием на английском (en_paraphrase) — то есть эффект специфичен для языка,
@@ -633,7 +779,7 @@ def render_html(
 </section>
 
 <section>
-  <h2>6. Что осталось по чек-листу task.md</h2>
+  <h2>7. Что осталось по чек-листу task.md</h2>
   <div class="warn">
   <p><b>Ручная валидация первых 100 rollouts</b> (task.md, "Auto-labeling для первых прогонов") —
   не выполнена. Требуется ручная сверка выборки эпизодов (камера + <code>rollout_annotations.jsonl</code> +
@@ -646,7 +792,7 @@ def render_html(
 </section>
 
 <section>
-  <h2>7. Интерпретация относительно research questions task.md</h2>
+  <h2>8. Интерпретация относительно research questions task.md</h2>
   <div class="callout">
   <p><b>RQ1</b>: "Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?"
   — отвечает Δlang-таблица (раздел 5), особенно разбивка по модели. Положительный и заметно больше нуля
@@ -676,12 +822,20 @@ def main() -> None:
     args = parser.parse_args()
 
     annotations = load_jsonl(ROLLOUTS_DIR / "rollout_annotations.jsonl")
+    provenance = annotate_provenance(annotations)
+    # Models whose episodes span an inference-code change are not a single
+    # measurement: drop them from every aggregate metric rather than pooling
+    # two configurations. They stay listed in the provenance table so the
+    # exclusion is visible instead of silent.
+    mixed = {m for m, s in provenance.items() if s["n_stale"]}
+    valid = [r for r in annotations if r["model"] not in mixed]
+
     data_overview = build_data_overview()
     setup = build_setup_overview()
     examples = build_examples()
     coverage = build_coverage(setup, annotations)
-    behavioral = compute_behavioral_pilot(annotations)
-    behavioral_by_model = compute_behavioral_pilot_by_model(annotations)
+    behavioral = compute_behavioral_pilot(valid)
+    behavioral_by_model = compute_behavioral_pilot_by_model(valid)
     language_effect = compute_language_effect(behavioral)
     language_effect_by_model = {
         model: compute_language_effect(table) for model, table in behavioral_by_model.items()
@@ -692,10 +846,14 @@ def main() -> None:
     html = render_html(
         data_overview, setup, examples, coverage, behavioral, behavioral_by_model,
         language_effect, language_effect_by_model, gallery, len(annotations),
+        provenance,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(html, encoding="utf-8")
-    print(f"Wrote {args.output} ({len(annotations)} annotations)")
+    print(f"Wrote {args.output} ({len(annotations)} annotations, {len(valid)} used in metrics)")
+    for model, s in sorted(provenance.items()):
+        flag = "  <-- EXCLUDED (mixed inference code)" if s["n_stale"] else ""
+        print(f"  {model:35s} n={s['n']:4d} stale={s['n_stale']:4d}{flag}")
 
 
 if __name__ == "__main__":
