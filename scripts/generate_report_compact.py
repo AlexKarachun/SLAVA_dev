@@ -28,9 +28,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from generate_rollout_report import (  # noqa: E402
-    _frames_to_gif,
-    annotate_provenance,
+from generate_rollout_report import _frames_to_gif  # noqa: E402
+from slava_rollout.provenance import partition  # noqa: E402
+from slava_rollout.stats import (  # noqa: E402
+    bootstrap_ci,
+    cluster_summary,
+    delta_lang,
+    failure_mix,
+    first_contact_profile,
+    outcomes_by_variant,
+    paired_by_task,
+    mcnemar_exact,
+    wilson,
 )
 
 ROLLOUTS = PROJECT_ROOT / "rollouts"
@@ -44,31 +53,6 @@ RU_VARIANTS = {"mt_russian", "ru_literal", "ru_case_swap", "ru_negation"}
 def load_annotations() -> list[dict[str, Any]]:
     path = ROLLOUTS / "rollout_annotations.jsonl"
     return [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
-
-
-def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    """Wilson score interval — correct at the 0% and 100% ends, where the
-    normal approximation degenerates. Most cells here are small-n and several
-    are exactly 0, so this matters."""
-    if n == 0:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / d
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (max(0.0, centre - half), min(1.0, centre + half))
-
-
-def bootstrap_ci(values: list[bool], iters: int = 2000, seed: int = 0) -> tuple[float, float]:
-    if not values:
-        return (0.0, 0.0)
-    rng = random.Random(seed)
-    n = len(values)
-    means = []
-    for _ in range(iters):
-        means.append(sum(rng.choice(values) for _ in range(n)) / n)
-    means.sort()
-    return (means[int(0.025 * iters)], means[int(0.975 * iters)])
 
 
 def per_model_variant(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[bool]]:
@@ -98,13 +82,18 @@ def pick_examples(rows: list[dict[str, Any]], assets: Path, n: int = 4) -> list[
         if len(agent) < 2:
             continue
         out = assets / r["run_id"]
-        ag_gif = out / "agentview.gif"
+        # Distinct filename from the long-form report's gallery, which writes
+        # `agentview.gif`/`wrist.gif` into the same per-run directory with
+        # lighter settings. Sharing the name meant whichever report ran last
+        # silently replaced the other's clips — these showcase episodes are
+        # rendered fuller (more frames, larger) on purpose.
+        ag_gif = out / "agentview_showcase.gif"
         _frames_to_gif(agent, ag_gif)
         wr_dir = run_dir / "camera" / "wrist"
         wr_frames = sorted(wr_dir.glob("step_*.png")) if wr_dir.exists() else []
         wr_rel = None
         if wr_frames:
-            wr_gif = out / "wrist.gif"
+            wr_gif = out / "wrist_showcase.gif"
             _frames_to_gif(wr_frames, wr_gif)
             wr_rel = str(wr_gif.relative_to(assets.parent))
         seen.add(key)
@@ -119,7 +108,241 @@ def esc(s: Any) -> str:
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def render(rows: list[dict[str, Any]], excluded: set[str], assets: Path) -> str:
+
+def load_published_baselines() -> dict[str, Any]:
+    path = PROJECT_ROOT / "data" / "published_baselines.json"
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8")).get("baselines", {})
+
+
+def build_baseline_check(rows: list[dict[str, Any]]) -> str:
+    """Does our harness reproduce a number the authors published?
+
+    This is the load-bearing sanity check of the whole pilot: every
+    cross-lingual claim rests on the English baseline being right. Reported
+    first, including where it clearly failed.
+    """
+    published = load_published_baselines()
+    body = ""
+    for m in sorted({r["model"] for r in rows}):
+        en = [r for r in rows if r["model"] == m and r["variant"] == "en_canonical"]
+        if not en:
+            continue
+        k, n = sum(r["success"] for r in en), len(en)
+        lo, hi = wilson(k, n)
+        ref = published.get(m) or {}
+        ref_sr, ref_label = ref.get("sr"), ref.get("label")
+        if ref_sr is None:
+            verdict, cls = "нет опубликованного числа", "na"
+        elif hi - lo > 0.40:
+            # With n this small the interval spans most of [0,1] and would
+            # "contain" almost any reference value — declaring a match from it
+            # would be an artefact of the sample size, not a reproduction.
+            verdict, cls = f"не проверяемо (n={n}, CI шире 40 п.п.)", "na"
+        elif lo <= ref_sr <= hi:
+            verdict, cls = "совпадает (в CI)", "hi"
+        elif k / n >= ref_sr:
+            verdict, cls = "выше заявленного", "hi"
+        else:
+            verdict, cls = "НИЖЕ заявленного", "zero"
+        body += (
+            f"<tr><th class=m>{esc(m)}</th>"
+            f"<td><b>{k}/{n}</b> = {100*k/n:.0f}%<br>"
+            f"<span class=ci>[{100*lo:.0f};{100*hi:.0f}]</span></td>"
+            f"<td>{esc(ref_label or '—')}<br><span class=ci>{esc(ref.get('scope') or '')}</span></td>"
+            f"<td class={cls}>{verdict}</td>"
+            f"<td class=ci>{esc(ref.get('source') or '')}</td></tr>"
+        )
+    return (
+        "<table><tr><th></th><th>наш en_canonical</th><th>заявлено авторами</th>"
+        f"<th>вердикт</th><th>источник</th></tr>{body}</table>"
+    )
+
+
+def build_mt_ablation(rows: list[dict[str, Any]]) -> str:
+    """Machine translation vs human-authored Russian, on shared scenes.
+
+    Separates "the model struggles with Russian" from "our Russian is
+    unnatural" — the cheapest objection to the whole result — and doubles as a
+    prompt-length control, since raw MT is systematically the longest variant.
+    """
+    frames = {f["task_uid"]: f for f in
+              (json.loads(l) for l in open(
+                  PROJECT_ROOT / "data" / "pilot_v0_release" / "frames_v0.jsonl", encoding="utf-8"))}
+    body = ""
+    for m in sorted({r["model"] for r in rows}):
+        by_variant = outcomes_by_variant([r for r in rows if r["model"] == m])
+        mt, ru = by_variant.get("mt_russian", {}), by_variant.get("ru_literal", {})
+        shared = sorted(set(mt) & set(ru))
+        if not shared:
+            continue
+        mt_k, ru_k = sum(mt[s] for s in shared), sum(ru[s] for s in shared)
+        toks = {"mt_russian": [], "ru_literal": []}
+        for s in shared:
+            tl = frames.get(s, {}).get("token_len", {}).get("openvla_oft", {})
+            for v in toks:
+                if tl.get(v) is not None:
+                    toks[v].append(tl[v])
+        avg = {v: (sum(x) / len(x) if x else None) for v, x in toks.items()}
+        d_mt = sum(1 for s in shared if mt[s] and not ru[s])
+        d_ru = sum(1 for s in shared if ru[s] and not mt[s])
+        b = mcnemar_exact(d_mt, d_ru)
+        tok_txt = (
+            "—" if avg["mt_russian"] is None
+            else f"{avg['mt_russian']:.1f} vs {avg['ru_literal']:.1f}"
+        )
+        # b is None means zero discordant scenes — i.e. the two Russian
+        # variants behaved identically on every single scene. That is the
+        # result here, not missing data, so say it rather than print a dash.
+        p_txt = (f"нет расхождений<br><span class=ci>0 из {len(shared)}</span>"
+                 if b is None else f"{b:.3f}<br><span class=ci>{d_mt}:{d_ru}</span>")
+        body += (
+            f"<tr><th class=m>{esc(m)}</th><td>{len(shared)}</td>"
+            f"<td>{mt_k}/{len(shared)}</td><td>{ru_k}/{len(shared)}</td>"
+            f"<td>{p_txt}</td><td class=ci>{tok_txt}</td></tr>"
+        )
+    return (
+        "<table><tr><th></th><th>общих сцен</th><th>mt_russian (сырой MT)</th>"
+        "<th>ru_literal (человек)</th><th>p (McNemar)</th>"
+        "<th>токенов: MT vs человек</th></tr>" + body + "</table>"
+    )
+
+
+def build_contact_profile(rows: list[dict[str, Any]]) -> str:
+    """Where it breaks, not just how often — first-contact attribution."""
+    out = ""
+    for m in sorted({r["model"] for r in rows}):
+        model_rows = [r for r in rows if r["model"] == m]
+        if not any(r["variant"] == "en_canonical" for r in model_rows):
+            continue
+        body = ""
+        for v in VARIANT_ORDER:
+            vr = [r for r in model_rows if r["variant"] == v]
+            if not vr:
+                continue
+            p = first_contact_profile(vr)
+            body += (
+                f"<tr><td>{v}</td><td>{p['n']}</td>"
+                f"<td class={'hi' if p['correct_target'] >= 0.7 else 'mid'}>{100*p['correct_target']:.0f}%</td>"
+                f"<td>{100*p['wrong_target']:.0f}%</td>"
+                f"<td>{100*p['no_contact']:.0f}%</td></tr>"
+            )
+        out += (f"<h4>{esc(m)}</h4><table class=t2><tr><th>вариант</th><th>n</th>"
+                f"<th>верный target</th><th>не тот объект</th>"
+                f"<th>не коснулся вовсе</th></tr>{body}</table>")
+    return out
+
+
+def build_failure_mix(rows: list[dict[str, Any]]) -> str:
+    labels = ["success", "target_grounding_error", "relation_binding_error",
+              "negation_error", "physical_execution_error", "no_action_or_timeout", "unclear"]
+    out = ""
+    for m in sorted({r["model"] for r in rows}):
+        model_rows = [r for r in rows if r["model"] == m]
+        body = ""
+        for v in VARIANT_ORDER:
+            vr = [r for r in model_rows if r["variant"] == v]
+            if not vr:
+                continue
+            mix = failure_mix(vr)
+            body += f"<tr><td>{v}</td>" + "".join(
+                f"<td>{'' if not mix.get(l) else f'{100*mix[l]:.0f}%'}</td>" for l in labels
+            ) + "</tr>"
+        if body:
+            head = "".join(f"<th>{l.replace('_error','').replace('_or_timeout','')}</th>" for l in labels)
+            out += f"<h4>{esc(m)}</h4><table class=t2><tr><th>вариант</th>{head}</tr>{body}</table>"
+    return out
+
+
+def build_scene_matrix(rows: list[dict[str, Any]], model: str) -> str:
+    """Per-scene outcomes: is the effect spread out, or two scenes carrying it?"""
+    by_variant = outcomes_by_variant([r for r in rows if r["model"] == model])
+    scenes = sorted(by_variant.get("en_canonical", {}))
+    if not scenes:
+        return ""
+    head = "".join(f"<th>{v.replace('_','<br>')}</th>" for v in VARIANT_ORDER)
+    body = ""
+    for s in scenes:
+        short = s.replace("libero_", "").rsplit("__init", 1)
+        label = f"{short[0][:44]}<span class=ci> init{short[1]}</span>" if len(short) > 1 else s[:48]
+        cells_html = ""
+        for v in VARIANT_ORDER:
+            val = by_variant.get(v, {}).get(s)
+            if val is None:
+                cells_html += "<td class=na>·</td>"
+            else:
+                cells_html += f"<td class={'hi' if val else 'zero'}>{'✓' if val else '✗'}</td>"
+        body += f"<tr><th class=m>{label}</th>{cells_html}</tr>"
+    return f"<table><tr><th></th>{head}</tr>{body}</table>"
+
+
+def build_caveats(rows: list[dict[str, Any]], all_rows: list[dict[str, Any]]) -> str:
+    """State the limits ourselves, with numbers, rather than leave them to be found."""
+    items = []
+
+    # power + clustering, on the model that carries the result
+    for m in ["OpenVLA-OFT"]:
+        by_variant = outcomes_by_variant([r for r in rows if r["model"] == m])
+        en, ru = by_variant.get("en_canonical", {}), by_variant.get("ru_literal", {})
+        shared = sorted(set(en) & set(ru))
+        if not shared:
+            continue
+        b = sum(1 for s in shared if en[s] and not ru[s])
+        c = sum(1 for s in shared if ru[s] and not en[s])
+        cl = cluster_summary(shared)
+        tb, tc = paired_by_task(en, ru)
+        items.append(
+            f"<li><b>Мощность на пределе.</b> У {esc(m)} значимость даёт расклад "
+            f"{b}:{c} по дискордантным сценам (p={mcnemar_exact(b, c):.3f}). "
+            f"При n={len(shared)} минимум для p&lt;0.05 — это 6:0; одна сцена в "
+            f"обратную сторону, и p={mcnemar_exact(max(b-1, 0), c+0) or 1:.3f}. "
+            f"Пилот показывает направление, а не финальную величину.</li>"
+        )
+        items.append(
+            f"<li><b>Наблюдения не независимы.</b> {cl['n_scenes']} сцен — это "
+            f"{cl['n_tasks']} различных задач (до {cl['max_scenes_per_task']} init-состояний "
+            f"на одну). На уровне задач расклад {tb}:{tc}, "
+            f"p={'—' if mcnemar_exact(tb, tc) is None else f'{mcnemar_exact(tb, tc):.3f}'} — "
+            f"значимость на уровне сцен частично держится на том, что init-состояния "
+            f"одной задачи считаются независимыми. Это главный аргумент за полный набор.</li>"
+        )
+
+    # floor effect
+    floor = []
+    for m in sorted({r["model"] for r in rows}):
+        en = [r for r in rows if r["model"] == m and r["variant"] == "en_canonical"]
+        if en and sum(r["success"] for r in en) / len(en) < 0.15:
+            floor.append(m)
+    if floor:
+        items.append(
+            "<li><b>Floor effect.</b> У " + esc(", ".join(floor)) +
+            " SR близок к нулю уже на английском, поэтому их Δlang≈0 означает "
+            "«измерять нечем», а не «языкового эффекта нет». Эти строки нельзя "
+            "читать как свидетельство против эффекта.</li>"
+        )
+
+    items.append(
+        "<li><b>n=1 повтор</b> на (сцена × вариант × модель) — осознанное решение ради "
+        "простоты сравнения. У pi0/pi0.5/SmolVLA действие сэмплируется из "
+        "flow-matching головы, так что их числа шумнее детерминированных OpenVLA-OFT/GreenVLA.</li>"
+    )
+    items.append(
+        "<li><b>Авторазметка не прошла ручную валидацию.</b> Обязательная по task.md проверка "
+        "первых 100 роллаутов ещё не сделана. Отдельно неразличимы "
+        "<code>relation_binding_error</code> и <code>reference_grounding_error</code>: "
+        "по одному сигналу первого контакта их не отделить, авторазметчик ставит первое.</li>"
+    )
+    items.append(
+        f"<li><b>Исключено из метрик:</b> {len(all_rows) - len(rows)} эпизодов из {len(all_rows)} "
+        "(объявлено в <code>data/rollout_provenance.json</code> с причиной).</li>"
+    )
+    return "<ul class=caveats>" + "".join(items) + "</ul>"
+
+
+def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path,
+           all_rows: list[dict[str, Any]] | None = None) -> str:
+    all_rows = all_rows if all_rows is not None else rows
     cells = per_model_variant(rows)
     models = sorted({r["model"] for r in rows})
 
@@ -140,31 +363,48 @@ def render(rows: list[dict[str, Any]], excluded: set[str], assets: Path) -> str:
                     f"{100*k/n:.0f}% [{100*lo:.0f};{100*hi:.0f}]</span></td>")
         body += f"<tr><th class=m>{esc(m)}</th>{tds}</tr>"
 
-    # ---- language effect, per model, en_canonical anchored
+    # ---- language effect, per model, en_canonical anchored, PAIRED
+    #
+    # Every number below is computed on the scenes a variant SHARES with
+    # en_canonical and en_paraphrase, never on its own marginal coverage.
+    # Without that, `ru_case_swap` (authored for only 8 of 20 scenes, the rest
+    # legitimately axis_na) would be compared against en_canonical's full 20 and
+    # the difference in scene composition would read as a language effect.
     lang = ""
     for m in models:
-        en = cells.get((m, "en_canonical"), [])
+        model_rows = [r for r in rows if r["model"] == m]
+        by_variant = outcomes_by_variant(model_rows)
+        en = by_variant.get("en_canonical")
         if not en:
             continue
-        sr_en = sum(en) / len(en)
-        para = cells.get((m, "en_paraphrase"), [])
-        gap_para = (sr_en - sum(para) / len(para)) if para else None
+        sr_en = sum(en.values()) / len(en)
         ru_rows = ""
         for v in VARIANT_ORDER:
             if v in ("en_canonical", "en_paraphrase"):
                 continue
-            vals = cells.get((m, v), [])
-            if not vals:
+            d = delta_lang(by_variant, v)
+            if d is None:
                 continue
-            gap = sr_en - sum(vals) / len(vals)
-            dl = (gap - gap_para) if gap_para is not None else None
-            ru_rows += (f"<tr><td>{v}</td><td>{100*gap:+.1f}</td>"
-                        f"<td><b>{'—' if dl is None else f'{100*dl:+.1f}'}</b></td></tr>")
-        lo, hi = bootstrap_ci(en)
-        lang += (f"<h4>{esc(m)} <span class=ci>SR<sub>en_canonical</sub> = "
-                 f"{100*sr_en:.0f}% [bootstrap {100*lo:.0f};{100*hi:.0f}]</span></h4>"
-                 f"<table class=t2><tr><th>вариант</th><th>gap, п.п.</th>"
-                 f"<th>Δlang, п.п.</th></tr>{ru_rows}</table>")
+            lo, hi = d["ci"]
+            p = d["p_mcnemar_vs_anchor"]
+            p_txt = "—" if p is None else (f"{p:.3f}" if p >= 0.001 else "&lt;0.001")
+            sig = " class=sig" if (p is not None and p < 0.05) else ""
+            ru_rows += (
+                f"<tr><td>{v}</td><td>{d['n_scenes']}</td>"
+                f"<td>{100*d['gap_variant']:+.1f}</td>"
+                f"<td><b>{100*d['value']:+.1f}</b><br>"
+                f"<span class=ci>[{100*lo:+.0f};{100*hi:+.0f}]</span></td>"
+                f"<td{sig}>{p_txt}</td></tr>"
+            )
+        lo, hi = bootstrap_ci([float(x) for x in en.values()])
+        lang += (
+            f"<h4>{esc(m)} <span class=ci>SR<sub>en_canonical</sub> = "
+            f"{100*sr_en:.0f}% ({sum(en.values())}/{len(en)}) "
+            f"[bootstrap {100*lo:.0f};{100*hi:.0f}]</span></h4>"
+            f"<table class=t2><tr><th>вариант</th><th>парных сцен</th>"
+            f"<th>gap, п.п.</th><th>Δlang, п.п. [95% CI]</th>"
+            f"<th>p (McNemar)</th></tr>{ru_rows}</table>"
+        )
 
     ex = pick_examples(rows, assets)
     ex_html = ""
@@ -181,11 +421,28 @@ def render(rows: list[dict[str, Any]], excluded: set[str], assets: Path) -> str:
             f"{imgs}</figure>")
 
     excl = ""
-    if excluded:
-        excl = ("<p class=warn><b>Исключены из метрик:</b> " + ", ".join(sorted(excluded)) +
-                " — их эпизоды собраны по обе стороны от правки общего model-server, "
-                "смешивать две конфигурации инференса в одно число нельзя "
-                "(<code>annotate_provenance()</code>).</p>")
+    applied = [r for r in (rules or []) if r.get("n_matched")]
+    if applied:
+        items = ""
+        for r in applied:
+            scope = ", ".join(r.get("models", [])) or r.get("id", "")
+            if r.get("environment"):
+                scope += f" · {r['environment']}"
+            items += (
+                f"<li><b>{r['n_matched']} эпизодов</b> <span class=ci>({esc(scope)})</span><br>"
+                f"{esc(r.get('reason', ''))}"
+                f"<br><span class=ci>снимается когда: {esc(r.get('clears_when', ''))}</span></li>"
+            )
+        excl = ("<p class=warn><b>Исключены из метрик</b> — объявлено в "
+                "<code>data/rollout_provenance.json</code>, не выведено из mtime файлов:</p>"
+                f"<ul class=warnlist>{items}</ul>")
+
+    baseline_html = build_baseline_check(rows)
+    mt_html = build_mt_ablation(rows)
+    contact_html = build_contact_profile(rows)
+    failure_html = build_failure_mix(rows)
+    matrix_html = build_scene_matrix(rows, "OpenVLA-OFT")
+    caveats_html = build_caveats(rows, all_rows)
 
     n_total = len(rows)
     return f"""<title>SLAVA — результаты</title>
@@ -204,22 +461,58 @@ figure img{{width:190px;image-rendering:pixelated;border:1px solid #ddd;margin-r
 figcaption{{font-size:12px;margin-bottom:6px}}
 code{{background:#f4f4f4;padding:1px 4px;border-radius:3px}}
 .warn{{background:#fffbe6;border-left:3px solid #f0c000;padding:6px 10px;font-size:13px}}
+.warnlist{{background:#fffbe6;border-left:3px solid #f0c000;margin:0;padding:6px 10px 6px 26px;font-size:13px}}
+.warnlist li{{margin:4px 0}}
+.caveats{{padding-left:20px;font-size:13px}} .caveats li{{margin:6px 0}}
+table.t2 td:first-child{{text-align:left;white-space:nowrap}}
+td.sig{{font-weight:700;background:#f0fff4}}
 .f{{background:#f7f7f9;padding:8px 10px;border-radius:5px;font-family:ui-monospace,monospace;font-size:12.5px}}
 </style>
 <h1>SLAVA — кросс-язычный бенчмарк VLA</h1>
 <p class=ci>{n_total} эпизодов в метриках · n=1 повтор на (сцена × вариант × модель)</p>
 
-<h2>1. Метрики</h2>
+<h2>1. Воспроизводим ли мы известные числа</h2>
+<p>Всё остальное в этом отчёте имеет смысл только если харнесс корректен. Самая
+прямая проверка — прогнать <code>en_canonical</code> и сравнить с тем, что
+авторы моделей заявляют сами. Наш набор сцен не совпадает с их бенчмарком,
+поэтому это ориентир, а не построчное воспроизведение; но порядок величины
+должен сходиться.</p>
+{baseline_html}
+<p class=ci><b>Как это читать.</b> OpenVLA-OFT воспроизводится — значит
+пайплайн (сброс среды, подача наблюдений, пост-обработка действий, детекция
+успеха) работает, и его кросс-язычные числа можно интерпретировать. Там, где
+воспроизведения нет, выводы по модели ограничены её же настройкой, а не
+языком: это относится к GreenVLA, где расхождение с заявленным велико и
+причина пока не найдена.</p>
+
+<h2>2. Метрики</h2>
 <div class=f>
 SR = успешные эпизоды / всего &nbsp;·&nbsp; успех берётся из нативного <code>env.check_success()</code><br>
 gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
 <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
 </div>
 <p>Вычитание <code>gap_en_paraphrase</code> — ключевой контроль: он убирает эффект
-«инструкция просто непривычная» и оставляет только языковой. CI по SR —
-интервал Уилсона (корректен у краёв 0% и 100%), по <code>en_canonical</code> — бутстрап, 2000 итераций.</p>
+«инструкция просто непривычная» и оставляет только языковой.</p>
+<p><b>Сравнение парное.</b> Каждый вариант сравнивается с
+<code>en_canonical</code> и <code>en_paraphrase</code> только на тех сценах, которые
+есть у всех трёх («парных сцен» в таблице). Иначе разница в составе сцен
+читалась бы как языковой эффект: например <code>ru_case_swap</code> осмыслен лишь
+на 8 сценах из 20 (у остальных <code>axis_na</code>), и его маргинальный SR
+относится к другому, более узкому набору задач, чем SR<sub>en_canonical</sub>.</p>
+<p>CI по SR — интервал Уилсона (корректен у краёв 0% и 100%); по Δlang —
+парный бутстрап (2000 итераций, ресэмплируются <i>сцены</i>, а не эпизоды, чтобы
+исходы одной сцены двигались вместе). <code>p</code> — точный тест Мак-Немара
+против <code>en_canonical</code> по дискордантным парам; прочерк означает, что
+дискордантных пар нет вовсе, то есть данных для суждения нет — это не то же самое,
+что «различий нет».</p>
+<p class=ci><b>Оговорка о метриках.</b> <code>final_relation_success</code> в этом
+пилоте тождественно равен <code>success</code> (проверено: совпадает во всех 550
+эпизодах): у каждой сцены ровно один success-предикат, и это буквально тот же
+предикат, который проверяет нативный <code>env.check_success()</code>. Поэтому
+отдельной колонкой «relation success» он не выводится — это было бы то же число
+под другим именем.</p>
 
-<h2>2. SR по вариантам</h2>
+<h2>3. SR по вариантам</h2>
 <table><tr><th></th>{head}</tr>{body}</table>
 {excl}
 <p class=ci><code>ru_case_swap</code> — намеренно перевёрнутая инструкция
@@ -227,10 +520,38 @@ gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
 Модель, выполнившая её верно, засчитывается как провал: это зонд на
 чувствительность к порядку, а не задача. В агрегат по модели не входит.</p>
 
-<h2>3. Языковой эффект</h2>
+<h2>4. Языковой эффект</h2>
 {lang}
 
-<h2>4. Примеры эпизодов</h2>
+<h2>5. Машинный перевод против человеческого русского</h2>
+<p>Самое дешёвое возражение к результату — «у вас просто неестественный
+русский». Проверяется прямо: <code>mt_russian</code> — сырой выход DeepL без
+единой правки, <code>ru_literal</code> — вручную выверенный вариант, прошедший
+native check. Сравнение на общих сценах. Последняя колонка — средняя длина в
+токенах (токенизатор OpenVLA-OFT): заодно контроль на то, что падение не
+объясняется просто более длинным промптом.</p>
+{mt_html}
+
+<h2>6. Где именно ломается: первый контакт</h2>
+<p>SR говорит только «получилось/нет». Первый объект, которого робот реально
+коснулся, различает три разные неудачи: потянулся к верному объекту и не
+справился физически; потянулся не к тому (ошибка заземления); не тронул ничего.
+Это и есть slot-level атрибуция, ради которой строился бенчмарк.</p>
+{contact_html}
+
+<h2>7. Профиль типов отказов</h2>
+<p>Ломается ли русский <i>иначе</i>, чем английский, а не просто чаще.</p>
+{failure_html}
+
+<h2>8. По сценам: эффект размазан или держится на паре сцен</h2>
+<p>OpenVLA-OFT, по одной строке на сцену. Видно, что падение на русском не
+сосредоточено в одной задаче.</p>
+{matrix_html}
+
+<h2>9. Ограничения</h2>
+{caveats_html}
+
+<h2>10. Примеры эпизодов</h2>
 <p class=ci>анимация всего эпизода: agentview и wrist (где есть)</p>
 {ex_html}
 """
@@ -241,16 +562,17 @@ def main() -> None:
     ap.add_argument("--output", type=Path, default=PROJECT_ROOT / "docs" / "report.html")
     args = ap.parse_args()
     ann = load_annotations()
-    prov = annotate_provenance(ann)
-    excluded = {m for m, s in prov.items() if s["n_stale"]}
-    rows = [r for r in ann if r["model"] not in excluded]
+    rows, excluded, rules = partition(ann)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     assets = args.output.parent / "report_assets"
-    args.output.write_text(render(rows, excluded, assets), encoding="utf-8")
+    args.output.write_text(render(rows, rules, assets, all_rows=ann), encoding="utf-8")
     print(f"Wrote {args.output} ({len(rows)}/{len(ann)} эпизодов в метриках)")
-    for m, s in sorted(prov.items()):
-        flag = "  <-- исключён" if s["n_stale"] else ""
-        print(f"  {m:35s} n={s['n']:4d} stale={s['n_stale']:4d}{flag}")
+    if not rules:
+        print("  NOTE: data/rollout_provenance.json declares no exclusions — "
+              "every collected episode is being aggregated.")
+    for r in rules:
+        status = "applied" if r.get("n_matched") else "matched nothing (stale rule?)"
+        print(f"  exclusion {r.get('id','unnamed'):50s} {r.get('n_matched',0):4d} episodes  [{status}]")
 
 
 if __name__ == "__main__":

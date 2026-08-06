@@ -236,3 +236,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+rollouts
+
+# HF rollout data pulled locally from AlexKarachun/slava-rollouts (multi-GB)
+slava_data/

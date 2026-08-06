@@ -208,6 +208,28 @@ class LerobotBackend:
         self.image_features = image_features
         self.state_feature_name, self.state_feature = next(iter(state_features.items()))
 
+    def reset(self) -> None:
+        """Clear the policy's internal action queue between episodes.
+
+        `PreTrainedPolicy.reset()` is lerobot's own per-episode hook and is
+        what their evaluation loops call on every `env.reset()`. We were not
+        calling it: this server holds ONE policy instance for its whole
+        lifetime (see the module docstring — that persistence is deliberate,
+        it is what gives correct open-loop chunk replay WITHIN an episode),
+        and `select_action()` pops from `_action_queue` and only runs a real
+        forward pass when the queue is empty.
+
+        So whatever remained in the queue when an episode ended — typically
+        most of a chunk, since episodes stop on success/termination rather
+        than on a chunk boundary — was replayed as the first actions of the
+        next episode, computed from the previous episode's observation and
+        the previous episode's instruction. Episodes are ordered by variant,
+        so that contaminated across variants: precisely the axis SLAVA
+        measures. Affects pi0/pi0.5/SmolVLA; OpenVLA-OFT is unaffected because
+        its chunk queue lives in the orchestrator as a per-episode local.
+        """
+        self.policy.reset()
+
     @torch.inference_mode()
     def predict(self, instruction: str, obs: dict, meta: dict) -> list[float]:
         from lerobot.common.control_utils import predict_action

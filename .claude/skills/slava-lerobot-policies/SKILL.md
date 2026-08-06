@@ -507,6 +507,41 @@ numbers for these families actually matter scientifically, the real fix is
 a bridge-finetuned checkpoint, not more layout archaeology — raise it with
 the user rather than tuning silently.
 
+## FIXED 2026-08-06 (audit): the policy's action queue was never reset between episodes
+
+This server holds ONE policy instance for its whole lifetime — deliberate, and
+documented at the top of `lerobot_server.py` as what gives correct open-loop
+chunk replay *within* an episode. The part that was missed: `select_action()`
+pops from `_action_queue` and only runs a real forward pass once that queue is
+empty, and nothing ever called `policy.reset()` between episodes. Episodes stop
+on success/termination, not on a chunk boundary, so a partly-drained chunk was
+normal at episode end — and those leftover actions, computed from the PREVIOUS
+episode's observation and the PREVIOUS episode's instruction, were executed as
+the opening actions of the next episode.
+
+Why this one is worse than it sounds: `run_rollouts.py` iterates a model's
+prompts grouped by variant, so the contamination flows across instruction
+variants — precisely the comparison SLAVA exists to make. Affects pi0, pi0.5
+and SmolVLA. OpenVLA-OFT is unaffected: its chunk queue is a per-episode local
+(`pending_actions`) in the orchestrator, not policy state. GreenVLA is
+unaffected too — its `select_action()` returns the whole chunk on every call
+(that is why `predict_chunk` reshapes and slices to `action_horizon=2`), so it
+holds nothing between calls.
+
+Fix: `LerobotBackend.reset()` calls `self.policy.reset()` (lerobot's own
+per-episode hook, the one their eval loops call on every `env.reset()`), exposed
+via `base_server.py`'s `/reset` and invoked by the orchestrator right after each
+env reset.
+
+**Data collected before 2026-08-06 carries this contamination**, including the
+LIBERO episodes for all three models. It was NOT the cause of the near-0% SR
+(that was the camera swap, see above), but it is a real confound in any
+variant-to-variant comparison from those runs and the affected episodes should
+be re-collected before those numbers are used. Note this is a separate issue
+from the SimplerEnv camera-slot staleness already declared in
+`data/rollout_provenance.json` — decide with the user whether to add a second
+exclusion rule there or simply rerun.
+
 ## Still open / not yet investigated
 
 - **NEW, unexplained (found 2026-08-05 once the camera-swap fix's full

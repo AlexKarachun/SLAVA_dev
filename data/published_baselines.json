@@ -1,0 +1,69 @@
+{
+  "_README": [
+    "Success rates the model authors themselves report, for the sanity check in the report:",
+    "does our harness reproduce a known number on en_canonical?",
+    "",
+    "This is the single most load-bearing check in the whole pilot. If our English baseline",
+    "lands near the published one, the harness is doing what it should and the cross-lingual",
+    "numbers mean something. If it does not, no downstream comparison can be trusted, and",
+    "saying so is more useful than a plausible-looking table.",
+    "",
+    "Rules for this file:",
+    "  * every number must have a `source` a reader can open. Never fill one in from memory.",
+    "  * `comparable` says how directly the published number can be set against ours: our",
+    "    subset of scenes is NOT the authors' evaluation suite, so most of these are",
+    "    'indicative' rather than a like-for-like reproduction.",
+    "  * a model with no published number for our exact setup gets null, not a guess."
+  ],
+  "baselines": {
+    "OpenVLA-OFT": {
+      "sr": 0.97,
+      "label": "~97%",
+      "scope": "их собственная оценка этого же чекпойнта на LIBERO",
+      "source": "openvla-oft (moojink), LIBERO.md / OFT paper; зафиксировано в .claude/skills/slava-openvla-oft",
+      "comparable": "indicative"
+    },
+    "GreenVLA-R0": {
+      "sr": 0.333,
+      "label": "33.3% success / 91.7% pick",
+      "scope": "Cubes, SimplerEnv WidowX",
+      "source": "arXiv:2602.00919, Table 4; зафиксировано в .claude/skills/slava-greenvla",
+      "comparable": "indicative"
+    },
+    "GreenVLA-R1 (bridge)": {
+      "sr": 0.729,
+      "label": "72.9%",
+      "scope": "SimplerEnv WidowX Bridge, entire average",
+      "source": "GreenVLA model card / paper; зафиксировано в .claude/skills/slava-greenvla",
+      "comparable": "indicative"
+    },
+    "GreenVLA-R2 (bridge, RL-aligned)": {
+      "sr": 0.805,
+      "label": "80.5% entire / 94.5% partial",
+      "scope": "SimplerEnv WidowX Bridge",
+      "source": "HF model card SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge; зафиксировано в .claude/skills/slava-greenvla",
+      "comparable": "indicative"
+    },
+    "pi0": {
+      "sr": null,
+      "label": null,
+      "scope": null,
+      "source": "не зафиксировано: авторского числа именно для lerobot/pi0_libero_finetuned на нашем наборе сцен у нас нет",
+      "comparable": "none"
+    },
+    "pi0.5": {
+      "sr": null,
+      "label": null,
+      "scope": null,
+      "source": "не зафиксировано, см. pi0",
+      "comparable": "none"
+    },
+    "SmolVLA": {
+      "sr": null,
+      "label": null,
+      "scope": null,
+      "source": "не зафиксировано, см. pi0",
+      "comparable": "none"
+    }
+  }
+}

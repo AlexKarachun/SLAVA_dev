@@ -426,8 +426,8 @@ before either finished.
 ## `normalization_mode`: real asymmetry in R0's config, real drift, but NOT the SR explanation (2026-08-05)
 
 Investigated after R0 finished its rotation-fix rerun at 0/28 with all 28
-episodes labeled `unclear` and `first_contact_object=null` — i.e. R0 never
-touched anything, while the paper (arXiv:2602.00919, Table 4) reports R0 at
+episodes showing `first_contact_object=null` — i.e. R0 never touched
+anything, while the paper (arXiv:2602.00919, Table 4) reports R0 at
 **91.7% pick / 33.3% success on Cubes**. That gap (91.7% pick → 0% contact)
 is not "a generalist checkpoint underperforms"; it demanded a mechanism.
 
@@ -650,10 +650,14 @@ explanation; the frame bug is the one that hits all three stages equally.
 ## Still open
 
 - **R0/R1 rerun with the gripper fix completed (2026-08-05, 28/28 each) —
-  result is honest and mixed, not a clean win like R2.** R0: 0/28 SR, and
-  all 28 episodes labeled `unclear` — consistent with the *already
+  result is honest and mixed, not a clean win like R2.** R0: 0/28 SR, with
+  `first_contact_object=null` on all 28 — consistent with the *already
   re-checked* freezing symptom below, i.e. the gripper fix did NOT resolve
-  R0's freezing. R1: 0/28 raw SR too, but a categorically different and
+  R0's freezing. (Those 28 carried the label `unclear` until the 2026-08-06
+  audit; that was an artifact of the labeler, not a statement about R0 —
+  `no_action_or_timeout` was unreachable on SimplerEnv. They are now labeled
+  `no_action_or_timeout`, which says the same thing the raw signal always
+  did. See `slava-model-rollouts`, "Data-integrity audit".) R1: 0/28 raw SR too, but a categorically different and
   healthier pattern — `target_grounding_error`×7 + `relation_binding_error`
   ×16, meaning real contact and real (if unsuccessful) stacking attempts
   are happening, unlike R0. So the fix clearly helped R1's *behavior*
@@ -667,7 +671,7 @@ explanation; the frame bug is the one that hits all three stages equally.
   gripper fix, this is the more likely remaining explanation, not a
   further code bug.
 - **R0's freezing symptom — re-checked with the gripper fix in place,
-  STILL PRESENT** (see point above: 28/28 `unclear` post-fix). The gripper
+  STILL PRESENT** (see point above: 28/28 with no contact at all post-fix). The gripper
   controller theory (half-executing every close command causing apparent
   "freezing") is therefore not the (sole) explanation either — R0 remains
   the weakest of the three stages, consistent with its embodiment-check

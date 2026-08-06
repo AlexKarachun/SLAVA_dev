@@ -40,7 +40,8 @@ def label_episode(
     final_object_poses: dict[str, list[float]],
     success_predicates: list[dict[str, Any]],
     step_count: int,
-    max_steps: int,
+    ran_to_completion: bool = True,
+    max_steps: Optional[int] = None,
 ) -> dict[str, Any]:
     """Compute the auto-labeled fields of one rollout_annotations.jsonl row.
 
@@ -55,6 +56,25 @@ def label_episode(
         физически не получилось.
       no_action_or_timeout: нет осмысленного действия.
       unclear: невозможно уверенно определить.
+
+    `ran_to_completion` — did the episode get its full allotted horizon (the
+    environment declared `done`, or the orchestrator's outer cap was reached)?
+    False only when an episode was cut short for an unrelated reason (crash,
+    HTTP error, orchestrator kill), where "the model failed to act" is not a
+    claim the data supports.
+
+    `max_steps` is accepted but no longer used for labeling, and is kept only
+    so old call sites don't break. It USED to gate the timeout branch as
+    `step_count >= max_steps`, which was an environment-dependent bug:
+    schema.MAX_EPISODE_STEPS is our OUTER safety cap, not the environment's
+    real horizon. SimplerEnv's gymnasium TimeLimit fires at its registered
+    per-task horizon (e.g. 60 for StackGreenCubeOnYellowCube) while our cap is
+    120, so the condition was unreachable there and every no-contact episode
+    fell through to `unclear`. The dataset showed the artifact cleanly:
+    SimplerEnv had 0 `no_action_or_timeout` and 115 `unclear`, LIBERO had 199
+    and 0 — a perfect split by environment, i.e. a property of this function
+    rather than of the models. Termination is now expressed directly by
+    `ran_to_completion` instead of being inferred from a step budget.
     """
     success = bool(env_success)
     final_relation_success = _resolve_relation_success(
@@ -78,13 +98,30 @@ def label_episode(
 
     if success:
         failure_type_auto = "success"
-    elif step_count <= 1 or first_contact_object is None:
-        failure_type_auto = "no_action_or_timeout" if step_count >= max_steps else "unclear"
+    elif step_count <= 1:
+        # Degenerate: the episode produced essentially no trajectory at all.
+        failure_type_auto = "unclear"
+    elif first_contact_object is None:
+        # Never touched any task object. If the policy got its whole horizon,
+        # that is task.md's "нет осмысленного действия"; if the episode was cut
+        # short by an error, we cannot attribute anything and say so.
+        failure_type_auto = "no_action_or_timeout" if ran_to_completion else "unclear"
     elif forbidden_object_touched:
+        # NOTE (precedence is a real judgement call, not an oversight): this
+        # sits above target_grounding_error, and `forbidden_object_touched`
+        # uses "touched at any point" while `wrong_object` uses "first
+        # contact". So an episode that correctly grasps the target and only
+        # later brushes the negated object still lands here. That matches
+        # task.md's own wording ("робот тронул forbidden object", no ordering
+        # qualifier) and keeps the negation axis conservative — but it does
+        # mean negation_error counts are an upper bound. Both raw signals stay
+        # in the row (`first_contact_object`, `forbidden_object_touched`), so a
+        # stricter rule can be recomputed without re-running anything. Revisit
+        # during the mandatory first-100 manual audit.
         failure_type_auto = "negation_error"
     elif wrong_object:
         failure_type_auto = "target_grounding_error"
-    elif relation is not None and reference_object is not None and not success:
+    elif relation is not None and reference_object is not None:
         # target contact was correct; relation unmet. task.md distinguishes
         # reference_grounding_error (wrong reference) from relation_binding_error
         # (right target+reference, wrong spatial relation) — telling these apart
@@ -94,10 +131,9 @@ def label_episode(
         # (target+reference both grounded correctly, per contact evidence) and
         # flag for the mandatory first-100 manual audit rather than guess.
         failure_type_auto = "relation_binding_error"
-    elif not success:
-        failure_type_auto = "physical_execution_error"
     else:
-        failure_type_auto = "unclear"
+        # Right target, no relation to get wrong (open/turn_on-style tasks).
+        failure_type_auto = "physical_execution_error"
 
     return {
         "success": success,

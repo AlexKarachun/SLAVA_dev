@@ -130,6 +130,9 @@ ensure_env slava-libero 3.8.13
   --extra-index-url https://download.pytorch.org/whl/cu113
 "${CONDA_BIN}" run -n slava-libero python -m pip install -e "${LIBERO_ROOT}"
 "${CONDA_BIN}" run -n slava-libero python -m pip install huggingface_hub
+# D5 env-worker (src/slava_rollout/env_worker_libero.py) serves HTTP from this env.
+# flask<3 because this env is pinned to Python 3.8.
+"${CONDA_BIN}" run -n slava-libero python -m pip install 'flask<3'
 
 LIBERO_CONFIG_DIR="${LIBERO_CONFIG_PATH:-${HOME}/.libero}"
 "${CONDA_BIN}" run -n slava-libero python "${PROJECT_ROOT}/scripts/configure_libero.py" \
@@ -193,6 +196,8 @@ ensure_env slava-simpler 3.10
 "${CONDA_BIN}" run -n slava-simpler python -m pip install \
   -e "${SIMPLER_ROOT}/ManiSkill2_real2sim"
 "${CONDA_BIN}" run -n slava-simpler python -m pip install -e "${SIMPLER_ROOT}"
+# D5 env-worker (src/slava_rollout/env_worker_simpler.py) serves HTTP from this env.
+"${CONDA_BIN}" run -n slava-simpler python -m pip install flask
 # Run pins after editable installs: their resolvers otherwise upgrade NumPy / setuptools.
 "${CONDA_BIN}" run -n slava-simpler python -m pip install \
   'setuptools<81' 'numpy==1.24.4' 'opencv-python<4.10'
@@ -200,6 +205,14 @@ ensure_env slava-simpler 3.10
 
 "${CONDA_BIN}" run -n slava-notebook python -c \
   "import pandas, ipywidgets, PIL; print('Notebook imports OK')"
+
+# D5 orchestrator + env-workers: fail here rather than mid-run.
+"${CONDA_BIN}" run -n slava-notebook python -c \
+  "import requests; print('Orchestrator imports OK')"
+"${CONDA_BIN}" run -n slava-libero python -c \
+  "import flask; print('LIBERO env-worker imports OK')"
+"${CONDA_BIN}" run -n slava-simpler python -c \
+  "import flask; print('SimplerEnv env-worker imports OK')"
 "${CONDA_BIN}" run -n slava-libero python -c \
   "import libero, robosuite, torch, imageio; print('LIBERO imports OK')"
 "${CONDA_BIN}" run -n slava-simpler python -c \

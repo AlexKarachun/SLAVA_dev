@@ -49,6 +49,18 @@ class ModelClient:
     def __init__(self, base_url: str):
         self.base_url = base_url
 
+    def reset(self) -> None:
+        """Tell the model-server a new episode is starting.
+
+        Must be called after every env reset: a model-server process serves
+        many episodes, and a policy holding per-episode state (lerobot's
+        internal action queue) would otherwise carry the previous episode's
+        instruction and observation into the next one. See base_server.py's
+        `/reset` for the full rationale.
+        """
+        resp = requests.post(f"{self.base_url}/reset", timeout=60)
+        resp.raise_for_status()
+
     def predict(self, instruction: str, obs: dict[str, Any], meta: dict[str, Any]) -> list[float]:
         """`obs` is the env-worker's raw obs dict (agentview_rgb, wrist_rgb,
         proprioception, and env-specific extras like ee_pose/gripper_closedness

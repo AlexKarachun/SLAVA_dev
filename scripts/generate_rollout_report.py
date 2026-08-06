@@ -12,11 +12,15 @@ import argparse
 import csv
 import json
 import statistics
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from slava_rollout.provenance import partition  # noqa: E402
+
 DATA_DIR = PROJECT_ROOT / "data"
 ROLLOUTS_DIR = PROJECT_ROOT / "rollouts"
 
@@ -233,120 +237,82 @@ def compute_behavioral_pilot_by_model(annotations: list[dict[str, Any]]) -> dict
     return {model: compute_behavioral_pilot(rows) for model, rows in sorted(by_model.items())}
 
 
-def compute_language_effect(behavioral: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    def sr(variant: str) -> Optional[float]:
-        return behavioral.get(variant, {}).get("sr")
+def compute_language_effect(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Δlang for ONE model's annotation rows, paired scene-by-scene.
 
-    sr_en_canonical = sr("en_canonical")
+    Takes raw annotation rows rather than a pre-aggregated per-variant table,
+    because the pairing has to happen at scene level and a table of marginal
+    success rates has already thrown that information away.
 
-    def gap(variant: str) -> Optional[float]:
-        v = sr(variant)
-        if sr_en_canonical is None or v is None:
-            return None
-        return sr_en_canonical - v
+    This function used to accept the pooled per-variant table and was also
+    called once across ALL models at once. Two things were wrong with that:
 
-    gap_en_paraphrase = gap("en_paraphrase")
+      * pooling models — the mix is not the same for every variant (coverage
+        differs per model), so the pooled per-variant SRs are weighted
+        differently and their difference is not a language effect. Concretely,
+        pooled Δlang_ru_literal came out at +11.4 п.п. while per-model values
+        ranged 0 to +50: models with ~0% SR in every language contribute
+        Δlang≈0 by construction and dilute the models that actually show the
+        effect.
+      * unpaired variants — see slava_rollout.stats.delta_lang.
+    """
+    from slava_rollout.stats import delta_lang, outcomes_by_variant
 
-    def delta_lang(variant: str) -> Optional[float]:
-        g = gap(variant)
-        if g is None or gap_en_paraphrase is None:
-            return None
-        return g - gap_en_paraphrase
-
-    rows = [
-        {"effect": "gap_en_paraphrase", "formula": "SR_en_canonical − SR_en_paraphrase", "value": gap_en_paraphrase},
-        {"effect": "gap_ru_literal", "formula": "SR_en_canonical − SR_ru_literal", "value": gap("ru_literal")},
-        {"effect": "Δlang_ru_literal", "formula": "gap_ru_literal − gap_en_paraphrase", "value": delta_lang("ru_literal")},
-        {"effect": "Δlang_ru_free_order", "formula": "gap_ru_free_order − gap_en_paraphrase", "value": delta_lang("ru_free_order")},
-        {"effect": "Δlang_ru_negation", "formula": "gap_ru_negation − gap_en_paraphrase", "value": delta_lang("ru_negation")},
-        {"effect": "Δlang_code_switch", "formula": "gap_code_switch − gap_en_paraphrase", "value": delta_lang("code_switch")},
-    ]
-    return rows
+    by_variant = outcomes_by_variant(rows)
+    out: list[dict[str, Any]] = []
+    for variant in ("mt_russian", "ru_literal", "ru_free_order", "ru_case_swap",
+                    "ru_negation", "code_switch"):
+        d = delta_lang(by_variant, variant)
+        if d is None:
+            continue
+        out.append(
+            {
+                "effect": f"Δlang_{variant}",
+                "formula": f"gap_{variant} − gap_en_paraphrase",
+                "value": d["value"],
+                "n_scenes": d["n_scenes"],
+                "ci": d["ci"],
+                "p": d["p_mcnemar_vs_anchor"],
+            }
+        )
+    return out
 
 
 # --------------------------------------------------------------------------
 # Data provenance
 # --------------------------------------------------------------------------
 
-# Each model family is served by one model-server file. Episodes collected
-# *before* that file's last bug fix were produced by different inference code
-# than episodes collected after it, so pooling them measures nothing well
-# defined — and it specifically confounds the cross-lingual comparison, which
-# contrasts prompt variants *within* one model. The last-modified time of the
-# server file is the cutoff; an episode's provenance is the mtime of its first
-# saved frame (frames are rewritten whenever an episode is re-run, so this
-# survives directory reuse, unlike the episode directory's own mtime).
-MODEL_SERVER_FILE = {
-    "OpenVLA-OFT": "openvla_oft_server.py",
-    "pi0": "lerobot_server.py",
-    "pi0.5": "lerobot_server.py",
-    "SmolVLA": "lerobot_server.py",
-    "GreenVLA-R0": "greenvla_server.py",
-    "GreenVLA-R1 (bridge)": "greenvla_server.py",
-    "GreenVLA-R2 (bridge, RL-aligned)": "greenvla_server.py",
-}
-
-
-# Provenance is keyed on the model-server file's mtime, which is a proxy for
-# "when did this model's inference behaviour last change". The proxy is
-# imperfect in one direction: an edit that touches the file WITHOUT changing
-# inference (a comment, a path-resolution default, a docstring) bumps mtime and
-# falsely invalidates good episodes. That happened on 2026-08-06, when making
-# openvla_oft_server.py's third-party paths portable marked all 99 of its valid
-# LIBERO episodes stale.
-#
-# The fix used there was to reset that file's mtime to just before its earliest
-# episode, because its last *behavioural* change (the gripper post-processing
-# fix) genuinely predates that run. Recording it here because silently touching
-# mtimes to make data pass a validity check is indistinguishable from fudging
-# results unless the reason is written down: only do this when you can name the
-# specific edit and say why it cannot affect inference, and never to rescue
-# episodes that a real behavioural change actually invalidated.
-def annotate_provenance(annotations: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
-    """Tag each annotation with `_stale` (collected before its model-server's
-    last fix) and return per-model {n, n_stale} counts."""
-    servers_dir = PROJECT_ROOT / "scripts" / "model_servers"
-    cutoff: dict[str, float] = {}
-    for model, fname in MODEL_SERVER_FILE.items():
-        path = servers_dir / fname
-        if path.exists():
-            cutoff[model] = path.stat().st_mtime
-
-    episodes_root = ROLLOUTS_DIR / "episodes"
-    stats: dict[str, dict[str, int]] = {}
-    for row in annotations:
-        model = row["model"]
-        entry = stats.setdefault(model, {"n": 0, "n_stale": 0})
-        entry["n"] += 1
-        row["_stale"] = False
-        if model not in cutoff:
-            continue
-        frames = sorted((episodes_root / row["run_id"] / "camera" / "agentview").glob("step_*.png"))
-        if not frames:
-            continue  # no evidence either way; don't accuse it of being stale
-        if frames[0].stat().st_mtime < cutoff[model]:
-            row["_stale"] = True
-            entry["n_stale"] += 1
-    return stats
-
-
 # --------------------------------------------------------------------------
 # Camera demo gallery
 # --------------------------------------------------------------------------
 
 def _frames_to_gif(
-    frame_paths: list[Path], dest: Path, fps: int = 10, max_frames: int = 40, size: int = 192
+    frame_paths: list[Path], dest: Path, fps: int = 20, max_frames: int = 100, size: int = 192
 ) -> None:
-    """Subsample + downscale before encoding: the gallery now shows many more
-    episodes than it used to, so per-GIF weight matters for page load (the
-    whole report ships as static assets on GitHub Pages)."""
+    """Subsample + downscale before encoding: the gallery shows many episodes,
+    so per-GIF weight matters for page load (the whole report ships as static
+    assets on GitHub Pages).
+
+    Playback was raised from 10fps/40 frames to 20fps/100 frames: at 40 frames a
+    300-step LIBERO episode was subsampled ~8:1, which turned a smooth reach
+    into a stutter and made the two failure modes we most need to tell apart —
+    a frozen arm and an arm reaching but missing — look alike. 50ms/frame is
+    also the safe floor for GIF timing, since browsers treat delays under that
+    inconsistently."""
     from PIL import Image
 
     if len(frame_paths) > max_frames:
         step = len(frame_paths) / max_frames
         frame_paths = [frame_paths[int(i * step)] for i in range(max_frames)]
+    # Quantise to an adaptive 128-colour palette before encoding. GIF is
+    # palette-based anyway, so letting Pillow pick the palette per episode
+    # costs nothing visible on these renders and roughly halves the file —
+    # which matters once the frame count went up: the gallery is ~100 GIFs
+    # shipped as static assets.
     imgs = [
-        Image.open(p).convert("RGB").resize((size, size), Image.LANCZOS) for p in frame_paths
+        Image.open(p).convert("RGB").resize((size, size), Image.LANCZOS)
+        .convert("P", palette=Image.ADAPTIVE, colors=128)
+        for p in frame_paths
     ]
     dest.parent.mkdir(parents=True, exist_ok=True)
     imgs[0].save(
@@ -437,11 +403,11 @@ def build_camera_gallery(
             wrist_frames = sorted(wrist_dir.glob("step_*.png")) if wrist_dir.exists() else []
 
             agent_gif = assets_dir / row["run_id"] / "agentview.gif"
-            _frames_to_gif(agent_frames, agent_gif)
+            _frames_to_gif(agent_frames, agent_gif, max_frames=50, size=160)
             wrist_rel = None
             if wrist_frames:
                 wrist_gif = assets_dir / row["run_id"] / "wrist.gif"
-                _frames_to_gif(wrist_frames, wrist_gif)
+                _frames_to_gif(wrist_frames, wrist_gif, max_frames=50, size=160)
                 wrist_rel = str(wrist_gif.relative_to(assets_dir.parent))
 
             items.append(
@@ -605,11 +571,20 @@ def render_html(
         for r in rows:
             v = r["value"] or 0
             css = "pos" if v > 0 else ("neg" if v < 0 else "")
-            parts.append(f"<tr><td>{r['effect']}</td><td class=\"{css}\">{fmt_delta(r['value'])}</td></tr>")
+            lo, hi = r.get("ci", (None, None))
+            ci_txt = "—" if lo is None else f"[{100*lo:+.0f}; {100*hi:+.0f}]"
+            p = r.get("p")
+            p_txt = "—" if p is None else (f"{p:.3f}" if p >= 0.001 else "&lt;0.001")
+            parts.append(
+                f"<tr><td>{r['effect']}</td><td>{r.get('n_scenes','—')}</td>"
+                f"<td class=\"{css}\">{fmt_delta(r['value'])}</td>"
+                f"<td>{ci_txt}</td><td>{p_txt}</td></tr>"
+            )
         return "".join(parts)
 
     language_effect_by_model_sections = "".join(
-        f"<h3>{model}</h3><table class=\"data-table\"><thead><tr><th>Effect</th><th>Value</th></tr></thead>"
+        f"<h3>{model}</h3><table class=\"data-table\"><thead><tr><th>Effect</th>"
+        f"<th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead>"
         f"<tbody>{_lang_effect_rows_html(rows)}</tbody></table>"
         for model, rows in language_effect_by_model.items()
         if any(r["value"] is not None for r in rows)
@@ -785,11 +760,19 @@ def render_html(
   Положительный Δlang значит, что соответствующая RU/code-switch ось теряет SR сильнее, чем можно было бы
   объяснить простым перефразированием на английском (en_paraphrase) — то есть эффект специфичен для языка,
   не просто "непривычная формулировка".</p>
-  <table class="data-table"><thead><tr><th>Effect</th><th>Formula</th><th>Value</th></tr></thead>
-  <tbody>{language_rows}</tbody></table>
+  <div class="warn"><b>Единой таблицы «по всем моделям» здесь нет намеренно.</b>
+  Пуллинг моделей в один Δlang даёт величину, которая ничего не измеряет: покрытие
+  по вариантам у моделей разное, поэтому пулинговые SR разных вариантов взвешены
+  по-разному, а модели с SR≈0 во всех языках механически дают Δlang≈0 и размывают
+  тех, у кого эффект есть (пулинговый Δlang<sub>ru_literal</sub> = +11.4 п.п. против
+  разброса 0…+50 п.п. по моделям). Ниже — только разбивка по моделям.</p></div>
 
-  <h3>Δlang по моделям</h3>
-  <p class="muted">Пуллинг по вариантам в таблице выше смешивает разные подмножества моделей/сцен (см. оговорку в разделе 4) — разбивка по модели ниже честнее для интерпретации.</p>
+  <h3>Δlang по моделям (парное сравнение)</h3>
+  <p class="muted">Каждый вариант сравнивается с <code>en_canonical</code> и
+  <code>en_paraphrase</code> только на общих для всех трёх сценах — колонка «парных сцен».
+  CI — парный бутстрап по сценам, p — точный тест Мак-Немара против
+  <code>en_canonical</code>; прочерк в p означает отсутствие дискордантных пар,
+  то есть данных для суждения нет.</p>
   {language_effect_by_model_sections or '<p class="muted">Недостаточно данных.</p>'}
 </section>
 
@@ -837,13 +820,15 @@ def main() -> None:
     args = parser.parse_args()
 
     annotations = load_jsonl(ROLLOUTS_DIR / "rollout_annotations.jsonl")
-    provenance = annotate_provenance(annotations)
-    # Models whose episodes span an inference-code change are not a single
-    # measurement: drop them from every aggregate metric rather than pooling
-    # two configurations. They stay listed in the provenance table so the
-    # exclusion is visible instead of silent.
-    mixed = {m for m, s in provenance.items() if s["n_stale"]}
-    valid = [r for r in annotations if r["model"] not in mixed]
+    # Validity is declared in data/rollout_provenance.json, not inferred from
+    # file mtimes (see slava_rollout.provenance for what went wrong with that).
+    valid, excluded_rows, rules = partition(annotations)
+    provenance = {}
+    for row in annotations:
+        entry = provenance.setdefault(row["model"], {"n": 0, "n_stale": 0})
+        entry["n"] += 1
+    for row in excluded_rows:
+        provenance[row["model"]]["n_stale"] += 1
 
     data_overview = build_data_overview()
     setup = build_setup_overview()
@@ -851,9 +836,12 @@ def main() -> None:
     coverage = build_coverage(setup, annotations)
     behavioral = compute_behavioral_pilot(valid)
     behavioral_by_model = compute_behavioral_pilot_by_model(valid)
-    language_effect = compute_language_effect(behavioral)
+    language_effect = []  # pooled Δlang intentionally not reported — see render_html
+    by_model_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in valid:
+        by_model_rows[row["model"]].append(row)
     language_effect_by_model = {
-        model: compute_language_effect(table) for model, table in behavioral_by_model.items()
+        model: compute_language_effect(rows) for model, rows in sorted(by_model_rows.items())
     }
     assets_dir = (args.output.parent / "report_assets") if args.for_pages else None
     gallery = build_camera_gallery(annotations, assets_dir=assets_dir)
@@ -866,9 +854,8 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(html, encoding="utf-8")
     print(f"Wrote {args.output} ({len(annotations)} annotations, {len(valid)} used in metrics)")
-    for model, s in sorted(provenance.items()):
-        flag = "  <-- EXCLUDED (mixed inference code)" if s["n_stale"] else ""
-        print(f"  {model:35s} n={s['n']:4d} stale={s['n_stale']:4d}{flag}")
+    for rule in rules:
+        print(f"  exclusion {rule.get('id','unnamed'):50s} {rule.get('n_matched',0):4d} episodes")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,35 @@
+{
+  "_README": [
+    "Which collected episodes must NOT be aggregated into reported metrics, and why.",
+    "",
+    "Read by src/slava_rollout/provenance.py, used by both report generators.",
+    "This file is the single place that decides what counts as valid data, on",
+    "purpose: it is version-controlled, reviewable in a diff, and identical on",
+    "every machine. It replaced an mtime-based heuristic that gave different",
+    "answers on different machines for the same dataset (see that module's",
+    "docstring for the specific failure).",
+    "",
+    "Add an exclusion when episodes were collected with inference code that has",
+    "since been found wrong, and the rerun has not happened yet. Each entry must",
+    "name the bug, the evidence, and what would clear it. Remove the entry only",
+    "after the affected episodes have actually been re-collected — not because",
+    "the code was fixed.",
+    "",
+    "Selectors (all optional, combined with AND; at least one is required):",
+    "  models       list of `model` display names, as written in the annotations",
+    "  environment  \"LIBERO\" or \"SimplerEnv\"",
+    "  variants     list of instruction-variant names",
+    "  run_ids      explicit list of run_ids"
+  ],
+  "exclusions": [
+    {
+      "id": "pi0-family-simplerenv-pre-basewrist-camera-fix",
+      "models": ["pi0", "pi0.5"],
+      "environment": "SimplerEnv",
+      "reason": "Collected before the _BASE_WRIST_CAMERA_NAME_MAP fix in scripts/model_servers/lerobot_server.py. WidowX/bridge has no wrist camera, and the previous positional camera assignment let the lone real (exterior) frame be consumed by the `left_wrist_0_rgb` slot, leaving `base_0_rgb` -- the slot these checkpoints treat as the main view -- empty, with `right_wrist_0_rgb` filled by a duplicated frame. The policy was therefore looking at the scene in a slot it was trained to treat as a wrist closeup.",
+      "evidence": "Camera-slot convention confirmed against openpi's own reference input adapters (physical-intelligence/openpi, src/openpi/policies/{droid,aloha}_policy.py): base_0_rgb is always the exterior camera and a genuinely missing camera is omitted, not duplicated. Full write-up in .claude/skills/slava-lerobot-policies/SKILL.md.",
+      "affects": "56 episodes (28 pi0 + 28 pi0.5)",
+      "clears_when": "these 56 episodes are re-collected on a GPU machine with the current lerobot_server.py; the fix is already in the code, only the data is stale"
+    }
+  ]
+}

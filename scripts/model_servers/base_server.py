@@ -52,6 +52,29 @@ def serve(backend: Backend, port: int) -> None:
     def health():
         return jsonify({"ok": True, "model": backend.display_name, "checkpoint": backend.checkpoint})
 
+    @app.route("/reset", methods=["POST"])
+    def reset():
+        """Drop any per-episode state the policy is holding.
+
+        A model-server process outlives every episode it serves, so anything a
+        policy caches between calls survives across episode boundaries unless
+        it is explicitly cleared. That is not hypothetical here: lerobot
+        policies (pi0/pi0.5/SmolVLA) keep an internal `_action_queue` and only
+        run a real forward pass when it runs dry — so the tail of one episode's
+        action chunk would be executed as the opening actions of the NEXT
+        episode, which is a different scene AND a different instruction
+        variant. Since episodes are ordered by variant, that leaks across
+        exactly the comparison this benchmark exists to make.
+
+        Backends without per-episode state just don't define `reset()`.
+        """
+        try:
+            if hasattr(backend, "reset"):
+                backend.reset()
+            return jsonify({"ok": True, "reset": hasattr(backend, "reset")})
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
+
     @app.route("/predict", methods=["POST"])
     def predict():
         payload = request.get_json(force=True)

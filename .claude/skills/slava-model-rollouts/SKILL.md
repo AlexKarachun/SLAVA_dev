@@ -332,6 +332,122 @@ model** (first 2 scenes in that model's environment(s), in prompts_v0.jsonl
 order) and **only the `en_canonical` variant** — fast end-to-end check of
 env-worker + model-server + logging before the full 127-prompt run.
 
+## Porting to different hardware — what is a V100 workaround, not a design choice
+
+Everything in this project has only ever run on 4×Tesla V100-32GB (Volta,
+cc 7.0, **no bf16 tensor cores**). Several fixes in the code exist solely
+because of that and are a needless cost on Ampere or newer. If you are reading
+this on an A100/H100/RTX-40xx, review these four before trusting the setup —
+none of them will fail loudly on newer hardware, they will just quietly waste
+time or memory:
+
+| Workaround | Where | Why it exists | On cc≥8.0 |
+| --- | --- | --- | --- |
+| `torch.backends.cudnn.enabled = False` | top of `lerobot_server.py` | SigLIP's patch-embedding Conv2d hits `GET was unable to find an engine` on this GPU/cuDNN/torch combination | **Remove it.** Disabling cuDNN globally forces the slower native conv path for every model in that process |
+| `policy_cfg.dtype = "float32"` | `LerobotBackend.__init__` | pi0.5 defaults to bf16, which Volta has no tensor cores for — a hard crash here, not a slowdown | Drop the override and let the checkpoint use bf16; faster and lower memory |
+| `torch==2.7.1+cu126` pin | `bootstrap_models.sh` | newer official wheels support only cc≥7.5 | Free to move to current torch |
+| `compile_model=False` | `LerobotBackend.__init__` | Triton/`torch.compile` fails on this Volta+torch combination | Re-enable if you run many episodes; it is a throughput win once JIT cost amortizes |
+
+The observation/action-side fixes (camera slot mapping, proprioception frame,
+gripper range/polarity, rotation representation, action truncation) are **not**
+hardware-dependent — they are about matching each checkpoint's training
+convention and must be kept everywhere.
+
+Memory sizing is also V100-shaped: `stop_model()` unloads each model-server
+before the next loads because 32GB could not hold several. With 80GB you can
+keep more resident and parallelise across models rather than serialising —
+but load sequentially even then (see the concurrent-load caveat below).
+
+## Data-integrity audit (2026-08-06) — five defects and how to not reintroduce them
+
+Run before handing results to anyone. Each of these produced plausible-looking
+numbers, which is what made them dangerous: none of them crashed, and none
+were visible in the output.
+
+**1. Never let file mtimes decide what data is valid.** The report used to
+infer "was this episode collected before the last bug fix?" by comparing the
+episode's first frame mtime against the model-server file's mtime. mtimes do
+not survive `git clone`, `tar -x`, `rsync` without `-t`, or a container
+rebuild, and a comment-only edit bumps them. Measured consequence on identical
+annotations: the committed report was built from 182 episodes (GreenVLA
+R0/R1/R2 + OpenVLA-OFT), regenerating after a fresh clone gave 396 (GreenVLA-R2
++ SmolVLA + pi0 + pi0.5) — the two models carrying the headline result silently
+dropped out, and it had already required a manual mtime reset once to rescue 99
+valid episodes. Replaced by `data/rollout_provenance.json` + `slava_rollout.
+provenance`: exclusions are declared as data, with a reason and a
+`clears_when`, reviewable in a diff and identical everywhere. **If you exclude
+episodes, say so in that file, never by touching the filesystem.**
+
+**2. A label threshold that is unreachable in one environment.** The failure
+ladder decided timeout via `step_count >= max_steps`, but `MAX_EPISODE_STEPS`
+is our OUTER cap, while SimplerEnv's gymnasium `TimeLimit` fires at each task's
+registered horizon (60 for StackGreenCubeOnYellowCube) — so on SimplerEnv the
+condition was never true and every no-contact episode became `unclear` instead
+of `no_action_or_timeout`. The dataset showed it perfectly: SimplerEnv 0 vs 115,
+LIBERO 199 vs 0. **A metric that splits cleanly along an infrastructural
+boundary is a bug until proven otherwise** — check every derived field for
+correlation with environment/model/machine before believing it. Termination is
+now passed in explicitly (`ran_to_completion`), not inferred from a step budget.
+
+**3. Derived labels must be recomputable, never hand-edited.** Fixing #2
+invalidated the labels on 550 already-collected episodes. Re-running GPU
+episodes to fix a labeling bug is absurd; editing labels by hand is
+indistinguishable from fudging. `scripts/relabel_rollouts.py` recomputes them
+from each episode's raw `steps.jsonl`, prints the transition table, and refuses
+to write if `success` changes (that value comes from the environment, so if it
+moves, the raw data and the annotations disagree — a data problem, not a
+labeling one). It reported exactly one transition class: 115 × `unclear` →
+`no_action_or_timeout`. **Log enough raw signal per step that any derived field
+can be rebuilt later** — that is what made this recoverable.
+
+**4. Unpaired comparison of a paired design.** task.md specifies "парный
+дизайн (одна сцена/сид, разные инструкции)", but Δlang was computed from
+marginal per-variant success rates. Coverage is genuinely ragged —
+`ru_case_swap` is authored for only 8 of 20 scenes (the rest legitimately
+`axis_na`), and partial runs left some models with different scene sets per
+variant — so those marginals describe different scene populations and their
+difference mixes composition with language. Worse, the long-form report pooled
+all models into one Δlang: pooled `Δlang_ru_literal` = +11.4 п.п. against a
+per-model range of 0…+50, because models at ~0% SR in every language
+contribute Δlang≈0 by construction and dilute the rest. Now in
+`slava_rollout.stats`: every comparison runs on the anchor ∩ control ∩ variant
+scene intersection, with a paired bootstrap that resamples SCENES, plus an
+exact McNemar test (task.md asks for it explicitly). Effect on the headline:
+OpenVLA-OFT ru_literal Δlang = +37.5 п.п., CI [+12;+62], p=0.031 — and
+code_switch +6.2, p=1.000, which is the interesting contrast. GreenVLA-R1's
+former "+50 п.п." is now correctly shown as 4 scenes, CI [0;100], p=1.000.
+
+**5. Per-episode state inside a long-lived model-server.** A model-server
+outlives every episode it serves. lerobot policies keep an internal
+`_action_queue` and only run a real forward pass when it empties, so the tail
+of one episode's chunk was executed as the opening actions of the next —
+a different scene AND a different instruction variant, and since episodes run
+grouped by variant, that leaked across the exact axis being measured. There is
+now a `/reset` endpoint (`base_server.py`) called by the orchestrator after
+every env reset. **Any state a backend caches between `predict()` calls needs
+an explicit per-episode reset**; ask this of every new backend.
+
+Also fixed while in there: SAPIEN contacts are now impulse-filtered
+(`scene.get_contacts()` returns zero-force pairs too, which made
+`first_contact_object` fire on near-misses and mis-attribute
+`target_grounding_error`), and the terminal frame is saved (the loop stored the
+pre-action observation and broke on success, so no success GIF ever showed the
+completed task).
+
+### Regression tests
+
+`tests/` runs on a bare `python3`, no pip install, by design — this repository
+is handed to other people:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+`test_auto_label.py` pins the label ladder (including that both environments
+agree); `test_stats.py` pins Wilson/McNemar against published values and
+asserts the composition confound from #4 cannot come back. Extend these rather
+than re-deriving the rules from prose.
+
 ## What's still open / needs the user when they're back
 
 - Whether `first_contact_object`/contact-based auto-labeling holds up —

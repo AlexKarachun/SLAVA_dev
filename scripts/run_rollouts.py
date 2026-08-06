@@ -273,6 +273,11 @@ def run_episode(
     max_steps = MAX_EPISODE_STEPS[environment]
 
     reset_resp = env_client.reset(build_reset_payload(prompt, model_key))
+    # Clear any per-episode state the policy is holding before it sees this
+    # episode's first observation (lerobot's internal action queue would
+    # otherwise replay the previous episode's chunk here — see
+    # scripts/model_servers/base_server.py's /reset).
+    model_client.reset()
     obs = reset_resp["obs"]
     meta = {"task_uid": prompt["task_uid"], "suite": prompt.get("suite"), "environment": environment}
 
@@ -281,6 +286,14 @@ def run_episode(
     final_object_poses: dict[str, list[float]] = {}
     env_success = False
     step_count = 0
+    # Did the policy get its full allotted horizon? True once the environment
+    # reports `done` (its own TimeLimit/termination) or we exhaust the outer
+    # cap. Passed to label_episode instead of the old `step_count >= max_steps`
+    # test, which was environment-dependent: SimplerEnv's native per-task
+    # horizon (e.g. 60) fires well below our 120 cap, so that test could never
+    # be true there and every no-contact episode was mislabeled `unclear`
+    # instead of `no_action_or_timeout` (see auto_label.label_episode docstring).
+    ran_to_completion = False
     # Action-chunk queue: drained one env-step at a time; refilled by a new
     # /predict_chunk call once empty. Length 1 for every backend except
     # OpenVLA-OFT (see clients.py::predict_chunk / openvla_oft_server.py) —
@@ -330,7 +343,28 @@ def run_episode(
             )
 
             if step_resp.get("done") or env_success:
+                ran_to_completion = True
                 break
+        else:
+            # Exhausted the orchestrator's outer cap without the environment
+            # terminating first — also a full horizon from the policy's side.
+            ran_to_completion = True
+
+        # Terminal frame. The loop above saves the observation the model SAW
+        # before acting, so without this the last saved frame is one action
+        # short of the final state — and since the loop breaks the moment
+        # `env_success` flips, the frame showing the completed task was never
+        # written at all. Every success GIF in the report used to stop just
+        # before succeeding.
+        save_png(
+            decode_png_b64(obs["agentview_rgb"]),
+            camera_dir(run_id, "agentview") / f"step_{step_count + 1:04d}.png",
+        )
+        if has_wrist and obs.get("wrist_rgb"):
+            save_png(
+                decode_png_b64(obs["wrist_rgb"]),
+                camera_dir(run_id, "wrist") / f"step_{step_count + 1:04d}.png",
+            )
 
     env_client.close()
 
@@ -346,7 +380,7 @@ def run_episode(
         final_object_poses=final_object_poses,
         success_predicates=prompt.get("success_predicates") or [],
         step_count=step_count,
-        max_steps=max_steps,
+        ran_to_completion=ran_to_completion,
     )
 
     record = {
