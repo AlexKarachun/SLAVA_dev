@@ -34,6 +34,16 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ROLLOUTS = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0"
+LABEL_SHORT = {
+    "success": "успех",
+    "target_grounding_error": "не тот target",
+    "reference_grounding_error": "не тот reference",
+    "relation_binding_error": "не то отношение",
+    "negation_error": "нарушил запрет",
+    "physical_execution_error": "физика",
+    "no_action_or_timeout": "не двигался",
+    "unclear": "непонятно",
+}
 LABELS = [
     "success", "target_grounding_error", "reference_grounding_error",
     "relation_binding_error", "negation_error", "physical_execution_error",
@@ -138,7 +148,12 @@ def sparkline(values: list[float]) -> str:
 
 
 def render(sample: list[dict]) -> str:
-    options = "".join(f'<option value="{label}">{label}</option>' for label in LABELS)
+    # One click, not two: a row of buttons rather than a <select>, because the
+    # reviewer goes through 100 cards and every extra click is paid 100 times.
+    options = "".join(
+        f'<button type="button" data-value="{label}">{LABEL_SHORT.get(label, label)}</button>'
+        for label in LABELS
+    )
     cards = []
     for index, record in enumerate(sample, start=1):
         run_id = record["run_id"]
@@ -181,12 +196,11 @@ def render(sample: list[dict]) -> str:
     <dt>контакты за эпизод</dt><dd>{contacts}</dd>
   </dl>
   <div class="verdict">
-    <label>успех
-      <select class="v-success"><option value="">?</option><option value="true">да</option><option value="false">нет</option></select>
-    </label>
-    <label>метка
-      <select class="v-label"><option value="">?</option>{options}</select>
-    </label>
+    <div class="seg v-success">
+      <button type="button" class="ok" data-value="true">успех</button>
+      <button type="button" class="bad" data-value="false">провал</button>
+    </div>
+    <div class="seg v-label">{options}</div>
     <input class="v-note" placeholder="заметка">
   </div>
 </article>""")
@@ -211,7 +225,13 @@ def render(sample: list[dict]) -> str:
  .auto dt {{ color: #888; }}
  .spark {{ width: 240px; height: 28px; vertical-align: middle; }}
  .spark polyline {{ fill: none; stroke: #2a7; stroke-width: 1.5; }}
- .verdict {{ display: flex; gap: 12px; align-items: center; margin-top: 10px; }}
+ .verdict {{ display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }}
+ .seg {{ display: flex; gap: 4px; flex-wrap: wrap; }}
+ .seg button {{ font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid #bbb;
+                border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }}
+ .seg button:hover {{ border-color: #2a7; }}
+ .seg button.on {{ background: #2a7; border-color: #2a7; color: #fff; font-weight: 600; }}
+ .v-success button.on.bad {{ background: #c33; border-color: #c33; }}
  .v-note {{ flex: 1; }}
  .done {{ border-color: #2a7; background: #f6fffa; }}
  #bar {{ position: sticky; top: 0; z-index: 5; background: #fff; padding: 10px 0;
@@ -264,6 +284,22 @@ cards.forEach(card => {{
 document.getElementById('autoplay').addEventListener('change', e =>
   cards.forEach(c => e.target.checked ? play(c) : stop(c)));
 
+function selected(card, group) {{
+  const on = card.querySelector('.' + group + ' button.on');
+  return on ? on.dataset.value : '';
+}}
+function select(card, group, value) {{
+  card.querySelectorAll('.' + group + ' button').forEach(b =>
+    b.classList.toggle('on', value !== '' && b.dataset.value === value));
+}}
+cards.forEach(card => card.querySelectorAll('.seg button').forEach(button =>
+  button.addEventListener('click', () => {{
+    const group = button.parentElement.classList.contains('v-success') ? 'v-success' : 'v-label';
+    // Clicking the active choice clears it — otherwise a misclick is unfixable.
+    select(card, group, selected(card, group) === button.dataset.value ? '' : button.dataset.value);
+    refresh();
+  }})));
+
 document.addEventListener('keydown', e => {{
   if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
   if (e.key !== '1' && e.key !== '2') return;
@@ -272,20 +308,20 @@ document.addEventListener('keydown', e => {{
     return r.top < window.innerHeight / 2 && r.bottom > window.innerHeight / 2;
   }});
   if (!card) return;
-  card.querySelector('.v-success').value = e.key === '1' ? 'true' : 'false';
+  select(card, 'v-success', e.key === '1' ? 'true' : 'false');
   refresh();
 }});
 
 function collect() {{
-  return cards.filter(c => c.querySelector('.v-success').value).map(c => ({{
+  return cards.filter(c => selected(c, 'v-success')).map(c => ({{
     run_id: c.dataset.runId,
-    success: c.querySelector('.v-success').value === 'true',
-    failure_type_manual: c.querySelector('.v-label').value || null,
+    success: selected(c, 'v-success') === 'true',
+    failure_type_manual: selected(c, 'v-label') || null,
     note: c.querySelector('.v-note').value || null,
   }}));
 }}
 function refresh() {{
-  cards.forEach(c => c.classList.toggle('done', !!c.querySelector('.v-success').value));
+  cards.forEach(c => c.classList.toggle('done', !!selected(c, 'v-success')));
   document.getElementById('count').textContent = collect().length;
   localStorage.setItem('slava_label_review', JSON.stringify(collect()));
 }}
@@ -294,8 +330,8 @@ document.addEventListener('input', refresh);
 JSON.parse(localStorage.getItem('slava_label_review') || '[]').forEach(v => {{
   const c = cards.find(c => c.dataset.runId === v.run_id);
   if (!c) return;
-  c.querySelector('.v-success').value = String(v.success);
-  c.querySelector('.v-label').value = v.failure_type_manual || '';
+  select(c, 'v-success', String(v.success));
+  select(c, 'v-label', v.failure_type_manual || '');
   c.querySelector('.v-note').value = v.note || '';
 }});
 refresh();
