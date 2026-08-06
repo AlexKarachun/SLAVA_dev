@@ -1,0 +1,121 @@
+---
+name: slava-budget-pacing
+description: Work within the remaining token/rate-limit budget so a long or unattended session never dies mid-task — where to read the current budget, what to do in each band of remaining budget, and the cheap-vs-expensive alternatives for common operations (subagents, waiting, GPU runs, reading files, reports). Use when starting long autonomous work, when the budget line says the window is filling, or when deciding whether an expensive step is affordable now.
+---
+
+# Working inside the budget
+
+The failure this prevents: a session that runs out of budget in the middle of a
+task, leaving half-finished edits, an uncommitted working tree and no record of
+what was being done. Running out is not an accident to be discovered — it is a
+predictable event to be planned around.
+
+## Two different budgets, do not confuse them
+
+**Context window** — how much of *this conversation* fits. Running out triggers
+compaction: work continues, but detail is lost, so anything not written to disk
+may quietly disappear. Fix: write state to files, not to the chat.
+
+**Rate limit (5-hour and weekly)** — how much you may spend *at all*. Running
+out stops the session until the window resets. Fix: pace, and stop cleanly
+before zero.
+
+Both are visible in the same place.
+
+## Where to read the budget
+
+The `UserPromptSubmit` hook injects a line at the start of every user turn:
+context percentage, 5-hour limit, weekly limit, reset times, and the age of the
+data. Mid-turn — during long autonomous stretches, where no user prompt fires —
+read the cache yourself:
+
+```bash
+python3 -c "
+import json,pathlib,time
+d=json.loads((pathlib.Path.home()/'.claude/usage-cache.json').read_text())
+print(d.get('rate_limits'), d.get('context_window',{}).get('used_percentage'),
+      'возраст', int(time.time()-d['_cached_at']), 'с')"
+```
+
+The cache is written by the status line after every turn (`~/.claude/statusline-usage.sh`).
+**Check the age.** If it is minutes old you are pacing against numbers that no
+longer hold; if the file is missing, assume you are blind and behave as if the
+budget were low.
+
+## Bands: what to do with what is left of the 5-hour window
+
+| Осталось | Режим | Что делать |
+| --- | --- | --- |
+| >50% | обычный | Работать нормально. Можно субагенты, широкий поиск, тяжёлые проверки. |
+| 30-50% | экономный | Сначала дешёвый путь (см. таблицу ниже). Новые ветки исследования — только если они на критическом пути. |
+| 15-30% | завершающий | Никаких новых задач. Доделать текущую единицу работы, прогнать тесты, закоммитить, записать состояние. |
+| <15% | парковка | Остановиться сознательно: коммит, запись состояния в файл, затем ждать сброса (или отдать управление пользователю). Не начинать ничего, что не влезет. |
+
+Проценты — ориентир, а не закон: единица работы, которая обычно стоит 10%
+окна, при остатке 20% рискованна, потому что оценка у вас грубая. Правило
+простое: **никогда не начинайте то, чего заведомо не хватит доделать.**
+
+## Дешёвый путь против дорогого
+
+| Задача | Дорого | Дёшево |
+| --- | --- | --- |
+| Понять состояние данных | Прочитать несколько JSONL целиком | Один `python3 -c` со сводкой; печатать агрегаты, а не строки |
+| Найти место в коде | Читать файлы подряд | `grep -n` с узким паттерном, потом `Read` с `offset`/`limit` |
+| Проверить, что правка применилась | Перечитать файл | Ничего: `Edit` упал бы, если бы не применилась |
+| Разобрать вопрос вширь | Спавнить субагентов | Сделать инлайн: субагент стартует «холодным» и заново выводит контекст, который у вас уже есть |
+| Дождаться прогона на GPU | Опрашивать в цикле каждую минуту | Один фоновый `until <условие>; do sleep 60; done` — одно уведомление на событие |
+| Большой вывод команды | `cat`/полный лог | `tail -5`, `grep -c`, счётчики |
+| Отчёт/дашборд | Регенерировать после каждой мелкой правки | Накопить правки, собрать один раз (локальный CPU бесплатен, а вот чтение вывода — нет) |
+
+Отдельно про субагентов: **они тратят тот же лимит, что и вы.** Параллельность
+не делает работу дешевле — она делает её быстрее и дороже. При остатке ниже
+половины окна субагент оправдан только если задача действительно изолирована и
+её результат — короткая сводка, а не пересказ файлов, которые вы и так читали.
+
+## Кейсы
+
+**1. Тяжёлая задача не влезает в остаток.** Не начинать. Записать её в
+`docs/OPEN_ISSUES.md` или в бэклог сессии одной строкой с тем, что уже
+известно, и взяться за то, что влезает. Половина рефакторинга хуже, чем его
+отсутствие.
+
+**2. Есть длинная задача на внешнем железе.** Запустить прогон на GPU и ждать —
+ожидание само по себе токенов не стоит. Ставить одно фоновое ожидание с
+условием выхода, а не опрос в цикле: каждая проверка это ход, а ход это
+токены. Пока считает — не занимать себя параллельной дорогой работой, если
+остаток мал.
+
+**3. Лимит почти выбран, а работа осмысленная осталась.** Закоммитить, записать
+состояние, поставить пробуждение на время сброса (`ScheduleWakeup` в
+`/loop`-режиме) и подождать. Сутки автономной работы — это не сутки непрерывной
+генерации, это несколько окон с паузами между ними.
+
+**4. Пользователь вернётся и захочет работать.** Не выбирать окно досуха:
+оставлять запас, иначе человек упрётся в лимит, который выбрал агент. Это
+причина, по которой верхний порог автономной работы — не 100%.
+
+**5. Контекст заполняется быстрее лимита.** Признак того, что в чат тащится
+то, чему место в файлах: длинные выводы, полные файлы, повторные чтения.
+Переносить промежуточные результаты в файлы и ссылаться на них, а не
+пересказывать. Перед компактификацией — записать на диск то, что нельзя
+потерять.
+
+**6. Данные о бюджете протухли или их нет.** Вести себя как при низком остатке:
+доделать текущее, закоммитить, не начинать крупное. Слепая уверенность дороже
+осторожности.
+
+**7. Прогон вот-вот упрётся в сброс окна.** Если до сброса меньше, чем нужно на
+единицу работы, — выгоднее подождать сброса и начать с полным окном, чем
+начать сейчас и прерваться на середине.
+
+**8. Ночная смена без пользователя.** Планировать работу единицами размером в
+один коммит: сделал — проверил — закоммитил — записал строку в журнал. Тогда
+любой обрыв стоит максимум одной единицы, а утром видно, что происходило.
+Полномочия на коммит и пуш в таком режиме выданы (см. `AGENTS.md`).
+
+## Что записывать перед паузой
+
+Одна запись в конце файла состояния (например `docs/OPEN_ISSUES.md` или журнал
+смены): что сделано, что следующее, где остановились и почему. Достаточно,
+чтобы следующая сессия — или вы сами после компактификации — продолжили без
+переоткрытия. Это дешевле, чем восстанавливать контекст по diff'у.
