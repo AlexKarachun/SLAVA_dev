@@ -250,6 +250,11 @@ python3 scripts/relabel_rollouts.py --write
 
 | Симптом | Где написано |
 | --- | --- |
+| **SR≈0 у pi0/pi0.5 — проверить ПЕРВЫМ делом** | `slava-lerobot-policies` → «transformers out of lerobot's pin». Версия вне пина грузит модель без башни зрения и только предупреждает. Проверка: `grep -cE "Could not load state dict\|Missing key" rollouts/logs/model_server_*.log` — не ноль означает, что числа этого прогона недействительны |
+| `did not become healthy in 600.0s` | смотреть `rollouts/logs/model_server_*.log`, а не лог оркестратора: почти всегда это упавший на старте сервер — нехватка пакета или `torch.OutOfMemoryError` |
+| `401 ... restricted` при старте pi0/pi0.5 | gated-репозиторий `google/paligemma-3b-pt-224`: принять лицензию на HF **и** авторизоваться. Токен в `~/.bashrc` неинтерактивным шеллам не виден — нужен `hf auth login`, проверять `hf auth whoami`, не `echo` |
+| GPU загружены на 1-30%, кажется что всё стоит | так и должно быть у pi0-семейства из-за чанкинга действий. Мерить прогресс эпизодами в минуту, а не `nvidia-smi`; см. `slava-lerobot-policies` → «Throughput» |
+| Мало шардов / OOM при старте | там же: SmolVLA ~1.15 ГБ на шард (влезает 8), pi0/pi0.5 в bf16 ~10 ГБ (влезает **2** на 24 ГБ) |
 | SR=0% у модели, которая по статье работает | `slava-model-rollouts` → «Debugging low SR» |
 | Специфика OpenVLA-OFT / pi0 / pi0.5 / SmolVLA / GreenVLA | одноимённые `slava-*` skills |
 | Метрика подозрительно коррелирует со средой или моделью | `slava-model-rollouts` → «Data-integrity audit» |

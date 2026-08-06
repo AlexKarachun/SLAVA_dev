@@ -507,6 +507,111 @@ numbers for these families actually matter scientifically, the real fix is
 a bridge-finetuned checkpoint, not more layout archaeology — raise it with
 the user rather than tuning silently.
 
+## FIXED 2026-08-06: `transformers` out of lerobot's pin loaded pi0/pi0.5 with NO vision tower
+
+**The single highest-impact bug found so far, and the one most worth learning
+the shape of: a dependency version drift that lerobot reports as a `Warning`
+and then continues.** pi0's en_canonical SR went from 2/99 to 3/7 once fixed —
+i.e. the model had never actually been evaluated, only its language stack had.
+
+What happens: `lerobot/pyproject.toml` pins `transformers>=5.4.0,<5.6.0`.
+Installing a bare `transformers` (which is what a "just make the import work"
+fix does) pulls the newest release. Newer transformers renamed SigLIP's
+state-dict keys — `vision_tower.vision_model.*` became `vision_tower.*`. On
+load, every vision-tower key therefore misses, and lerobot prints:
+
+```
+WARNING:root:Vision embedding key might need handling: ...patch_embedding.weight
+Warning: Could not load state dict: Error(s) in loading state_dict for PI05Policy:
+    Missing key(s) in state_dict: "...vision_tower.embeddings.patch_embedding.weight", ...
+```
+
+and **carries on**. The server comes up, `/health` returns 200, episodes run to
+completion, annotations are written. Every prediction was made by a randomly
+initialised vision encoder. The failure signature downstream is
+`no_action_or_timeout` on nearly every episode — a model that "does nothing",
+which reads exactly like a weak policy rather than a broken load.
+
+Diagnostic, cheap, run it after ANY dependency change:
+
+```bash
+grep -cE "Could not load state dict|Missing key|might need handling" \
+  rollouts/logs/model_server_*.log
+```
+
+Nonzero for a pi0-family server means the numbers from that run are void.
+SmolVLA is unaffected by this particular rename (SmolVLM backbone, not SigLIP)
+— its logs showed 0 — so do not assume one healthy model clears the others.
+
+Fixed in `scripts/bootstrap_models.sh`, which now reads the constraint out of
+lerobot's own `pyproject.toml` rather than hardcoding a version, so it tracks
+the pin instead of drifting from it again.
+
+**The general lesson for whoever reads this next.** Three separate defects this
+session were of one kind: something was wrong, the code logged it at
+warning-or-lower, and execution continued to produce plausible-looking data.
+The vision tower here; the too-short action vector that `action[:7]` truncated
+to a silent no-op; the mtime-based provenance that quietly changed which
+episodes counted. In an evaluation harness a warning that lets a run continue
+is worse than a crash, because a crash costs an hour and a warning costs the
+credibility of every number in the table. When you touch inference, prefer
+raising to logging, and check the model-server log for warnings before
+trusting a single SR.
+
+## Environment gotchas on a fresh GPU box (all hit 2026-08-06)
+
+Collected in one place because each of these cost 20+ minutes of rented server
+time, and every one of them will hit the next person to bootstrap from scratch.
+
+**Missing packages the model-servers import at module level.** `scipy`,
+`transformers`, `num2words` were absent in `slava-lerobot` on a clean machine.
+Symptom is not an obvious ImportError in the foreground: the model-server dies
+at startup, and the *orchestrator* reports
+`TimeoutError: http://127.0.0.1:PORT did not become healthy in 600.0s`. Read
+`rollouts/logs/model_server_*.log`, not the orchestrator log. All three are now
+installed by `bootstrap_models.sh`.
+
+**pi0/pi0.5 need a gated HuggingFace repo.** Their tokenizer is
+`google/paligemma-3b-pt-224`, which requires accepting Google's licence AND an
+authenticated token: `401 Access to model ... is restricted`. Two separate
+things — a valid token without accepted terms fails identically.
+
+**A token in `~/.bashrc` is invisible to the collection driver.** Ubuntu's
+`.bashrc` starts with `case $- in *i*) ;; *) return;; esac`, so a
+non-interactive shell — which is what `ssh host 'cmd'` and any detached
+`nohup` driver get — returns before reaching the export. `echo $HF_TOKEN`
+works when a human checks it and is empty where it matters. Fix is to put the
+token where `huggingface_hub` looks regardless of shell type:
+`hf auth login` (note: `huggingface-cli login` is the old spelling), which
+writes `$HF_HOME/token`. Verify with `hf auth whoami`, not with `echo`.
+
+## Throughput: the GPU is not the bottleneck, VRAM is
+
+A shard runs one episode at a time and spends most of it on CPU — MuJoCo/SAPIEN
+stepping, per-step PNG writes, HTTP round-trips — so one shard per card left two
+3090s at 23%. Throughput comes from more shards (`--num-shards N` with a
+distinct `--shard-index`, `CUDA_VISIBLE_DEVICES` and ports per shard), not from
+bigger batches.
+
+How many shards fit is set by VRAM per model-server, measured 2026-08-06:
+
+| model | VRAM per shard | shards per 24GB card |
+| --- | --- | --- |
+| SmolVLA (0.45B) | ~1.15 GB | 8 comfortably (both cards hit 99%) |
+| pi0 / pi0.5 in bf16 | ~9-10 GB | **2** — three OOMs at load |
+
+Three pi0.5 servers per card looked plausible on paper (6.6GB of weights) and
+failed in practice: activations and CUDA context push it to ~10GB. The failure
+is `torch.OutOfMemoryError` inside the model-server, which the orchestrator sees
+only as the 600s health timeout above. `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+helps at the margin, not by a whole extra copy.
+
+Counter-intuitive but real: with pi0-family models GPU utilisation stays at
+1-30% even when everything is healthy and throughput is ~5 episodes/min. That is
+action chunking doing its job — `predict_chunk` returns tens of actions, so the
+policy runs once per several dozen simulator steps. **Judge progress by episodes
+per minute, not by `nvidia-smi`.** Low utilisation here is not a symptom.
+
 ## FIXED 2026-08-06 (audit): the policy's action queue was never reset between episodes
 
 This server holds ONE policy instance for its whole lifetime — deliberate, and

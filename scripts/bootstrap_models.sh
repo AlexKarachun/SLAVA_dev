@@ -146,7 +146,19 @@ ensure_env slava-lerobot 3.12
 # lerobot model-server died on import and every episode waited out the 600s
 # health timeout. Declared explicitly for all three envs now (found 2026-08-06
 # on the first genuinely-from-scratch install).
-"${CONDA_BIN}" run -n slava-lerobot python -m pip install scipy flask requests
+# transformers must stay inside lerobot's own pin. Installing a bare
+# `transformers` here pulls the newest release, and the newest release
+# renames SigLIP's vision-tower state-dict keys
+# (`vision_tower.vision_model.*` -> `vision_tower.*`). pi0/pi0.5 then load
+# their checkpoint with the ENTIRE vision tower missing -- and lerobot only
+# warns about it, it does not raise, so the server comes up healthy and
+# every prediction is made by an untrained vision encoder. Caught 2026-08-06
+# with transformers 5.14.1 against the pinned range below.
+LEROBOT_TRANSFORMERS="$(grep -oE 'transformers>=[0-9.]+,<[0-9.]+' "${LEROBOT_ROOT}/pyproject.toml" | head -1)"
+LEROBOT_TRANSFORMERS="${LEROBOT_TRANSFORMERS:-transformers>=5.4.0,<5.6.0}"
+echo "lerobot pins: ${LEROBOT_TRANSFORMERS}"
+"${CONDA_BIN}" run -n slava-lerobot python -m pip install scipy flask requests \
+  num2words "${LEROBOT_TRANSFORMERS}"
 
 echo ""
 echo "Done. Sanity-check each env, e.g.:"
