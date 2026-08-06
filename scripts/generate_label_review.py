@@ -100,10 +100,16 @@ def frames(run_id: str, camera: str, count: int) -> list[str]:
     found = sorted(directory.glob("step_*.png"))
     if not found:
         return []
-    step = max(len(found) // count, 1)
-    picked = found[::step][:count]
-    if found[-1] not in picked:
-        picked.append(found[-1])
+    if len(found) <= count:
+        picked = found
+    else:
+        # Evenly spaced across the whole episode, first and last included.
+        # Taking every k-th frame and then appending the final one instead
+        # leaves one huge gap at the end — 88 frames sampled every 3rd jumps
+        # 70 → 88, which reads as the robot lurching at the last moment. The
+        # motion was smooth; the sampling was not.
+        last = len(found) - 1
+        picked = [found[round(i * last / (count - 1))] for i in range(count)]
     return [str(Path("..") / f.relative_to(PROJECT_ROOT)) for f in picked]
 
 

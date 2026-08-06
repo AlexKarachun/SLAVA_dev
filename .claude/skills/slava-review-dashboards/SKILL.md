@@ -83,6 +83,30 @@ State the anchoring cost out loud when handing the dashboard over — prefilling
 does bias a reviewer toward agreement, and that limitation belongs in whatever
 the pass reports, not just in the code.
 
+## Subsampling frames: uniform, first and last included
+
+An episode is 27–300 frames and a card shows ~24, so the frames are subsampled —
+and the obvious implementation is wrong in a way that looks like a robot
+malfunction. `found[::step]` plus "append the last frame if missing" leaves one
+huge gap at the end: 88 frames sampled every 3rd runs 1, 4, … 70, then jumps
+straight to 88. The reviewer sees smooth motion followed by a lurch and
+reasonably reports it as a physics or control problem.
+
+Space them evenly over the whole range instead, ends included:
+
+```python
+last = len(found) - 1
+picked = [found[round(i * last / (count - 1))] for i in range(count)]
+```
+
+Worth checking on the widest and narrowest episodes in the sample, not just one:
+after the fix the gap between consecutive shown frames varies by at most one
+step across all 100 cards.
+
+**The general trap:** any artefact of how the media is *displayed* will be read
+by the reviewer as a property of what was recorded. Playback rate, subsampling
+and frame ordering are part of the measurement instrument here, not cosmetics.
+
 ## Frames: relative paths, not base64
 
 Inlining ~24 frames × 100 episodes as data URIs produces a tens-of-megabytes
