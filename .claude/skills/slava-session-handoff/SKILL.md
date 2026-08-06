@@ -79,6 +79,16 @@ a data-contract decision task.md left unspecified that got resolved with
 the user (both of the above record their shape decisions). A one-off
 scene-specific fix belongs in that record's `notes` field, not a skill.
 
+**Sweep for what went right, not only for what broke.** The bar is the same
+(will this need doing again?), but the signals are different and easy to miss
+because nothing failed: something the user praised or told you to keep doing,
+a trick that visibly saved time or removed a risk, and any explanation you
+had to give the user more than once. All three are repeatable knowledge that
+otherwise dies with the chat — a later session then reinvents the approach,
+usually worse. Record the *why*, not the compliment: "the reviewer needs both
+cameras playing plus the evidence the labeller used, or they cannot disagree
+with it" is reusable; "the user liked the dashboard" is not.
+
 When updating an existing skill instead of writing a new one: prefer
 extending it over creating a near-duplicate. `slava-mt-russian` started as
 "how to run the DeepL pass" and grew a "how to switch provider" section
