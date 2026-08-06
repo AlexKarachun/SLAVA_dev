@@ -35,6 +35,18 @@
       "affects": "56 episodes (28 pi0 + 28 pi0.5)",
       "clears_when": "these 56 episodes are re-collected on a GPU machine with the current lerobot_server.py; the fix is already in the code, only the data is stale",
       "short_reason": "сняты с конфигурацией камер, не соответствующей этим чекпойнтам на WidowX/bridge; требуется пересъёмка"
+    },
+    {
+      "id": "smolvla-simplerenv-action-space-mismatch",
+      "models": [
+        "SmolVLA"
+      ],
+      "environment": "SimplerEnv",
+      "reason": "lerobot/smolvla_base is an SO-100 checkpoint, not a cross-embodiment base model. Its own config declares output_features['action'].shape == (6,) and its postprocessor ships unnormalization statistics keyed only to so100 / so100-red / so100-blue. SimplerEnv's WidowX/bridge controller takes 7 values (6 end-effector deltas + gripper) in an entirely different action space. Unlike pi0/pi0.5 -- whose declared 32-dim space IS a zero-padded universal one, so `action[:7]` is the documented exact inverse of training's pad_vector() -- there is no truncation or padding of a 6-dim SO-100 joint command that yields a valid WidowX command. Evaluating this pair zero-shot is not defined.",
+      "evidence": "PreTrainedConfig.from_pretrained('lerobot/smolvla_base').output_features == {'action': shape=(6,)}; the postprocessor's UnnormalizerProcessorStep carries only so100/so100-red/so100-blue action statistics; SimplerEnv's base_controller asserts action.shape == (7,). The 15 episodes collected for this pair are 0/15 successful with 9 labelled no_action_or_timeout, which is the signature of a command that means nothing to the robot rather than of a policy that tried and failed.",
+      "affects": "15 episodes (SmolVLA x SimplerEnv). SmolVLA's 99 LIBERO episodes are unaffected: HuggingFaceVLA/smolvla_libero is fine-tuned on that embodiment and declares the matching action space.",
+      "clears_when": "never for this checkpoint -- it would need a SmolVLA fine-tuned on bridge/WidowX, which is a different model, not a rerun",
+      "short_reason": "чекпойнт обучен на другом манипуляторе (SO-100) и не определён на WidowX/bridge: пара «модель × среда» не оценивается zero-shot"
     }
   ]
 }

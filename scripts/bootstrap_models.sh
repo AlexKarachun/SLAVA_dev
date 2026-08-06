@@ -107,7 +107,7 @@ ensure_env slava-greenvla 3.11
 "${CONDA_BIN}" run -n slava-greenvla python -m pip install \
   'torch==2.7.1' --index-url https://download.pytorch.org/whl/cu126
 "${CONDA_BIN}" run -n slava-greenvla python -m pip install -e "${GREENVLA_ROOT}"
-"${CONDA_BIN}" run -n slava-greenvla python -m pip install transforms3d flask requests
+"${CONDA_BIN}" run -n slava-greenvla python -m pip install transforms3d scipy flask requests
 
 # ---------------------------------------------------------------------------
 # slava-openvla (py3.10) — OpenVLA-OFT, scripts/model_servers/openvla_oft_server.py
@@ -127,7 +127,7 @@ ensure_env slava-openvla 3.10
 # mismatch, that warning is expected and harmless (tensorflow is never on the
 # actual inference path).
 "${CONDA_BIN}" run -n slava-openvla python -m pip install 'tensorflow>=2.16' 'protobuf>=6.31.1,<7'
-"${CONDA_BIN}" run -n slava-openvla python -m pip install flask requests
+"${CONDA_BIN}" run -n slava-openvla python -m pip install scipy flask requests
 
 # ---------------------------------------------------------------------------
 # slava-lerobot (py3.12) — pi0/pi0.5/SmolVLA, scripts/model_servers/lerobot_server.py
@@ -140,7 +140,13 @@ ensure_env slava-lerobot 3.12
 "${CONDA_BIN}" run -n slava-lerobot python -m pip install \
   'torch==2.7.1' --index-url https://download.pytorch.org/whl/cu126
 "${CONDA_BIN}" run -n slava-lerobot python -m pip install -e "${LEROBOT_ROOT}"
-"${CONDA_BIN}" run -n slava-lerobot python -m pip install flask requests
+# scipy: scripts/model_servers/*.py all do `from scipy.spatial.transform import
+# Rotation` at module level. It reached slava-greenvla/slava-openvla as a
+# transitive dependency and slava-lerobot not at all, so on a clean machine the
+# lerobot model-server died on import and every episode waited out the 600s
+# health timeout. Declared explicitly for all three envs now (found 2026-08-06
+# on the first genuinely-from-scratch install).
+"${CONDA_BIN}" run -n slava-lerobot python -m pip install scipy flask requests
 
 echo ""
 echo "Done. Sanity-check each env, e.g.:"

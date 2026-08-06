@@ -420,6 +420,23 @@ class LerobotBackend:
             # is the correct inverse, the same convention GreenVLA's own
             # `BridgeOutputsTransform` uses (`actions[:, :7]`) for the exact
             # same embodiment.
+            #
+            # This inverse is only valid when the declared space is a PADDED
+            # universal one, i.e. strictly wider than the robot's real 7. A
+            # narrower output means the checkpoint's action space is a
+            # different robot's, not a padded superset of this one, and there
+            # is no truncation (or padding) that turns it into a WidowX
+            # command — see the SmolVLA case in slava-lerobot-policies'
+            # architecture section. Refuse loudly instead of handing the
+            # controller something it will either reject or, worse, accept.
+            if action.shape[0] < 7:
+                raise RuntimeError(
+                    f"{self.checkpoint}: policy returned a {action.shape[0]}-dim action, "
+                    "but SimplerEnv/WidowX needs 7 (6 end-effector deltas + gripper). "
+                    "The checkpoint's action space is another embodiment's, not a padded "
+                    "superset of this one, so no reshaping of it is a valid WidowX command. "
+                    "This model/environment pair cannot be evaluated zero-shot."
+                )
             action = action[:7]
         return action.tolist()
 

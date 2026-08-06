@@ -286,38 +286,40 @@ def compute_language_effect(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # Camera demo gallery
 # --------------------------------------------------------------------------
 
-def _frames_to_gif(
-    frame_paths: list[Path], dest: Path, fps: int = 20, max_frames: int = 100, size: int = 192
-) -> None:
-    """Subsample + downscale before encoding: the gallery shows many episodes,
-    so per-GIF weight matters for page load (the whole report ships as static
-    assets on GitHub Pages).
+def _frames_to_clip(
+    frame_paths: list[Path], dest: Path, fps: int = 20, max_frames: int = 50,
+    size: int = 160, quality: int = 70,
+) -> Path:
+    """Write one episode as an animated clip. Returns the path actually written.
 
-    Playback was raised from 10fps/40 frames to 20fps/100 frames: at 40 frames a
-    300-step LIBERO episode was subsampled ~8:1, which turned a smooth reach
-    into a stutter and made the two failure modes we most need to tell apart —
-    a frozen arm and an arm reaching but missing — look alike. 50ms/frame is
-    also the safe floor for GIF timing, since browsers treat delays under that
-    inconsistently."""
+    Animated WebP, not GIF. These are photographic renders, which GIF's 256-colour
+    palette handles badly: the same 50-frame clip is ~370 KB as GIF and ~60 KB as
+    WebP at visually indistinguishable quality. That ratio decides whether the
+    report is publishable — a gallery of ~120 clips is ~60 MB in GIF and under
+    10 MB in WebP, and the whole site has to be checked out and served by GitHub
+    Pages on every deploy. Animated WebP is supported by every current browser
+    (Chrome 32+, Firefox 65+, Safari 14+).
+
+    Frames are subsampled to `max_frames` and downscaled first: a 300-step LIBERO
+    episode at full rate is neither readable nor necessary. 20fps (50ms/frame) is
+    the floor browsers time reliably.
+    """
     from PIL import Image
 
     if len(frame_paths) > max_frames:
         step = len(frame_paths) / max_frames
         frame_paths = [frame_paths[int(i * step)] for i in range(max_frames)]
-    # Quantise to an adaptive 128-colour palette before encoding. GIF is
-    # palette-based anyway, so letting Pillow pick the palette per episode
-    # costs nothing visible on these renders and roughly halves the file —
-    # which matters once the frame count went up: the gallery is ~100 GIFs
-    # shipped as static assets.
     imgs = [
         Image.open(p).convert("RGB").resize((size, size), Image.LANCZOS)
-        .convert("P", palette=Image.ADAPTIVE, colors=128)
         for p in frame_paths
     ]
+    dest = dest.with_suffix(".webp")
     dest.parent.mkdir(parents=True, exist_ok=True)
     imgs[0].save(
-        dest, save_all=True, append_images=imgs[1:], duration=int(1000 / fps), loop=0, optimize=True
+        dest, format="WEBP", save_all=True, append_images=imgs[1:],
+        duration=int(1000 / fps), loop=0, quality=quality, method=4,
     )
+    return dest
 
 
 def _pick_runs_for_model(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -358,7 +360,7 @@ def build_camera_gallery(
     """Render episode camera streams as animated GIFs, grouped per model.
 
     assets_dir: if given, each episode's agentview/wrist frame sequence is
-    written to assets_dir/<run_id>/*.gif — needed for GitHub Pages (rollouts/
+    written to assets_dir/<run_id>/*.webp — needed for GitHub Pages (rollouts/
     isn't in git) and because a rollout reads better as motion than as stills.
 
     Models with a non-zero SR get `per_working_model` episodes across different
@@ -402,13 +404,13 @@ def build_camera_gallery(
             wrist_dir = run_dir / "camera" / "wrist"
             wrist_frames = sorted(wrist_dir.glob("step_*.png")) if wrist_dir.exists() else []
 
-            agent_gif = assets_dir / row["run_id"] / "agentview.gif"
-            _frames_to_gif(agent_frames, agent_gif, max_frames=50, size=160)
+            # _frames_to_clip decides the container (and therefore the suffix),
+            # so take the path it actually wrote rather than assuming one.
+            agent_clip = _frames_to_clip(agent_frames, assets_dir / row["run_id"] / "agentview")
             wrist_rel = None
             if wrist_frames:
-                wrist_gif = assets_dir / row["run_id"] / "wrist.gif"
-                _frames_to_gif(wrist_frames, wrist_gif, max_frames=50, size=160)
-                wrist_rel = str(wrist_gif.relative_to(assets_dir.parent))
+                wrist_clip = _frames_to_clip(wrist_frames, assets_dir / row["run_id"] / "wrist")
+                wrist_rel = str(wrist_clip.relative_to(assets_dir.parent))
 
             items.append(
                 {
@@ -418,7 +420,7 @@ def build_camera_gallery(
                     "instruction": row["instruction"],
                     "success": row["success"],
                     "failure_type_auto": row["failure_type_auto"],
-                    "agent_gif": str(agent_gif.relative_to(assets_dir.parent)),
+                    "agent_gif": str(agent_clip.relative_to(assets_dir.parent)),
                     "wrist_gif": wrist_rel,
                 }
             )

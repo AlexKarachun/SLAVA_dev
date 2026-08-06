@@ -41,6 +41,17 @@ ROLLOUT_ANNOTATION_FIELDS = (
 # confirmed with the user for the SimplerEnv/bridge zero-shot risk — see AGENTS.md
 # "Текущее состояние проекта" decision log for sourcing/rationale. Re-verify if this
 # session is picked up much later; HF repos can move.
+#
+# WHICH CELLS OF THE GRID LEGALLY EXIST: docs/CHECKPOINTS.md — the model x robot
+# table, each entry checked against the checkpoint's own declared action/state
+# space rather than against a paper. Read it before adding an environment to any
+# model here. Two facts it exists to stop people re-deriving: LIBERO is a Franka
+# Panda and SimplerEnv is a WidowX (both take 7 numbers, but they are different
+# robots and different quantities), and a model having an environment installed
+# is not the same as a checkpoint existing for that robot. SmolVLA has no
+# SimplerEnv entry below for exactly that reason — `lerobot/smolvla_base` is an
+# SO-100 checkpoint declaring a 6-dim action space, so the pair is undefined,
+# not merely untested.
 MODEL_REGISTRY: dict[str, dict[str, Any]] = {
     "greenvla_r0": {
         "display_name": "GreenVLA-R0",
@@ -117,7 +128,16 @@ MODEL_REGISTRY: dict[str, dict[str, Any]] = {
         "backbone": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
         "environments": {
             "LIBERO": {"checkpoint": "HuggingFaceVLA/smolvla_libero", "zero_shot": False},
-            "SimplerEnv": {"checkpoint": "lerobot/smolvla_base", "zero_shot": True},
+            # No SimplerEnv entry, deliberately. There is no SmolVLA checkpoint for
+            # WidowX/bridge -- not in `lerobot`, not in `HuggingFaceVLA`, and the
+            # SmolVLA paper never evaluates on SimplerEnv/bridge either. The base
+            # checkpoint that used to sit here (`lerobot/smolvla_base`) is an SO-100
+            # model: it declares a 6-dim action space and ships unnormalization
+            # statistics keyed only to so100*, so its output is six SO-100 joint
+            # values, not six end-effector deltas plus a gripper. No truncation or
+            # zero-padding converts one into the other. See docs/CHECKPOINTS.md.
+            # Restoring this entry requires a bridge-finetuned checkpoint, not a
+            # code change.
         },
     },
 }

@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from generate_rollout_report import _frames_to_gif  # noqa: E402
+from generate_rollout_report import _frames_to_clip  # noqa: E402
 from slava_rollout.provenance import partition  # noqa: E402
 from slava_rollout.stats import (  # noqa: E402
     bootstrap_ci,
@@ -116,13 +116,14 @@ def build_variant_gallery(rows: list[dict[str, Any]], assets: Path) -> str:
             frames = _agentview_frames(r["run_id"])
             if len(frames) < 2:
                 continue
-            gif = assets / r["run_id"] / "variant.gif"
-            _frames_to_gif(frames, gif, max_frames=60, size=168)
+            clip = _frames_to_clip(
+                frames, assets / r["run_id"] / "variant", max_frames=60, size=168
+            )
             ok = r.get("success")
             outcome = "успех" if ok else esc(r.get("failure_type_auto") or "")
             cards += (
                 f"<figure class='vcard {'ok' if ok else 'bad'}'>"
-                f"<img src='{gif.relative_to(assets.parent)}'>"
+                f"<img src='{clip.relative_to(assets.parent)}' loading='lazy'>"
                 f"<figcaption><code>{esc(variant)}</code> — <b>{outcome}</b>"
                 f"<br><span class=ci>{esc(r['instruction'])}</span>"
                 f"<br><span class=ci>{len(frames)} шагов</span></figcaption></figure>"
