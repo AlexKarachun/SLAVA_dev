@@ -147,6 +147,10 @@ def sparkline(values: list[float]) -> str:
     return f'<svg class="spark" viewBox="0 0 240 28"><polyline points="{coords}"/></svg>'
 
 
+def esc_attr(value: str) -> str:
+    return str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+
+
 def render(sample: list[dict]) -> str:
     # One click, not two: a row of buttons rather than a <select>, because the
     # reviewer goes through 100 cards and every extra click is paid 100 times.
@@ -170,7 +174,9 @@ def render(sample: list[dict]) -> str:
             f'<img src="{src}" loading="lazy" data-i="{i}">' for i, src in enumerate(agent)
         )
         cards.append(f"""
-<article class="card" data-run-id="{run_id}" data-agent='{json.dumps(agent)}' data-wrist='{json.dumps(wrist)}'>
+<article class="card" data-run-id="{run_id}" data-agent='{json.dumps(agent)}' data-wrist='{json.dumps(wrist)}'
+         data-auto-success="{str(bool(record['success'])).lower()}"
+         data-auto-label="{esc_attr(record['failure_type_auto'] or '')}">
   <header>
     <span class="n">{index}/{len(sample)}</span>
     <span class="model">{record['model']}</span>
@@ -247,7 +253,7 @@ def render(sample: list[dict]) -> str:
   <strong>Проверено: <span id="count">0</span>/{len(sample)}</strong>
   <label><input type="checkbox" id="autoplay" checked> проигрывать</label>
   <button id="export">Скачать вердикты</button>
-  <span id="hint">1 — успех, 2 — провал (для карточки в центре экрана)</span>
+  <span id="hint">Enter — согласиться с автоматом и перейти дальше · 1 — успех · 2 — провал</span>
 </div>
 {''.join(cards)}
 <script>
@@ -292,36 +298,60 @@ function select(card, group, value) {{
   card.querySelectorAll('.' + group + ' button').forEach(b =>
     b.classList.toggle('on', value !== '' && b.dataset.value === value));
 }}
+// The automation's answer is pre-selected so agreeing costs one keystroke.
+// It does NOT count as reviewed until the human acts: otherwise every card
+// would look answered and the whole point of the pass — measuring how often
+// the labeller is wrong — would be measuring nothing. `reviewed` is the flag
+// that separates "I looked at this" from "I scrolled past it".
+function prefill(card) {{
+  select(card, 'v-success', card.dataset.autoSuccess);
+  select(card, 'v-label', card.dataset.autoLabel);
+}}
+function markReviewed(card) {{
+  card.dataset.reviewed = '1';
+}}
+cards.forEach(prefill);
+
 cards.forEach(card => card.querySelectorAll('.seg button').forEach(button =>
   button.addEventListener('click', () => {{
     const group = button.parentElement.classList.contains('v-success') ? 'v-success' : 'v-label';
     // Clicking the active choice clears it — otherwise a misclick is unfixable.
     select(card, group, selected(card, group) === button.dataset.value ? '' : button.dataset.value);
+    markReviewed(card);
     refresh();
   }})));
 
-document.addEventListener('keydown', e => {{
-  if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
-  if (e.key !== '1' && e.key !== '2') return;
-  const card = cards.find(c => {{
+function centreCard() {{
+  return cards.find(c => {{
     const r = c.getBoundingClientRect();
     return r.top < window.innerHeight / 2 && r.bottom > window.innerHeight / 2;
   }});
+}}
+document.addEventListener('keydown', e => {{
+  if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
+  if (!['1', '2', 'Enter'].includes(e.key)) return;
+  const card = centreCard();
   if (!card) return;
-  select(card, 'v-success', e.key === '1' ? 'true' : 'false');
+  e.preventDefault();
+  if (e.key !== 'Enter') select(card, 'v-success', e.key === '1' ? 'true' : 'false');
+  markReviewed(card);
   refresh();
+  const next = cards[cards.indexOf(card) + 1];
+  if (next) next.scrollIntoView({{behavior: 'smooth', block: 'center'}});
 }});
 
 function collect() {{
-  return cards.filter(c => selected(c, 'v-success')).map(c => ({{
+  return cards.filter(c => c.dataset.reviewed && selected(c, 'v-success')).map(c => ({{
     run_id: c.dataset.runId,
     success: selected(c, 'v-success') === 'true',
     failure_type_manual: selected(c, 'v-label') || null,
+    kept_auto: selected(c, 'v-success') === c.dataset.autoSuccess
+               && selected(c, 'v-label') === c.dataset.autoLabel,
     note: c.querySelector('.v-note').value || null,
   }}));
 }}
 function refresh() {{
-  cards.forEach(c => c.classList.toggle('done', !!selected(c, 'v-success')));
+  cards.forEach(c => c.classList.toggle('done', !!c.dataset.reviewed));
   document.getElementById('count').textContent = collect().length;
   localStorage.setItem('slava_label_review', JSON.stringify(collect()));
 }}
@@ -332,6 +362,7 @@ JSON.parse(localStorage.getItem('slava_label_review') || '[]').forEach(v => {{
   if (!c) return;
   select(c, 'v-success', String(v.success));
   select(c, 'v-label', v.failure_type_manual || '');
+  markReviewed(c);
   c.querySelector('.v-note').value = v.note || '';
 }});
 refresh();

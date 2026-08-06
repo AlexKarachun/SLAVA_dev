@@ -65,6 +65,24 @@ used on the card, next to the automation's answer:
 - **A visible counter and an explicit export button.** Progress in
   `localStorage` is not something an agent can read; the exported JSON is.
 
+## Prefilling the automation's answer: allowed, but never as the "done" signal
+
+The reviewer will ask for the automatic values to be pre-selected, and they are
+right that it is faster — most cards are correct, so agreeing should cost one
+keystroke, not a click per field. The trap is that a prefilled card looks
+answered, which would silently turn "how often is the labeller wrong" into "how
+often did the human bother to disagree".
+
+The shape that keeps both: prefill the controls, but track an explicit
+`reviewed` flag set only by a human action (Enter confirms as-is and scrolls to
+the next card; any click or `1`/`2` also sets it). Only reviewed cards go into
+the export, and each carries `kept_auto` so a later pass can separate "confirmed
+identical" from "edited". Progress counters count reviewed, not filled.
+
+State the anchoring cost out loud when handing the dashboard over — prefilling
+does bias a reviewer toward agreement, and that limitation belongs in whatever
+the pass reports, not just in the code.
+
 ## Frames: relative paths, not base64
 
 Inlining ~24 frames × 100 episodes as data URIs produces a tens-of-megabytes
