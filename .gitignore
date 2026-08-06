@@ -256,3 +256,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Служебное состояние счётчика бюджета (scripts/budget_log.py)
+docs/.budget_log_state.json
