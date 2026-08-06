@@ -199,13 +199,19 @@ def build_baseline_check(rows: list[dict[str, Any]]) -> str:
 
 
 def build_validation_banner(rows: list[dict[str, Any]]) -> str:
-    """Models whose English baseline does not reproduce, stated before anything else.
+    """What the reader must know before any number below: which models did not
+    reproduce their own published English baseline, and what we do about each.
 
     A model that cannot hit its own published number on the authors' own English
-    string is not measuring language: whatever is wrong sits in our pipeline, and
-    its Russian numbers would be an artefact of that. They are named here with
-    both figures and then left out of the analysis, rather than quietly carried
-    into tables where they would read as findings.
+    string is not measuring language — whatever is wrong sits in our pipeline.
+    But that does not make every such model equally uninformative, so
+    data/published_baselines.json carries an explicit `report_treatment` per
+    model (a judgement, not a threshold):
+
+      preliminary — English baseline is high enough that a collapse to zero on
+                    Russian is still an observation; shown, flagged.
+      excluded    — English baseline is too low to separate a language effect
+                    from a broken pipeline; no language analysis at all.
     """
     published = load_published_baselines()
     # A dedicated validation run, when one exists, replaces the pilot's own
@@ -215,43 +221,58 @@ def build_validation_banner(rows: list[dict[str, Any]]) -> str:
     validation: list[dict[str, Any]] = []
     if validation_path.is_file():
         validation = [json.loads(l) for l in open(validation_path, encoding="utf-8") if l.strip()]
-    failed = []
+
+    groups: dict[str, list[tuple[str, int, int, float]]] = {"preliminary": [], "excluded": []}
     for model in sorted({r["model"] for r in rows} | {r["model"] for r in validation}):
+        reference = (published.get(model) or {}).get("sr")
+        treatment = (published.get(model) or {}).get("report_treatment")
+        if reference is None or treatment not in groups:
+            continue
         en = [r for r in validation if r["model"] == model and r["variant"] == "en_canonical"]
         if not en:
             en = [r for r in rows if r["model"] == model and r["variant"] == "en_canonical"]
-        reference = (published.get(model) or {}).get("sr")
-        if not en or reference is None:
+        if not en:
             continue
         hits, total = sum(r["success"] for r in en), len(en)
-        low, high = wilson(hits, total)
-        if high - low > 0.40 or low <= reference <= high or hits / total >= reference:
-            continue
-        failed.append((model, hits, total, reference))
-    if not failed:
+        groups[treatment].append((model, hits, total, reference))
+    if not any(groups.values()):
         return ""
-    items = "".join(
-        f"<li><b>{esc(model)}</b> — у нас {hits}/{total} = {100 * hits / total:.0f}% "
-        f"на <code>en_canonical</code> против заявленных {100 * reference:.0f}%</li>"
-        for model, hits, total, reference in failed
-    )
-    return (
-        "<div class=banner><b>Результаты по этим моделям считаем недостоверными.</b>"
-        f"<ul>{items}</ul>"
+
+    def items(entries: list[tuple[str, int, int, float]]) -> str:
+        return "".join(
+            f"<li><b>{esc(model)}</b> — у нас {hits}/{total} = {100 * hits / total:.0f}% "
+            f"на <code>en_canonical</code> против заявленных {100 * reference:.0f}%</li>"
+            for model, hits, total, reference in entries
+        )
+
+    out = "<div class=banner><b>Валидацию стенда прошла одна модель из семи.</b>"
+    if groups["excluded"]:
+        out += (
+            "<p>Языковой анализ по этим моделям не приводится: их английская база слишком "
+            "низка, чтобы отличить языковой эффект от общей поломки — нули на русском "
+            "неотличимы от эффекта пола:</p>"
+            f"<ul>{items(groups['excluded'])}</ul>"
+        )
+    if groups["preliminary"]:
+        out += (
+            "<p>Эти показаны как <b>предварительные</b>: опубликованное число не "
+            "воспроизводится, но английская база ненулевая, поэтому падение до нуля "
+            "на русском остаётся содержательным наблюдением:</p>"
+            f"<ul>{items(groups['preliminary'])}</ul>"
+        )
+    out += (
         "<p>Расхождение такого размера на родной английской строке задачи — это "
-        "дефект нашего пайплайна инференса, а не свойство модели. Пока он не "
-        "найден, кросс-язычные выводы по этим моделям не имели бы смысла: их "
-        "нули на русском неотличимы от эффекта пола. Ниже они присутствуют "
-        "только в сводных таблицах, полнотой ради; анализ языкового эффекта по "
-        "ним в этом отчёте не приводится.</p>"
-        + (
+        "дефект нашего пайплайна инференса, а не свойство модели. Полноценные "
+        "выводы делаются только по модели, прошедшей валидацию.</p>"
+    )
+    if validation:
+        out += (
             "<p class=ci>Числа GreenVLA здесь — по отдельному прогону на полном "
             "bridge-наборе SimplerEnv (22 сцены, все четыре задачи), а не по "
             "четырём сценам пилота: те покрывали одну задачу и с публикуемым "
-            "средним по четырём не сопоставимы.</p>" if validation else ""
+            "средним по четырём не сопоставимы.</p>"
         )
-        + "</div>"
-    )
+    return out + "</div>"
 
 
 def build_mt_ablation(rows: list[dict[str, Any]]) -> str:

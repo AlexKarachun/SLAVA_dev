@@ -13,7 +13,15 @@
     "  * `comparable` says how directly the published number can be set against ours: our",
     "    subset of scenes is NOT the authors' evaluation suite, so most of these are",
     "    'indicative' rather than a like-for-like reproduction.",
-    "  * a model with no published number for our exact setup gets null, not a guess."
+    "  * a model with no published number for our exact setup gets null, not a guess.",
+    "",
+    "`report_treatment` — как модель подаётся в отчёте (решение пользователя 07.08.2026,",
+    "не выводится из чисел автоматически):",
+    "  primary      валидация пройдена, выводы полноценные",
+    "  preliminary  валидация не пройдена, но английская база ненулевая — падение до нуля",
+    "               на русском остаётся наблюдением; показываем с явной пометкой",
+    "  excluded     английская база на полу, русские нули неотличимы от эффекта пола;",
+    "               языковой анализ по такой модели не приводится вовсе"
   ],
   "baselines": {
     "OpenVLA-OFT": {
@@ -21,28 +29,33 @@
       "label": "~97%",
       "scope": "их собственная оценка этого же чекпойнта на LIBERO",
       "source": "openvla-oft (moojink), LIBERO.md / OFT paper; зафиксировано в .claude/skills/slava-openvla-oft",
-      "comparable": "indicative"
+      "comparable": "indicative",
+      "report_treatment": "primary"
     },
     "GreenVLA-R0": {
       "sr": 0.333,
       "label": "33.3% success / 91.7% pick",
       "scope": "Cubes, SimplerEnv WidowX",
       "source": "arXiv:2602.00919, Table 4; зафиксировано в .claude/skills/slava-greenvla",
-      "comparable": "indicative"
+      "comparable": "indicative",
+      "report_treatment": "excluded",
+      "report_treatment_note": "Исключена по тому же правилу, что pi0.5: 0/22 на en_canonical (полный bridge-набор) — английская база на полу, значит нули на русском неотличимы от эффекта пола. R1 и R2 остаются preliminary: у них база ненулевая (по 5/22)."
     },
     "GreenVLA-R1 (bridge)": {
       "sr": 0.729,
       "label": "72.9%",
       "scope": "SimplerEnv WidowX Bridge, entire average",
       "source": "GreenVLA model card / paper; зафиксировано в .claude/skills/slava-greenvla",
-      "comparable": "indicative"
+      "comparable": "indicative",
+      "report_treatment": "preliminary"
     },
     "GreenVLA-R2 (bridge, RL-aligned)": {
       "sr": 0.805,
       "label": "80.5% entire / 94.5% partial",
       "scope": "SimplerEnv WidowX Bridge",
       "source": "HF model card SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge; зафиксировано в .claude/skills/slava-greenvla",
-      "comparable": "indicative"
+      "comparable": "indicative",
+      "report_treatment": "preliminary"
     },
     "pi0": {
       "sr": 0.7467,
@@ -50,7 +63,8 @@
       "scope": "среднее по Spatial/Object/Goal — ровно тем трём сьютам, из которых набраны наши сцены; Long (35%) в наш набор не входит. Оценка ровно того чекпойнта, что у нас: lerobot/pi0_libero_finetuned, 10 эпизодов на задачу, seed 3000",
       "source": "huggingface/lerobot issue #2114 (https://github.com/huggingface/lerobot/issues/2114) — воспроизведение сообществом, не число авторов; на момент сверки 07.08.2026 ответа мейнтейнеров в тикете нет",
       "comparable": "community-reproduction",
-      "note": "Авторского SR именно под этот чекпойнт не опубликовано. Официальная страница lerobot по LIBERO приводит 97.5% в среднем, но для ДРУГОГО чекпойнта (pi05_libero_finetuned_v044) и для pi0.5, а не pi0 — см. запись pi0.5."
+      "note": "Авторского SR именно под этот чекпойнт не опубликовано. Официальная страница lerobot по LIBERO приводит 97.5% в среднем, но для ДРУГОГО чекпойнта (pi05_libero_finetuned_v044) и для pi0.5, а не pi0 — см. запись pi0.5.",
+      "report_treatment": "excluded"
     },
     "pi0.5": {
       "sr": 0.7733,
@@ -59,7 +73,8 @@
       "source": "huggingface/lerobot issue #2114 (https://github.com/huggingface/lerobot/issues/2114) — воспроизведение сообществом",
       "comparable": "community-reproduction",
       "note": "Официальные 97.5% (Spatial 97 / Object 99 / Goal 98 / Long 96) из docs/source/pi05.mdx относятся к lerobot/pi05_libero_finetuned_v044 — дообученному ещё на 6k шагов, то есть не к нашему чекпойнту. Отдельно: в lerobot есть открытый тикет #2533 про НУЛЕВОЙ success rate у pi05_libero_base, при том что fine-tuned вариант у того же автора даёт 96-100% — то есть нулевой SR у семейства pi0.5 в этом стеке уже наблюдался не только у нас.",
-      "our_result_note": "НЕ ВОСПРОИЗВЕЛОСЬ: 0/20 на en_canonical (Wilson [0%; 16.1%]) и 0 успехов на всех 127 эпизодах. При этом в 72 эпизодах из 127 зафиксирован контакт с целевым объектом — см. docs/OPEN_ISSUES.md."
+      "our_result_note": "НЕ ВОСПРОИЗВЕЛОСЬ: 0/20 на en_canonical (Wilson [0%; 16.1%]) и 0 успехов на всех 127 эпизодах. При этом в 72 эпизодах из 127 зафиксирован контакт с целевым объектом — см. docs/OPEN_ISSUES.md.",
+      "report_treatment": "excluded"
     },
     "SmolVLA": {
       "sr": 0.927,
@@ -67,7 +82,8 @@
       "scope": "среднее по Spatial/Object/Goal — ровно тем трём сьютам, из которых набраны наши сцены. Четвёртый сьют, Long (71%), в наш набор не входит и в среднее здесь не включён; авторское среднее по всем четырём — 87.3%",
       "source": "SmolVLA, arXiv:2506.01844, Table 2 (checkpoint дообучен на LIBERO, оценка не zero-shot — как и наш HuggingFaceVLA/smolvla_libero)",
       "comparable": "indicative",
-      "our_result_note": "НЕ ВОСПРОИЗВЕЛОСЬ: у нас 2/16 на en_canonical (12.5%, Wilson [3.5%; 36%]), интервал не задевает 92.7%. По сьютам: goal 1/8, object 1/4, spatial 0/4. Сравнение при этом честное — en_canonical это родная строка задачи LIBERO без изменений. Причина не установлена. Локализация: OpenVLA-OFT на том же оркестраторе, тех же сценах и том же env-воркере даёт 15/16 против заявленных ~97%, то есть среда, сцены и инструкции валидны, а расхождение лежит в пути через lerobot_server.py. Версия transformers, из-за которой pi0/pi0.5 грузились без башни зрения, SmolVLA не объясняет: у неё другой бэкбон и ноль предупреждений о загрузке весов. Следствие для метрик: на полу Δlang неинформативен — нули по русским вариантам у этой модели суть эффект пола, а не устойчивость к языку."
+      "our_result_note": "НЕ ВОСПРОИЗВЕЛОСЬ: у нас 2/16 на en_canonical (12.5%, Wilson [3.5%; 36%]), интервал не задевает 92.7%. По сьютам: goal 1/8, object 1/4, spatial 0/4. Сравнение при этом честное — en_canonical это родная строка задачи LIBERO без изменений. Причина не установлена. Локализация: OpenVLA-OFT на том же оркестраторе, тех же сценах и том же env-воркере даёт 15/16 против заявленных ~97%, то есть среда, сцены и инструкции валидны, а расхождение лежит в пути через lerobot_server.py. Версия transformers, из-за которой pi0/pi0.5 грузились без башни зрения, SmolVLA не объясняет: у неё другой бэкбон и ноль предупреждений о загрузке весов. Следствие для метрик: на полу Δlang неинформативен — нули по русским вариантам у этой модели суть эффект пола, а не устойчивость к языку.",
+      "report_treatment": "excluded"
     }
   }
 }
