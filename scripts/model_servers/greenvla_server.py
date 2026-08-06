@@ -65,12 +65,29 @@ class GreenVLABackend:
             torch_preprocess_dict_inference,
         )
 
-        ee_pose = obs["ee_pose"]  # [x,y,z,qw,qx,qy,qz], from env_worker_simpler._ee_pose_xyzquat
+        # [x,y,z,qw,qx,qy,qz], BASE-RELATIVE — see
+        # env_worker_simpler._ee_pose_xyzquat for why the frame matters and how
+        # it was verified against this checkpoint's own norm_stats.
+        ee_pose = obs["ee_pose"]
         roll, pitch, yaw = Rotation.from_quat(
             [ee_pose[4], ee_pose[5], ee_pose[6], ee_pose[3]]  # scipy wants xyzw
         ).as_euler("xyz")
+        # Gripper STATE is openness (1=open), not closedness (bug found
+        # 2026-08-05 alongside the frame bug — different from the commanded
+        # gripper's range rescale further down, which is about the action).
+        # Evidence: this checkpoint's norm_stats for the state gripper slot are
+        # mean=0.709, q01=0.052, q99=1.010 — a gripper is not *closed* 71% of
+        # the time in a manipulation dataset, but *open* 71% of the time is
+        # normal; and Bridge/Octo document the matching action channel as
+        # "range [0,1]; 1 = open". ManiSkill2's get_gripper_closedness() is
+        # (upper - qpos)/(upper - lower), i.e. 0=open, 1=closed — inverted.
+        gripper_openness = 1.0 - float(obs["gripper_closedness"])
+        # Raw 8-dim layout: BridgeInputsTransform's `state_mask =
+        # [i for i in range(8) if i != 6]` drops index 6, so the gripper must
+        # sit at index 7 and index 6 is the discarded pad (verified in their
+        # source, not inferred from the docstring).
         state = np.array(
-            [ee_pose[0], ee_pose[1], ee_pose[2], roll, pitch, yaw, 0.0, obs["gripper_closedness"]],
+            [ee_pose[0], ee_pose[1], ee_pose[2], roll, pitch, yaw, 0.0, gripper_openness],
             dtype=np.float32,
         )
         raw_obs = {

@@ -287,6 +287,21 @@ MODEL_SERVER_FILE = {
 }
 
 
+# Provenance is keyed on the model-server file's mtime, which is a proxy for
+# "when did this model's inference behaviour last change". The proxy is
+# imperfect in one direction: an edit that touches the file WITHOUT changing
+# inference (a comment, a path-resolution default, a docstring) bumps mtime and
+# falsely invalidates good episodes. That happened on 2026-08-06, when making
+# openvla_oft_server.py's third-party paths portable marked all 99 of its valid
+# LIBERO episodes stale.
+#
+# The fix used there was to reset that file's mtime to just before its earliest
+# episode, because its last *behavioural* change (the gripper post-processing
+# fix) genuinely predates that run. Recording it here because silently touching
+# mtimes to make data pass a validity check is indistinguishable from fudging
+# results unless the reason is written down: only do this when you can name the
+# specific edit and say why it cannot affect inference, and never to rescue
+# episodes that a real behavioural change actually invalidated.
 def annotate_provenance(annotations: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     """Tag each annotation with `_stale` (collected before its model-server's
     last fix) and return per-model {n, n_stale} counts."""

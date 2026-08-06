@@ -108,6 +108,98 @@ than reporting a meaningless Δlang for those 3×4 cells.
 GreenVLA repo: `github.com/greenvla/GreenVLA` (public, HEAD
 `952a80c` as of this session).
 
+## Starting from nothing: third-party repos and envs are NOT part of this repo
+
+**Read this first if `ls ../` doesn't show `LIBERO/`, `SimplerEnv/`,
+`greenvla_repo/`, `openvla_oft_repo/`, `lerobot_repo/`, or if
+`conda env list` doesn't show the `slava-*` envs.** None of that is
+tracked in git — it is external code plus multi-GB conda environments, and
+a fresh clone of SLAVA_dev on a new machine has none of it. Everything
+below is reproducible from two scripts; do not hand-install and do not
+assume the paths that happen to exist on whatever machine you're reading
+this from.
+
+```bash
+# 1. D1-D4 + the two env-workers: clones LIBERO and SimplerEnv (pinned
+#    commits), creates slava-notebook / slava-libero / slava-simpler.
+bash scripts/bootstrap.sh                       # add --skip-libero-datasets
+                                                # for inference-only work
+# 2. D5 model-servers: clones greenvla_repo / openvla_oft_repo /
+#    lerobot_repo (pinned commits), creates slava-greenvla / slava-openvla /
+#    slava-lerobot.
+bash scripts/bootstrap_models.sh
+```
+
+**Where they land.** Both scripts default to the *sibling* directory of
+this repo (`$(dirname SLAVA_dev)`), i.e. a checkout at `/anything/SLAVA_dev`
+puts LIBERO at `/anything/LIBERO`. Override with `SLAVA_DEPS_DIR=/some/path`
+(honoured by both scripts and by the runtime: `run_rollouts.py` and
+`openvla_oft_server.py` resolve their defaults the same way, and
+`LIBERO_ROOT`/`SIMPLERENV_ROOT`/`OPENVLA_OFT_ROOT` still override
+per-repo). Nothing in the codebase should hardcode an absolute path — if
+you find one, that's a bug; it was true of `/workspace/*` until 2026-08-05.
+
+**What the two scripts are worth trusting for.** `bootstrap.sh` has been
+run end-to-end successfully more than once and is idempotent (re-running
+skips what already exists). `bootstrap_models.sh` was *reconstructed* from
+the live state of envs that had been built by hand across sessions — it
+encodes every pin and workaround that was actually needed, but has not
+itself been executed on a clean machine. If a step fails, check the exact
+error against the per-model skill (`slava-greenvla`, `slava-openvla-oft`,
+`slava-lerobot-policies`) before improvising: most of the non-obvious
+lines in it exist because of a specific, documented upstream bug.
+
+**Non-obvious things baked into those scripts, so you don't rediscover them:**
+
+- GreenVLA's `pyproject.toml` does not build with plain `pip install -e .`
+  — `[project]` has no `version` (their README's `uv sync` tolerates it),
+  and `[tool.poetry]` declares no `packages`, so poetry-core looks for a
+  `greenvla/` dir that doesn't exist (their code lives in `lerobot/` — the
+  repo is an old *vendored fork of lerobot*). Both are patched locally by
+  the script; upstream is untouched.
+- **`greenvla_repo` and `lerobot_repo` both provide a top-level `lerobot`
+  package, and they are different, incompatible codebases.** GreenVLA's
+  fork uses `lerobot.common.policies.*`; current huggingface/lerobot uses
+  `lerobot.policies.*` (no `common`). They live in separate conda envs for
+  exactly this reason — never cross-reference import paths between them,
+  and don't "fix" an import in one based on the other. A wrong-but-
+  plausible import here will resolve to the wrong repo and waste a lot of
+  time.
+- `huggingface/lerobot` requires **python>=3.12** (not 3.10/3.11).
+- Pin `torch==2.7.1` explicitly. An unpinned resolver picks 2.11.0+cu130,
+  which supports only compute capability >=7.5 — wrong for the V100s
+  (cc 7.0) this project has been run on.
+- openvla-oft's inference path eagerly imports tensorflow/
+  tensorflow_datasets/dlimp; its declared `tensorflow==2.15.0` pin drags in
+  a protobuf incompatible with `tensorflow_metadata`'s compiled `_pb2.py`.
+  Upgrading to `tensorflow>=2.16` + `protobuf>=6.31.1,<7` fixes it; pip's
+  resulting "declared pin mismatch" warning is expected and harmless
+  (tensorflow is never on the inference path).
+- `sapien==2.2.2` segfaults on `env.step()` with numpy>=2 — pin
+  `numpy==1.26.4` in any env that touches SimplerEnv rendering.
+- `conda create --clone` fails on these mixed conda+pip envs (known conda
+  limitation). Build fresh instead.
+
+**Sanity-check before a real run**, in this order — each step isolates a
+different layer:
+
+```bash
+conda run -n slava-greenvla python -c 'from lerobot.common.policies.factory import load_pretrained_policy'
+conda run -n slava-openvla  python -c 'import prismatic'
+conda run -n slava-lerobot  python -c 'from lerobot.policies.factory import get_policy_class'
+# env-worker alone, real physics, no model involved:
+conda run -n slava-simpler env PYTHONPATH=$PWD/src python -m slava_rollout.env_worker_simpler --port 9911 &
+curl -s -X POST localhost:9911/reset -H 'Content-Type: application/json' \
+  -d '{"task_name":"widowx_stack_cube","episode_id":0,"reset_seed":0}' | head -c 200
+# then the whole chain:
+conda run -n slava-notebook python scripts/run_rollouts.py --smoke-test
+```
+
+GPU note: these envs have only ever been exercised on 4×V100-32GB (Volta,
+cc 7.0, **no bf16 tensor cores**) — checkpoints that default to bf16 must be
+forced to fp16/fp32. On newer hardware that constraint disappears but the
+torch pin above may need revisiting.
+
 ## Per-model conda envs
 
 Each model-server gets its own env under `/opt/miniforge3/envs/` (or a
@@ -422,6 +514,63 @@ whether that orchestrator process is still using this fix** (an
 already-running `run_rollouts.py` process has the old code in memory even
 after the source file is patched — it needed a restart to pick this up,
 which is what actually happened here).
+
+## Debugging low SR: check the INPUT distribution before anything else
+
+Hard-won ordering, after a long run of sessions that each found a real bug
+on the *action* side (gripper range, rotation representation, action
+truncation, chunk replay) while the largest error of all sat on the
+*observation* side, unexamined, for weeks. Actions are where behaviour is
+visible, so that's where attention goes — but a policy fed out-of-
+distribution proprioception cannot produce sane actions no matter how
+correctly you post-process them.
+
+**When a checkpoint ships normalization statistics, they are ground truth
+about what it expects. Compare your actual observations against them.**
+This is cheap, decisive, and catches an entire class of bugs (wrong frame,
+wrong units, wrong polarity, wrong slot order) that no amount of behavioural
+staring will isolate:
+
+```python
+# what the checkpoint expects
+stats = json.load(open(hf_hub_download(ckpt, "norm_stats/bridge/norm_stats.json")))
+q01, q99 = stats["norm_stats"]["state"]["q01"], stats["norm_stats"]["state"]["q99"]
+# what we actually feed, on a real reset
+print(build_state(env))
+# then: does each element land inside [q01, q99]? what does it normalize to?
+```
+
+Normalized inputs should land roughly in `[-1, 1]`. On 2026-08-05 this check
+took minutes and showed GreenVLA was being fed `[-3.24, 0.00, 7.46]` — a
+world-frame EE pose where the checkpoint's own quantiles unambiguously
+described a robot-base frame. See `slava-greenvla` for the full case.
+
+Corollaries worth internalising:
+
+- **Prose docs are not authoritative about frames or conventions.** GreenVLA's
+  own docs say the state is `[x, y, z, roll, pitch, yaw, _pad_, gripper]` —
+  true, and useless for deciding *which frame* or *which polarity*. Their own
+  inference example fills it with `np.random.rand(8)`. The numbers in
+  `norm_stats` were the only real evidence.
+- **A from-scratch reimplementation is only independent where it differs.**
+  The "pure-upstream reproduction" built to validate this pipeline shared its
+  hand-written `build_state()` conventions with the pipeline it was checking,
+  so it reproduced both bugs and its agreement was read as confirmation. When
+  you build a reference implementation, deliberately derive the parts you're
+  trying to validate from a *different* source (the checkpoint's stats, the
+  upstream harness's own wrapper) — not from the same docs you already read.
+- **If a checkpoint ships no stats for your embodiment, say so out loud.**
+  `lerobot/pi0_base` and `pi05_base` ship none at all; `smolvla_base` ships
+  stats only for the SO-100 arm. For those, no observation layout can be
+  *verified* — pick the best-supported convention, and treat the resulting
+  numbers as weakly specified rather than quietly reporting them alongside
+  properly grounded ones.
+- **Sanity-check against the upstream harness's own policy wrapper** for the
+  same embodiment (for SimplerEnv/WidowX:
+  `simpler_env/policies/octo/octo_model.py`, branch
+  `policy_setup == "widowx_bridge"`). It encodes real conventions —
+  camera choice, gripper binarization, euler→axangle — that the model repos
+  themselves never document.
 
 ## Per-model bugs — see the per-model skills
 

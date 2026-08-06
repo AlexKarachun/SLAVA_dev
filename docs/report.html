@@ -1,0 +1,45 @@
+<title>SLAVA — результаты</title>
+<style>
+body{font:14px/1.5 system-ui,sans-serif;margin:24px auto;max-width:1000px;color:#111}
+h1{font-size:20px;margin:0 0 4px} h2{font-size:16px;margin:22px 0 6px;border-bottom:1px solid #ddd}
+h4{margin:14px 0 4px;font-size:14px;font-weight:600}
+table{border-collapse:collapse;margin:6px 0;font-size:13px}
+td,th{border:1px solid #ddd;padding:4px 7px;text-align:center}
+th.m{text-align:left;white-space:nowrap;background:#fafafa}
+.ci{color:#777;font-size:11px;font-weight:400}
+.zero{background:#fff1f0} .mid{background:#fffbe6} .hi{background:#f0fff4} .na{color:#bbb}
+.t2 td:first-child{text-align:left}
+figure{margin:10px 0;padding:8px;border:1px solid #eee;border-radius:6px}
+figure img{width:190px;image-rendering:pixelated;border:1px solid #ddd;margin-right:6px;vertical-align:top}
+figcaption{font-size:12px;margin-bottom:6px}
+code{background:#f4f4f4;padding:1px 4px;border-radius:3px}
+.warn{background:#fffbe6;border-left:3px solid #f0c000;padding:6px 10px;font-size:13px}
+.f{background:#f7f7f9;padding:8px 10px;border-radius:5px;font-family:ui-monospace,monospace;font-size:12.5px}
+</style>
+<h1>SLAVA — кросс-язычный бенчмарк VLA</h1>
+<p class=ci>101 эпизодов в метриках · n=1 повтор на (сцена × вариант × модель)</p>
+
+<h2>1. Метрики</h2>
+<div class=f>
+SR = успешные эпизоды / всего &nbsp;·&nbsp; успех берётся из нативного <code>env.check_success()</code><br>
+gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
+<b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
+</div>
+<p>Вычитание <code>gap_en_paraphrase</code> — ключевой контроль: он убирает эффект
+«инструкция просто непривычная» и оставляет только языковой. CI по SR —
+интервал Уилсона (корректен у краёв 0% и 100%), по <code>en_canonical</code> — бутстрап, 2000 итераций.</p>
+
+<h2>2. SR по вариантам</h2>
+<table><tr><th></th><th>en_canonical</th><th>en_paraphrase</th><th>mt_russian</th><th>ru_literal</th><th>ru_case_swap</th><th>ru_negation</th><th>code_switch</th></tr><tr><th class=m>GreenVLA-R2 (bridge, RL-aligned)</th><td class=hi><b>1/2</b><br><span class=ci>50% [9;91]</span></td><td class=na>—</td><td class=na>—</td><td class=na>—</td><td class=na>—</td><td class=na>—</td><td class=na>—</td></tr><tr><th class=m>OpenVLA-OFT</th><td class=hi><b>15/16</b><br><span class=ci>94% [72;99]</span></td><td class=hi><b>15/16</b><br><span class=ci>94% [72;99]</span></td><td class=hi><b>9/16</b><br><span class=ci>56% [33;77]</span></td><td class=hi><b>9/16</b><br><span class=ci>56% [33;77]</span></td><td class=hi><b>4/4</b><br><span class=ci>100% [51;100]</span></td><td class=hi><b>8/15</b><br><span class=ci>53% [30;75]</span></td><td class=hi><b>14/16</b><br><span class=ci>88% [64;97]</span></td></tr></table>
+<p class=warn><b>Исключены из метрик:</b> SmolVLA, pi0, pi0.5 — их эпизоды собраны по обе стороны от правки общего model-server, смешивать две конфигурации инференса в одно число нельзя (<code>annotate_provenance()</code>).</p>
+<p class=ci><code>ru_case_swap</code> — намеренно перевёрнутая инструкция
+(«поставь жёлтый на зелёный» при success-предикате «зелёный на жёлтом»).
+Модель, выполнившая её верно, засчитывается как провал: это зонд на
+чувствительность к порядку, а не задача. В агрегат по модели не входит.</p>
+
+<h2>3. Языковой эффект</h2>
+<h4>GreenVLA-R2 (bridge, RL-aligned) <span class=ci>SR<sub>en_canonical</sub> = 50% [bootstrap 0;100]</span></h4><table class=t2><tr><th>вариант</th><th>gap, п.п.</th><th>Δlang, п.п.</th></tr></table><h4>OpenVLA-OFT <span class=ci>SR<sub>en_canonical</sub> = 94% [bootstrap 81;100]</span></h4><table class=t2><tr><th>вариант</th><th>gap, п.п.</th><th>Δlang, п.п.</th></tr><tr><td>mt_russian</td><td>+37.5</td><td><b>+37.5</b></td></tr><tr><td>ru_literal</td><td>+37.5</td><td><b>+37.5</b></td></tr><tr><td>ru_case_swap</td><td>-6.2</td><td><b>-6.2</b></td></tr><tr><td>ru_negation</td><td>+40.4</td><td><b>+40.4</b></td></tr><tr><td>code_switch</td><td>+6.2</td><td><b>+6.2</b></td></tr></table>
+
+<h2>4. Примеры эпизодов</h2>
+<p class=ci>анимация всего эпизода: agentview и wrist (где есть)</p>
+<figure><figcaption><code>en_canonical</code> · OpenVLA-OFT · успех · 119 шагов<br><span class=ci>open the middle drawer of the cabinet</span></figcaption><img src='report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__openvla_oft__seed000/agentview.gif' title='agentview'><img src='report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__en_canonical__openvla_oft__seed000/wrist.gif' title='wrist'></figure><figure><figcaption><code>code_switch</code> · OpenVLA-OFT · negation_error · 300 шагов<br><span class=ci>подвинь plate к передней части stove</span></figcaption><img src='report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__code_switch__openvla_oft__seed000/agentview.gif' title='agentview'><img src='report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__code_switch__openvla_oft__seed000/wrist.gif' title='wrist'></figure><figure><figcaption><code>mt_russian</code> · OpenVLA-OFT · no_action_or_timeout · 300 шагов<br><span class=ci>откройте средний ящик шкафа</span></figcaption><img src='report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__mt_russian__openvla_oft__seed000/agentview.gif' title='agentview'><img src='report_assets/libero_goal__open_the_middle_drawer_of_the_cabinet__init000__mt_russian__openvla_oft__seed000/wrist.gif' title='wrist'></figure><figure><figcaption><code>en_canonical</code> · OpenVLA-OFT · relation_binding_error · 300 шагов<br><span class=ci>push the plate to the front of the stove</span></figcaption><img src='report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__openvla_oft__seed000/agentview.gif' title='agentview'><img src='report_assets/libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__openvla_oft__seed000/wrist.gif' title='wrist'></figure>

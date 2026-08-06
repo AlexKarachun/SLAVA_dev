@@ -471,6 +471,42 @@ rerun in progress at handoff time was still running the pre-fix code, since
 model-servers don't hot-reload on file edit). Next session: check whether a
 fresh pi0.5 SimplerEnv rerun completes cleanly.
 
+## SimplerEnv proprioception: joint qpos where bridge conventions expect EE pose (fixed 2026-08-05)
+
+Same class of bug as the LIBERO proprioception-layout fix above, in the same
+function, one branch over — and it survived that fix because the LIBERO
+branch was written as a special case (`if is_libero and expected_dim == 8
+and len(proprioception) == 9`) while everything else fell through to a
+blind zero-pad of the raw 9-dim `proprioception` (WidowX joint qpos +
+gripper closedness).
+
+Joint qpos is not what a bridge-pretrained policy reads. The pi0 family's
+bridge convention is end-effector pose + gripper — the same
+`[x, y, z, roll, pitch, yaw, pad, gripper]` layout GreenVLA uses (GreenVLA
+is a pi0-derived architecture and copied it). `lerobot_server.py` now builds
+that from the env-worker's `ee_pose` + `gripper_closedness`, base-relative,
+gripper as openness. See `slava-greenvla` for the frame/polarity evidence —
+it is the same env-worker field, so the same reasoning applies.
+
+**But do not report these three models' SimplerEnv numbers as if they were
+grounded.** Unlike GreenVLA, there is nothing here to verify against:
+
+| checkpoint | state dim | normalization stats shipped |
+| --- | --- | --- |
+| `lerobot/pi0_base` | 32 | **none at all** |
+| `lerobot/pi05_base` | 32 | **none at all** |
+| `lerobot/smolvla_base` | 6 | only `so100*` (a different robot entirely) |
+
+Checked directly via `make_pre_post_processors(...)`'s
+`NormalizerProcessorStep.stats`. `smolvla_base`'s 6-dim state is an SO-100
+arm state — the checkpoint was never given WidowX/bridge statistics, which
+is also why 6 and not 8. So for these three the observation layout is a
+*best-supported guess*, not a verified convention, and their zero-shot
+SimplerEnv SR is weakly specified independently of any bug. If bridge
+numbers for these families actually matter scientifically, the real fix is
+a bridge-finetuned checkpoint, not more layout archaeology — raise it with
+the user rather than tuning silently.
+
 ## Still open / not yet investigated
 
 - **NEW, unexplained (found 2026-08-05 once the camera-swap fix's full

@@ -21,6 +21,7 @@ import signal
 import subprocess
 import sys
 import time
+import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -392,6 +393,31 @@ def select_prompts(
     return [p for p in filtered if p["task_uid"] in seen_task_uids and p["variant"] == "en_canonical"]
 
 
+def format_duration(seconds: float) -> str:
+    seconds = int(max(seconds, 0))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
+
+
+def format_eta(avg_seconds: float, remaining: int) -> str:
+    """Remaining wall time plus the projected finish clock time.
+
+    Runs here are long (hundreds of episodes, minutes each for the bigger
+    models) and usually unattended, so the absolute finish time is what the
+    user actually wants to read — not just a countdown.
+    """
+    if remaining <= 0:
+        return "done"
+    eta_s = avg_seconds * remaining
+    finish = datetime.datetime.now() + datetime.timedelta(seconds=eta_s)
+    return f"{format_duration(eta_s)} (~{finish:%H:%M})"
+
+
 def _handle_sigterm(signum: int, frame: Any) -> None:
     # A bare SIGTERM to this process does NOT run `finally` blocks (unlike a
     # caught exception) — found 2026-08-05 manually stopping a shard during
@@ -442,6 +468,22 @@ def main() -> None:
                 + (f" (shard {args.shard_index}/{args.num_shards})" if args.num_shards > 1 else ""),
                 flush=True,
             )
+            todo = [
+                p for p in selected
+                if build_run_id(model_key, p["prompt_id"], args.seed) not in completed
+            ]
+            n_todo = len(todo)
+            n_skipped = len(selected) - n_todo
+            if n_skipped:
+                print(f"[{model_key}] {n_skipped} already done, {n_todo} to run", flush=True)
+            # Rolling ETA. Episode wall time varies a lot by model and
+            # environment (a LIBERO episode with a 7B model runs minutes; a
+            # SimplerEnv one can be ~20s), so a static per-model estimate would
+            # be useless — this averages the episodes actually observed in this
+            # process and reprojects after every episode. Printed on every line
+            # so a long unattended run can be checked at a glance.
+            done_n = 0
+            elapsed_total = 0.0
             for prompt in selected:
                 run_id = build_run_id(model_key, prompt["prompt_id"], args.seed)
                 if run_id in completed:
@@ -450,13 +492,23 @@ def main() -> None:
                 t0 = time.monotonic()
                 try:
                     record = run_episode(pool, model_key, prompt, args.seed)
+                    dt = time.monotonic() - t0
+                    done_n += 1
+                    elapsed_total += dt
                     print(
                         f"[done] {run_id} success={record['success']} "
-                        f"failure={record['failure_type_auto']} ({time.monotonic() - t0:.1f}s)",
+                        f"failure={record['failure_type_auto']} ({dt:.1f}s) "
+                        f"| {done_n}/{n_todo} {model_key}, ETA {format_eta(elapsed_total / done_n, n_todo - done_n)}",
                         flush=True,
                     )
                 except Exception as exc:  # noqa: BLE001
                     print(f"[error] {run_id}: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+            if done_n:
+                print(
+                    f"[{model_key}] finished {done_n} episodes in "
+                    f"{format_duration(elapsed_total)} (avg {elapsed_total / done_n:.1f}s/episode)",
+                    flush=True,
+                )
             pool.stop_model(model_key)
     finally:
         pool.stop_all()

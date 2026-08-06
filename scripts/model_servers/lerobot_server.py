@@ -324,6 +324,39 @@ class LerobotBackend:
             gripper_qpos, eef_pos, eef_quat = proprio_raw[:2], proprio_raw[2:5], proprio_raw[5:9]
             axis_angle = Rotation.from_quat(eef_quat).as_rotvec()
             proprio = np.concatenate([eef_pos, axis_angle, gripper_qpos]).astype(np.float32)
+        elif obs.get("ee_pose") is not None:
+            # SimplerEnv/bridge (WidowX). Same class of bug as the LIBERO
+            # branch above, found 2026-08-05: this used to zero-pad the raw
+            # 9-dim `proprioception` (joint qpos + gripper closedness) into
+            # whatever `expected_dim` the checkpoint declared. Joint qpos is
+            # not what a bridge-pretrained policy reads — the pi0 family's
+            # bridge convention is end-effector pose plus gripper, the same
+            # [x, y, z, roll, pitch, yaw, pad, gripper] layout GreenVLA uses
+            # (GreenVLA is a pi0-derived architecture and copied it).
+            # `ee_pose` from env_worker_simpler is base-relative (see the long
+            # note there — the world-frame version was a major bug), and the
+            # gripper slot is openness, not closedness, for the same reason
+            # documented in greenvla_server.py.
+            #
+            # IMPORTANT CAVEAT, do not oversell this fix: `lerobot/pi0_base`
+            # and `pi05_base` ship NO normalization stats at all, and
+            # `smolvla_base` ships stats only for the SO-100 arm (hence its
+            # 6-dim state) — never for WidowX/bridge. So unlike GreenVLA,
+            # where the checkpoint's own norm_stats decide the question, there
+            # is no ground truth here to verify against; this layout is the
+            # best-supported convention, not a confirmed one. Treat these three
+            # models' SimplerEnv numbers as weakly specified regardless.
+            ee_pose = np.asarray(obs["ee_pose"], dtype=np.float32)
+            roll, pitch, yaw = Rotation.from_quat(
+                [ee_pose[4], ee_pose[5], ee_pose[6], ee_pose[3]]  # scipy wants xyzw
+            ).as_euler("xyz")
+            gripper_openness = 1.0 - float(obs.get("gripper_closedness", 0.0))
+            bridge_state = np.array(
+                [ee_pose[0], ee_pose[1], ee_pose[2], roll, pitch, yaw, 0.0, gripper_openness],
+                dtype=np.float32,
+            )
+            proprio = np.zeros(expected_dim, dtype=np.float32)
+            proprio[: min(expected_dim, bridge_state.shape[0])] = bridge_state[:expected_dim]
         else:
             proprio = np.asarray(obs.get("proprioception", []), dtype=np.float32)
             if proprio.shape[0] != expected_dim:

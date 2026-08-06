@@ -87,6 +87,12 @@ def collect(args: argparse.Namespace) -> None:
                         seed=args.reset_seed,
                         options={"obj_init_options": {"episode_id": episode_id}},
                     )
+                    # Let the scene settle before capturing. Without this the
+                    # render and `pose_xyz` catch objects mid-drop, right after
+                    # set-up, rather than where they actually come to rest —
+                    # the pilot v0 collection had this bug (settle_steps=0).
+                    for _ in range(args.settle_steps):
+                        obs, _, _, _, _ = env.step(np.zeros(7, dtype=np.float32))
                     unwrapped = env.unwrapped
                     rgb = np.asarray(obs["image"]["3rd_view_camera"]["rgb"])[..., :3]
                     relative_agent = Path("images") / "simpler" / f"{uid}__agentview.png"
@@ -119,6 +125,7 @@ def collect(args: argparse.Namespace) -> None:
                             "task_name": task_name,
                             "gym_env_name": gym_env_name,
                             "episode_id": int(reset_info.get("episode_id", episode_id)),
+                            "settle_steps": args.settle_steps,
                             "reset_seed": args.reset_seed,
                         },
                         "images": {
@@ -187,6 +194,7 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--reset-seed", type=int, default=0)
+    parser.add_argument("--settle-steps", type=int, default=0)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")
     return parser.parse_args()

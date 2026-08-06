@@ -27,6 +27,12 @@ LIBERO_SOURCE_FIELDS = {
     "bddl_file",
     "init_state_id",
 }
+# Optional, and deliberately so: `settle_steps` (how many zero-action steps
+# were simulated after set_init_state() before capturing images/poses) was
+# introduced with the full-set collection on 2026-08-06. The frozen pilot v0
+# inventory predates it and must stay valid, so this is allowed-but-not-
+# required rather than added to the exact-field set above.
+OPTIONAL_SOURCE_FIELDS = {"settle_steps"}
 SIMPLER_SOURCE_FIELDS = {
     "environment",
     "commit",
@@ -70,9 +76,14 @@ def is_technical_object(sim_handle: Any, raw_name: Any) -> bool:
     )
 
 
-def _exact_fields(value: dict[str, Any], expected: set[str], path: str) -> None:
+def _exact_fields(
+    value: dict[str, Any],
+    expected: set[str],
+    path: str,
+    optional: set[str] | None = None,
+) -> None:
     missing = expected - set(value)
-    extra = set(value) - expected
+    extra = set(value) - expected - (optional or set())
     if missing or extra:
         parts = []
         if missing:
@@ -120,12 +131,12 @@ def validate_inventory_record(record: dict[str, Any]) -> None:
         raise ValueError("source: expected an object")
     environment = source.get("environment")
     if environment == "LIBERO":
-        _exact_fields(source, LIBERO_SOURCE_FIELDS, "source")
+        _exact_fields(source, LIBERO_SOURCE_FIELDS, "source", OPTIONAL_SOURCE_FIELDS)
         if not isinstance(source["init_state_id"], int):
             raise ValueError("source.init_state_id: expected an integer")
         _portable_path(source["bddl_file"], "source.bddl_file")
     elif environment == "SimplerEnv":
-        _exact_fields(source, SIMPLER_SOURCE_FIELDS, "source")
+        _exact_fields(source, SIMPLER_SOURCE_FIELDS, "source", OPTIONAL_SOURCE_FIELDS)
         if not isinstance(source["episode_id"], int):
             raise ValueError("source.episode_id: expected an integer")
         if not isinstance(source["reset_seed"], int):

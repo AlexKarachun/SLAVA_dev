@@ -540,6 +540,113 @@ shows the Google-robot branch using a *relative* (previous − current)
 sticky-gripper scheme — that one is embodiment-specific, do not copy it to
 WidowX.
 
+## PROPRIOCEPTION FED IN THE WRONG COORDINATE FRAME (found 2026-08-05, strongest root-cause candidate yet)
+
+**The checkpoint's own `norm_stats` tell you the expected frame — read them
+before trusting any prose about the state layout.** For the Bridge state
+xyz slots:
+
+| slot | q01 | q99 |
+| --- | --- | --- |
+| x | 0.1708 | 0.4532 |
+| y | -0.1692 | 0.2355 |
+| z | -0.0555 | 0.1952 |
+
+x strictly positive in [0.17, 0.45], y roughly symmetric about 0, z small
+and centred near 0 — that is unmistakably a **robot-base frame**, not world
+coordinates.
+
+What we actually fed: `link.get_pose()` on `ee_gripper_link`, which in
+SAPIEN is the **global/world** pose. Measured at reset in
+`widowx_stack_cube`:
+
+```
+robot root pose p:          [0.147, 0.028, 0.870]
+ee_gripper_link GLOBAL p:   [-0.145, 0.034, 1.005]   <- what we fed
+ee_gripper_link BASE   p:   [ 0.292, -0.006, 0.135]  <- what the model expects
+```
+
+The WidowX base sits at z≈0.87 in these scenes, so the global z is ~5x above
+q99, and the global x is *negative* — the opposite sign of the entire
+training range. After the checkpoint's own quantile normalization:
+
+```
+global (what we fed) -> [-3.24, 0.00, 7.46]
+base   (correct)     -> [-0.14, -0.19, 0.52]
+```
+
+Normalized proprioception should land roughly in [-1, 1]. We were handing
+the model **-3.2 and +7.5 on every single step, of every episode, for all
+three GreenVLA stages.** That is far outside anything it saw in training and
+is sufficient on its own to explain near-zero SR regardless of how correct
+the action-side handling is.
+
+**Fix:** convert to base frame before building the state —
+`pose = env.unwrapped.agent.robot.get_root_pose().inv() * pose` — and derive
+roll/pitch/yaw from that same base-relative pose, not the global one.
+
+**Status of the behavioural confirmation — read before claiming this fixed
+anything.** The *input* error is proven arithmetically and is not in
+dispute: the values fed were far outside the checkpoint's own quantiles, on
+every step. What is **not** yet established is how much SR it buys back. A
+4-way ablation on `widowx_stack_cube` (R1, plain seed loop, n=10 each:
+world+closedness / base+closedness / base+openness, plus R0 on eggplant with
+both fixes) was still running when this was written and had **not separated**
+the arms — roughly 1/6 for the unfixed control vs 2/7 for each fixed arm at
+that point. Two things to be careful about when finishing it:
+
+1. n=10 per arm cannot resolve a difference between, say, 10% and 30%. Do
+   not read a 1-episode gap as a result.
+2. The control arm scoring **anything** (1/6) is itself a discrepancy worth
+   explaining: the production run of R1 scored 0/28. The diagnostic resets
+   with a plain `env.reset(seed=k)` loop, whereas production resets with
+   `options={"obj_init_options": {"episode_id": ...}}` over 4 fixed
+   episode_ids × 7 variants. Those are different object layouts, and the
+   4 production episode_ids may simply be harder. Worth confirming before
+   comparing any diagnostic number against a production number — they are
+   not the same distribution.
+
+**Why every previous investigation missed it, and the methodological lesson.**
+The "pure-upstream reproduction" that was treated as independent
+confirmation was not independent on this axis: its `build_state()` was
+hand-written from the same prose docs and used the same global
+`pose.p`. So it reproduced the bug rather than detecting it, and its
+2/20=10% agreeing with our 0/28 confirmed a *shared* defect, not
+correctness. **Treat "our pipeline agrees with my from-scratch reimplementation"
+as evidence only for the parts the two implementations do differently.**
+When a checkpoint ships `norm_stats`, comparing the actual observation values
+against q01/q99 is a cheap, decisive check for exactly this class of bug —
+do it first for any new embodiment, before any behavioral debugging.
+
+## Gripper *state* convention also looks inverted (same state vector, found alongside the frame bug)
+
+`norm_stats` for the state's gripper slot: mean **0.709**, q01 0.052, q99
+1.010. A gripper cannot be *closed* 71% of the time across a manipulation
+dataset; *open* 71% of the time is entirely normal. Bridge/Octo document the
+matching action channel as "range [0,1]; 1 = open". So the state slot is
+**openness**.
+
+We feed ManiSkill2's `get_gripper_closedness()`, which its source defines as
+`(upper - qpos) / (upper - lower)` → **0 = open, 1 = closed**. Inverted.
+
+Corroborating behavioral evidence, measured over real recorded episodes
+(gripper channel actually sent to the env): R1 commands "open" on **94%** of
+steps and "close" on 6% — implausible for a pick-and-place task, and exactly
+what you would expect from a policy that is being told its gripper is in the
+opposite state from reality. Fix: feed `1.0 - closedness`.
+
+Note this is a *different* thing from the action-side gripper range rescale
+already in `predict_chunk()` — that one is about the commanded value's range,
+this one is about the observed value's polarity.
+
+**Also worth testing but NOT the main issue:** SimplerEnv's own octo wrapper
+binarizes the *commanded* gripper for `widowx_bridge`
+(`2.0 * (open_gripper > 0.5) - 1.0`) while we pass a continuous `2x-1`.
+Measured over real episodes, the fraction of commands landing in the
+indecisive middle band is R0 97%, R1 0%, R2 7% — so binarization would
+matter a lot for R0 and almost nothing for R1/R2. It is not the universal
+explanation; the frame bug is the one that hits all three stages equally.
+
 ## Still open
 
 - **R0/R1 rerun with the gripper fix completed (2026-08-05, 28/28 each) —

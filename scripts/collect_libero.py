@@ -18,7 +18,16 @@ from slava_inventory.io_utils import append_jsonl, load_jsonl  # noqa: E402
 from slava_inventory.schema import empty_quota_eligibility, validate_inventory_record  # noqa: E402
 
 
-SUITES = ("libero_spatial", "libero_object", "libero_goal")
+# libero_10 and libero_90 added 2026-08-06 for the full-set collection
+# (task.md "Потом полный набор": 120-180 tasks). The pilot v0 used only the
+# first three suites; libero_90 alone has 91 more BDDL tasks.
+SUITES = (
+    "libero_spatial",
+    "libero_object",
+    "libero_goal",
+    "libero_10",
+    "libero_90",
+)
 
 
 def git_commit(repository: Path) -> str:
@@ -106,6 +115,15 @@ def collect(args: argparse.Namespace) -> None:
                             "task_name": task.name,
                             "bddl_file": str(bddl_path.relative_to(libero_repo)),
                             "init_state_id": init_state_id,
+                            # How many zero-action steps were simulated after
+                            # set_init_state() before capturing images/poses.
+                            # Recorded because it materially changes the data:
+                            # the pilot v0 collection ran with 0, so objects
+                            # were captured before settling under gravity and
+                            # both the renders and `pose_xyz` reflect a
+                            # transient state. Anything comparing scenes across
+                            # collections must check this matches.
+                            "settle_steps": args.settle_steps,
                         },
                         "images": {
                             "agentview_rgb": str(relative_agent),

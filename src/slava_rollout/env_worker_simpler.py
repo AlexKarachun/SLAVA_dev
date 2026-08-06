@@ -29,17 +29,36 @@ STATE: dict[str, Any] = {"env": None, "tracker": None, "step_count": 0}
 
 
 def _ee_pose_xyzquat(env: Any) -> list[float]:
-    """WidowX end-effector world pose as [x,y,z,qw,qx,qy,qz].
+    """WidowX end-effector pose **relative to the robot base**, as
+    [x,y,z,qw,qx,qy,qz].
 
-    BridgeData-style models (GreenVLA, and likely the lerobot bridge policies
-    for pi0/pi0.5/SmolVLA — see slava-model-rollouts SKILL.md) expect
+    BridgeData-style models (GreenVLA, and the lerobot bridge policies for
+    pi0/pi0.5/SmolVLA — see slava-model-rollouts SKILL.md) expect
     proprioception as EE pose, not joint qpos. `ee_gripper_link` matches the
     link name used by WidowX's own action space (see
     ManiSkill2_real2sim/agents/robots/widowx.py Actor list).
+
+    BASE-RELATIVE, not world (bug found 2026-08-05 — this returned the raw
+    global pose and was the single largest input-distribution error in the
+    SimplerEnv path; see .claude/skills/slava-greenvla). SAPIEN's
+    `link.get_pose()` is world-frame, and the WidowX base sits at z~0.87 in
+    these scenes, so the global pose is nowhere near the training
+    distribution. Checked against GreenVLA's own shipped
+    `norm_stats/bridge/norm_stats.json`, whose state xyz quantiles are
+    x in [0.171, 0.453], y in [-0.169, 0.236], z in [-0.056, 0.195] —
+    unmistakably base-frame. Measured at reset on widowx_stack_cube:
+    global [-0.145, 0.034, 1.005] (normalizes to [-3.24, 0.00, 7.46]) vs
+    base-relative [0.292, -0.006, 0.135] (normalizes to [-0.14, -0.19, 0.52]).
+    Normalized proprioception is supposed to land in roughly [-1, 1].
+
+    Any new embodiment: compare real observation values against the
+    checkpoint's own norm_stats q01/q99 before trusting prose docs about the
+    frame. It is a cheap, decisive check for exactly this class of bug.
     """
+    root_pose = env.agent.robot.get_root_pose()
     for link in env.agent.robot.get_links():
         if link.get_name() == "ee_gripper_link":
-            pose = link.get_pose()
+            pose = root_pose.inv() * link.get_pose()
             return [*pose.p.tolist(), *pose.q.tolist()]
     raise RuntimeError("ee_gripper_link not found on WidowX robot")
 
