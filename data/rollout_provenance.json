@@ -19,17 +19,22 @@
     "  models       list of `model` display names, as written in the annotations",
     "  environment  \"LIBERO\" or \"SimplerEnv\"",
     "  variants     list of instruction-variant names",
-    "  run_ids      explicit list of run_ids"
+    "  run_ids      explicit list of run_ids",
+    "`short_reason` — нейтральная формулировка для отчёта (одна строка, по-русски). Развёрнутые `reason`/`evidence` остаются внутренней записью репозитория и в отчёт не идут."
   ],
   "exclusions": [
     {
       "id": "pi0-family-simplerenv-pre-basewrist-camera-fix",
-      "models": ["pi0", "pi0.5"],
+      "models": [
+        "pi0",
+        "pi0.5"
+      ],
       "environment": "SimplerEnv",
       "reason": "Collected before the _BASE_WRIST_CAMERA_NAME_MAP fix in scripts/model_servers/lerobot_server.py. WidowX/bridge has no wrist camera, and the previous positional camera assignment let the lone real (exterior) frame be consumed by the `left_wrist_0_rgb` slot, leaving `base_0_rgb` -- the slot these checkpoints treat as the main view -- empty, with `right_wrist_0_rgb` filled by a duplicated frame. The policy was therefore looking at the scene in a slot it was trained to treat as a wrist closeup.",
       "evidence": "Camera-slot convention confirmed against openpi's own reference input adapters (physical-intelligence/openpi, src/openpi/policies/{droid,aloha}_policy.py): base_0_rgb is always the exterior camera and a genuinely missing camera is omitted, not duplicated. Full write-up in .claude/skills/slava-lerobot-policies/SKILL.md.",
       "affects": "56 episodes (28 pi0 + 28 pi0.5)",
-      "clears_when": "these 56 episodes are re-collected on a GPU machine with the current lerobot_server.py; the fix is already in the code, only the data is stale"
+      "clears_when": "these 56 episodes are re-collected on a GPU machine with the current lerobot_server.py; the fix is already in the code, only the data is stale",
+      "short_reason": "сняты с конфигурацией камер, не соответствующей этим чекпойнтам на WidowX/bridge; требуется пересъёмка"
     }
   ]
 }

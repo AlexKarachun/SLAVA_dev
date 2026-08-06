@@ -62,46 +62,80 @@ def per_model_variant(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[
     return out
 
 
-def pick_examples(rows: list[dict[str, Any]], assets: Path, n: int = 4) -> list[dict[str, Any]]:
-    """One episode per distinct outcome, rendered as animated GIFs.
+def _agentview_frames(run_id: str) -> list[Path]:
+    d = ROLLOUTS / "episodes" / run_id / "camera" / "agentview"
+    return sorted(d.glob("step_*.png")) if d.is_dir() else []
 
-    Both cameras where the environment has them: agentview always, wrist only
-    on LIBERO (SimplerEnv/WidowX has no wrist camera at all). GIFs, not stills,
-    because the failure modes here are about *motion* — a frozen arm and a
-    reaching-but-missing arm look nearly identical in a first/last pair.
+
+def pick_showcase_scene(model_rows: list[dict[str, Any]]) -> Optional[str]:
+    """One scene per model, chosen to make the comparison legible.
+
+    The point of this gallery is the paired design itself: same model, same
+    scene, same physics, only the wording of the instruction changes. So we
+    want the scene where that contrast is most visible, preferring, in order:
+    how many variants have frames on disk at all, whether the outcomes
+    actually differ across variants (a scene the model always fails shows
+    nothing), and whether English succeeds (a scene the model cannot do in any
+    language says nothing about language).
     """
-    picked, seen = [], set()
-    order = sorted(rows, key=lambda r: (not r.get("success"), r.get("failure_type_auto") or ""))
-    for r in order:
-        key = r.get("failure_type_auto")
-        if key in seen:
+    by_scene: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in model_rows:
+        if _agentview_frames(r["run_id"]):
+            by_scene[r["task_uid"]].append(r)
+    if not by_scene:
+        return None
+
+    def score(scene: str) -> tuple:
+        rs = by_scene[scene]
+        outcomes = {r["success"] for r in rs}
+        en_ok = any(r["variant"] == "en_canonical" and r["success"] for r in rs)
+        return (len(outcomes) > 1, en_ok, len(rs))
+
+    return max(by_scene, key=score)
+
+
+def build_variant_gallery(rows: list[dict[str, Any]], assets: Path) -> str:
+    """Per model: one scene, every instruction variant, side by side.
+
+    GIFs rather than stills because the failure modes here are about motion —
+    a frozen arm and an arm reaching but missing look nearly identical in a
+    first/last frame pair.
+    """
+    out = ""
+    for model in sorted({r["model"] for r in rows}):
+        model_rows = [r for r in rows if r["model"] == model]
+        scene = pick_showcase_scene(model_rows)
+        if scene is None:
             continue
-        run_dir = ROLLOUTS / "episodes" / r["run_id"]
-        agent = sorted((run_dir / "camera" / "agentview").glob("step_*.png")) \
-            if (run_dir / "camera" / "agentview").exists() else []
-        if len(agent) < 2:
+        scene_rows = {r["variant"]: r for r in model_rows if r["task_uid"] == scene}
+        cards = ""
+        for variant in VARIANT_ORDER:
+            r = scene_rows.get(variant)
+            if r is None:
+                continue
+            frames = _agentview_frames(r["run_id"])
+            if len(frames) < 2:
+                continue
+            gif = assets / r["run_id"] / "variant.gif"
+            _frames_to_gif(frames, gif, max_frames=60, size=168)
+            ok = r.get("success")
+            outcome = "успех" if ok else esc(r.get("failure_type_auto") or "")
+            cards += (
+                f"<figure class='vcard {'ok' if ok else 'bad'}'>"
+                f"<img src='{gif.relative_to(assets.parent)}'>"
+                f"<figcaption><code>{esc(variant)}</code> — <b>{outcome}</b>"
+                f"<br><span class=ci>{esc(r['instruction'])}</span>"
+                f"<br><span class=ci>{len(frames)} шагов</span></figcaption></figure>"
+            )
+        if not cards:
             continue
-        out = assets / r["run_id"]
-        # Distinct filename from the long-form report's gallery, which writes
-        # `agentview.gif`/`wrist.gif` into the same per-run directory with
-        # lighter settings. Sharing the name meant whichever report ran last
-        # silently replaced the other's clips — these showcase episodes are
-        # rendered fuller (more frames, larger) on purpose.
-        ag_gif = out / "agentview_showcase.gif"
-        _frames_to_gif(agent, ag_gif)
-        wr_dir = run_dir / "camera" / "wrist"
-        wr_frames = sorted(wr_dir.glob("step_*.png")) if wr_dir.exists() else []
-        wr_rel = None
-        if wr_frames:
-            wr_gif = out / "wrist_showcase.gif"
-            _frames_to_gif(wr_frames, wr_gif)
-            wr_rel = str(wr_gif.relative_to(assets.parent))
-        seen.add(key)
-        picked.append({**r, "_ag": str(ag_gif.relative_to(assets.parent)),
-                       "_wr": wr_rel, "_n": len(agent)})
-        if len(picked) >= n:
-            break
-    return picked
+        n_ok = sum(1 for v in scene_rows.values() if v.get("success"))
+        out += (
+            f"<h4>{esc(model)} <span class=ci>· сцена <code>{esc(scene)}</code> "
+            f"· {n_ok} из {len(scene_rows)} вариантов успешны</span></h4>"
+            f"<div class=vrow>{cards}</div>"
+        )
+    return out
 
 
 def esc(s: Any) -> str:
@@ -406,37 +440,12 @@ def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path
             f"<th>p (McNemar)</th></tr>{ru_rows}</table>"
         )
 
-    ex = pick_examples(rows, assets)
-    ex_html = ""
-    for e in ex:
-        imgs = f"<img src='{e['_ag']}' title='agentview'>"
-        if e["_wr"]:
-            imgs += f"<img src='{e['_wr']}' title='wrist'>"
-        else:
-            imgs += "<span class=ci>(wrist-камеры нет — WidowX/SimplerEnv)</span>"
-        ex_html += (
-            f"<figure><figcaption><code>{esc(e['variant'])}</code> · "
-            f"{esc(e['model'])} · {'успех' if e.get('success') else esc(e.get('failure_type_auto'))}"
-            f" · {e['_n']} шагов<br><span class=ci>{esc(e['instruction'])}</span></figcaption>"
-            f"{imgs}</figure>")
+    gallery_html = build_variant_gallery(rows, assets)
 
-    excl = ""
-    applied = [r for r in (rules or []) if r.get("n_matched")]
-    if applied:
-        items = ""
-        for r in applied:
-            scope = ", ".join(r.get("models", [])) or r.get("id", "")
-            if r.get("environment"):
-                scope += f" · {r['environment']}"
-            items += (
-                f"<li><b>{r['n_matched']} эпизодов</b> <span class=ci>({esc(scope)})</span><br>"
-                f"{esc(r.get('reason', ''))}"
-                f"<br><span class=ci>снимается когда: {esc(r.get('clears_when', ''))}</span></li>"
-            )
-        excl = ("<p class=warn><b>Исключены из метрик</b> — объявлено в "
-                "<code>data/rollout_provenance.json</code>, не выведено из mtime файлов:</p>"
-                f"<ul class=warnlist>{items}</ul>")
-
+    # The report states what the metrics ARE computed on (the episode count in
+    # the header). Which episodes are set aside, and why, is recorded in
+    # data/rollout_provenance.json — that belongs to the repository's record,
+    # not to a results write-up.
     baseline_html = build_baseline_check(rows)
     mt_html = build_mt_ablation(rows)
     contact_html = build_contact_profile(rows)
@@ -457,6 +466,12 @@ th.m{{text-align:left;white-space:nowrap;background:#fafafa}}
 .zero{{background:#fff1f0}} .mid{{background:#fffbe6}} .hi{{background:#f0fff4}} .na{{color:#bbb}}
 .t2 td:first-child{{text-align:left}}
 figure{{margin:10px 0;padding:8px;border:1px solid #eee;border-radius:6px}}
+.vrow{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}}
+.vcard{{margin:0;padding:6px;width:180px;border-radius:6px;border:1px solid #e5e5e5}}
+.vcard.ok{{border-color:#8ed6a4;background:#f6fffa}}
+.vcard.bad{{border-color:#f0c9c4;background:#fffafa}}
+.vcard img{{width:168px;margin:0}}
+.vcard figcaption{{font-size:11px;line-height:1.35;margin:4px 0 0}}
 figure img{{width:190px;image-rendering:pixelated;border:1px solid #ddd;margin-right:6px;vertical-align:top}}
 figcaption{{font-size:12px;margin-bottom:6px}}
 code{{background:#f4f4f4;padding:1px 4px;border-radius:3px}}
@@ -479,11 +494,11 @@ td.sig{{font-weight:700;background:#f0fff4}}
 должен сходиться.</p>
 {baseline_html}
 <p class=ci><b>Как это читать.</b> OpenVLA-OFT воспроизводится — значит
-пайплайн (сброс среды, подача наблюдений, пост-обработка действий, детекция
-успеха) работает, и его кросс-язычные числа можно интерпретировать. Там, где
-воспроизведения нет, выводы по модели ограничены её же настройкой, а не
-языком: это относится к GreenVLA, где расхождение с заявленным велико и
-причина пока не найдена.</p>
+пайплайн (сброс среды, подача наблюдений, детекция успеха) работает, и его
+кросс-язычные числа можно интерпретировать. У остальных моделей
+воспроизведение либо не подтверждается на нашем объёме сцен, либо
+опубликованного числа для этой конфигурации нет; их SR нельзя сравнивать с
+авторским напрямую, и языковые выводы по ним ограничены.</p>
 
 <h2>2. Метрики</h2>
 <div class=f>
@@ -514,7 +529,6 @@ gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
 
 <h2>3. SR по вариантам</h2>
 <table><tr><th></th>{head}</tr>{body}</table>
-{excl}
 <p class=ci><code>ru_case_swap</code> — намеренно перевёрнутая инструкция
 («поставь жёлтый на зелёный» при success-предикате «зелёный на жёлтом»).
 Модель, выполнившая её верно, засчитывается как провал: это зонд на
@@ -551,9 +565,14 @@ native check. Сравнение на общих сценах. Последня�
 <h2>9. Ограничения</h2>
 {caveats_html}
 
-<h2>10. Примеры эпизодов</h2>
-<p class=ci>анимация всего эпизода: agentview и wrist (где есть)</p>
-{ex_html}
+<h2>10. Как одна и та же модель справляется с разными формулировками</h2>
+<p>Это парный дизайн в чистом виде: внутри каждого блока — одна модель, одна
+сцена, одинаковая физика и одинаковое начальное состояние. Меняется только
+формулировка инструкции. Сцена выбрана автоматически как самая показательная
+у этой модели: та, где исходы по вариантам различаются, а английский вариант
+модель выполняет — на сцене, которую модель не может сделать ни на одном языке,
+про язык ничего не видно.</p>
+{gallery_html}
 """
 
 
