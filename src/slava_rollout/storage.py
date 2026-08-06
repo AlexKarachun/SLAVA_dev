@@ -53,9 +53,30 @@ def run_log_path(run_id: str, pool: str | None = None) -> Path:
 
 
 def ensure_episode_dirs(run_id: str, has_wrist: bool) -> None:
+    """Prepare an episode directory — including clearing whatever a previous
+    run of the same run_id left behind.
+
+    Re-running an episode overwrites frames 1..N and appends to steps.jsonl,
+    neither of which removes the tail of a longer earlier attempt. The result
+    is a directory holding two different episodes: frames 1..N from the new
+    run, frames N+1..M from the old one. Nothing in the metrics notices —
+    annotations and steps.jsonl are authoritative — but every consumer of the
+    frames (review dashboards, report clips) then shows one episode that
+    teleports mid-way. Found 2026-08-07 when the user hit exactly that while
+    reviewing rollout 8 of 100: a cube held above its target in one frame,
+    lying on the table in the next.
+    """
+    for camera in ("agentview", "wrist"):
+        directory = camera_dir(run_id, camera)
+        if directory.is_dir():
+            for frame in directory.glob("step_*.png"):
+                frame.unlink()
     camera_dir(run_id, "agentview").mkdir(parents=True, exist_ok=True)
     if has_wrist:
         camera_dir(run_id, "wrist").mkdir(parents=True, exist_ok=True)
+    # steps.jsonl is opened in append mode by the orchestrator, so a re-run
+    # would otherwise interleave two attempts in one file.
+    steps_path(run_id).unlink(missing_ok=True)
     run_log_path(run_id).parent.mkdir(parents=True, exist_ok=True)
 
 

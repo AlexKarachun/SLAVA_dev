@@ -363,6 +363,42 @@ Multiple env-workers could in principle write to the same
 reason, even though the current orchestrator design runs one (model, env)
 pair at a time sequentially.
 
+## Re-running an episode did not clear its directory (found 2026-08-07, fixed)
+
+Sixth data-integrity defect, and the first one found by a human watching the
+footage rather than by an audit script.
+
+`run_episode` writes frames as `step_0001.png`, `step_0002.png`, ... and opens
+`steps.jsonl` in **append** mode. Re-collecting an episode under the same
+`run_id` therefore overwrote frames `1..N` but left `N+1..M` from a longer
+earlier attempt in place. The directory then held two different episodes
+stitched end to end, and every consumer of the frames showed them as one:
+the review dashboard, the report's variant clips, the camera notebook.
+
+Symptom, as the user hit it while reviewing rollout 8 of 100: a cube carried
+above its target in one frame, lying on the table beside it in the next. The
+seam was frames 27→28 — 27 written 2026-08-06 by the valid run, 28..60 written
+2026-08-05 by the run it replaced (`stat -f %Sm` on the frames shows it
+immediately).
+
+**Metrics were never affected** — `rollout_annotations.jsonl` and
+`steps.jsonl` are authoritative and both came from the new run — which is
+exactly why no audit caught it: nothing that gets counted was wrong.
+
+Scale: 12 of 536 episodes (7 OpenVLA-OFT, 4 GreenVLA-R1, 1 GreenVLA-R0),
+2339 stale frames.
+
+Fix: `storage.ensure_episode_dirs` now deletes `step_*.png` in every camera
+directory and unlinks `steps.jsonl` before the episode starts, so a re-run
+begins from an empty directory. Repair for data collected before the fix:
+`scripts/clean_stale_frames.py` (uses `len(steps.jsonl)` as the authority and
+mtime to tell a legitimate terminal frame from an inherited one). Regression
+test: `tests/test_run_rollouts_selection.py::EpisodeDirHygieneTest`.
+
+The general lesson for this project: **an artifact that no metric reads is an
+artifact nothing validates.** Frames, logs and any other by-product need their
+own consistency check, or the first person to look at them finds the problem.
+
 ## Smoke test
 
 `scripts/run_rollouts.py --smoke-test` restricts to **2 task_uids per

@@ -117,5 +117,36 @@ class StoragePoolTest(unittest.TestCase):
         self.assertEqual(storage.DEFAULT_POOL, "pilot_v0")
         self.assertTrue(str(storage.pool_root("pilot_v0")).endswith("rollouts/final/pilot_v0"))
 
+
+class EpisodeDirHygieneTest(unittest.TestCase):
+    """A re-run must not inherit the previous attempt's frames.
+
+    Overwriting frames 1..N leaves N+1..M from a longer earlier run in place,
+    and the result is a directory holding two different episodes — invisible in
+    the metrics, very visible to anyone reviewing the footage.
+    """
+
+    def test_ensure_episode_dirs_clears_previous_attempt(self) -> None:
+        import importlib
+        import tempfile
+
+        import slava_rollout.storage as storage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            storage = importlib.reload(storage)
+            storage.ROLLOUTS_ROOT = Path(tmp)
+            run_id = "some__episode"
+            frames = storage.camera_dir(run_id, "agentview")
+            frames.mkdir(parents=True)
+            for i in (1, 2, 60):
+                (frames / f"step_{i:04d}.png").write_bytes(b"old")
+            storage.steps_path(run_id).write_text('{"step": 1}\n')
+
+            storage.ensure_episode_dirs(run_id, has_wrist=False)
+
+            self.assertEqual(list(frames.glob("step_*.png")), [])
+            self.assertFalse(storage.steps_path(run_id).exists())
+        importlib.reload(storage)
+
 if __name__ == "__main__":
     unittest.main()
