@@ -1,6 +1,6 @@
 ---
 name: slava-lerobot-policies
-description: pi0/pi0.5/SmolVLA model-server specifics for SLAVA rollouts (shared lerobot_server.py) — API, cuDNN crash fix, camera-swap bug, open items. Read slava-model-rollouts first for shared architecture.
+description: pi0/pi0.5/SmolVLA model-server specifics for SLAVA rollouts (shared lerobot_server.py) — API, the transformers-pin bug that loads pi0/pi0.5 with no vision tower, camera-slot and proprio layouts, fresh-machine environment traps (gated PaliGemma, HF token invisible to non-interactive shells), VRAM-per-shard throughput numbers, open items. Read slava-model-rollouts first for shared architecture.
 ---
 
 # pi0 / pi0.5 / SmolVLA — model-server notes

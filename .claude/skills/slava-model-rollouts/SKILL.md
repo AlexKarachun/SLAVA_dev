@@ -1,6 +1,6 @@
 ---
 name: slava-model-rollouts
-description: Shared architecture, contracts, and cross-model lessons for the SLAVA rollout pass (5 models x LIBERO/SimplerEnv), producing rollout_annotations.jsonl per task.md. Per-model debugging detail lives in slava-openvla-oft / slava-lerobot-policies / slava-greenvla.
+description: Shared architecture, contracts, and cross-model lessons for the SLAVA rollout pass (7 model x environment cells over LIBERO/SimplerEnv), producing rollout_annotations.jsonl per task.md. Covers the client-server design, sharding across GPUs, hardware-conditional settings, and the data-integrity audit. The authoritative model x robot grid is docs/CHECKPOINTS.md. Per-model debugging detail lives in slava-openvla-oft / slava-lerobot-policies / slava-greenvla.
 ---
 
 # SLAVA model rollouts — implementation notes
@@ -95,15 +95,28 @@ re-verify if picked up much later):
 | openvla_oft | LIBERO | `moojink/openvla-7b-oft-finetuned-libero-spatial-object-goal-10` | no |
 | pi0 | LIBERO / SimplerEnv | `lerobot/pi0_libero_finetuned` / `lerobot/pi0_base` | no / **yes** |
 | pi05 | LIBERO / SimplerEnv | `lerobot/pi05_libero_finetuned` / `lerobot/pi05_base` | no / **yes** |
-| smolvla | LIBERO / SimplerEnv | `HuggingFaceVLA/smolvla_libero` / `lerobot/smolvla_base` | no / **yes** |
+| greenvla_r2_bridge | SimplerEnv | `SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge` | no |
+| smolvla | LIBERO **only** | `HuggingFaceVLA/smolvla_libero` | no |
 
-No official bridge/WidowX finetune exists for π0/π0.5/SmolVLA (one
-unverified community one, `juexzz/INTACT-pi0-finetune-bridge`, not used).
-**Risk accepted explicitly by the user:** these 3 models on SimplerEnv/
-bridge run zero-shot on SAPIEN-rendered frames despite being pretrained on
-real camera frames — floor-effect SR (near 0 regardless of language) is
-possible; if the smoke test shows this, revisit before the full run rather
-than reporting a meaningless Δlang for those 3×4 cells.
+**The authoritative model x robot grid is `docs/CHECKPOINTS.md`** — read it
+before adding an environment to any model here. It records, per cell, the
+official checkpoint and the action/state space the checkpoint declares about
+itself, plus the fact this table exists to stop people re-deriving: LIBERO is
+a Franka Panda, SimplerEnv is a WidowX, both take 7 numbers and they are
+different quantities.
+
+SmolVLA has **no SimplerEnv row, deliberately** (removed 2026-08-06). There is
+no SmolVLA checkpoint for WidowX/bridge anywhere, and `lerobot/smolvla_base`
+is not a cross-embodiment base: it is an SO-100 model declaring a 6-dim action
+space, so the pair is undefined rather than merely untested. Restoring it
+needs a bridge-finetuned checkpoint, not a code change.
+
+pi0/pi0.5 on SimplerEnv stay zero-shot and legitimate — their declared 32-dim
+space genuinely is zero-padded universal, so `action[:7]` is the exact inverse
+of training's `pad_vector()`. The honest caveat is different: neither base
+checkpoint ships normalization statistics at all, so the observation layout is
+a best-supported convention rather than a verified one, and their bridge SR is
+weakly specified independently of any bug. That belongs in Limitations.
 
 GreenVLA repo: `github.com/greenvla/GreenVLA` (public, HEAD
 `952a80c` as of this session).
@@ -334,19 +347,31 @@ env-worker + model-server + logging before the full 127-prompt run.
 
 ## Porting to different hardware — what is a V100 workaround, not a design choice
 
-Everything in this project has only ever run on 4×Tesla V100-32GB (Volta,
-cc 7.0, **no bf16 tensor cores**). Several fixes in the code exist solely
-because of that and are a needless cost on Ampere or newer. If you are reading
-this on an A100/H100/RTX-40xx, review these four before trusting the setup —
-none of them will fail loudly on newer hardware, they will just quietly waste
-time or memory:
+The pilot was collected on 4×Tesla V100-32GB (Volta, cc 7.0, **no bf16 tensor
+cores**); the 2026-08-06 re-collection of pi0/pi0.5/SmolVLA ran on 2×RTX 3090
+(Ampere, cc 8.6). Several fixes exist solely because of Volta and are a
+needless cost on anything newer.
+
+**The first two are now selected automatically** by
+`torch.cuda.get_device_capability()` — do not "port" them by hand, and do not
+delete the Volta branch: it is still correct on Volta. `SLAVA_COMPAT_V100=1`
+forces the pilot's exact settings on any card, for reproducing released
+numbers rather than collecting new ones. Which batch was collected under which
+settings is recorded per session in `data/collection_runs.json` — update it
+when you collect anything new, because results are now hardware-dependent by
+design.
 
 | Workaround | Where | Why it exists | On cc≥8.0 |
 | --- | --- | --- | --- |
-| `torch.backends.cudnn.enabled = False` | top of `lerobot_server.py` | SigLIP's patch-embedding Conv2d hits `GET was unable to find an engine` on this GPU/cuDNN/torch combination | **Remove it.** Disabling cuDNN globally forces the slower native conv path for every model in that process |
-| `policy_cfg.dtype = "float32"` | `LerobotBackend.__init__` | pi0.5 defaults to bf16, which Volta has no tensor cores for — a hard crash here, not a slowdown | Drop the override and let the checkpoint use bf16; faster and lower memory |
-| `torch==2.7.1+cu126` pin | `bootstrap_models.sh` | newer official wheels support only cc≥7.5 | Free to move to current torch |
-| `compile_model=False` | `LerobotBackend.__init__` | Triton/`torch.compile` fails on this Volta+torch combination | Re-enable if you run many episodes; it is a throughput win once JIT cost amortizes |
+| `torch.backends.cudnn.enabled = False` | top of `lerobot_server.py` | SigLIP's patch-embedding Conv2d hits `GET was unable to find an engine` on this GPU/cuDNN/torch combination | **Automatic** — skipped, cuDNN left enabled |
+| `policy_cfg.dtype = "float32"` | `LerobotBackend.__init__` | pi0.5 defaults to bf16, which Volta has no tensor cores for — a hard crash here, not a slowdown | **Automatic** — the checkpoint's own bf16 is kept; also halves weight memory, which is what lets 2 shards share a 24GB card |
+| `torch==2.7.1+cu126` pin | `bootstrap_models.sh` | newer official wheels support only cc≥7.5 | Still manual. Free to move to current torch (the 3090 box ran 2.11.0+cu130 fine) |
+| `compile_model=False` | `LerobotBackend.__init__` | Triton/`torch.compile` fails on this Volta+torch combination | Still manual. Re-enable if you run many episodes; a throughput win once JIT cost amortizes |
+
+**Not hardware, but the thing that will actually bite you on a fresh box:**
+`transformers` must stay inside lerobot's own pin, or pi0/pi0.5 load with no
+vision tower and only warn about it. Full write-up and the one-line detection
+grep in `slava-lerobot-policies`. Check it before blaming the GPU.
 
 The observation/action-side fixes (camera slot mapping, proprioception frame,
 gripper range/polarity, rotation representation, action truncation) are **not**
