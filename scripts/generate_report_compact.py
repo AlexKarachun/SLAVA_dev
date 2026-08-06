@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from generate_rollout_report import _frames_to_clip  # noqa: E402
+from generate_rollout_report import _frames_to_clip, pretty_model  # noqa: E402
 from slava_rollout.provenance import partition  # noqa: E402
 from slava_rollout.stats import (  # noqa: E402
     bootstrap_ci,
@@ -135,7 +135,7 @@ def build_variant_gallery(rows: list[dict[str, Any]], assets: Path) -> str:
             continue
         n_ok = sum(1 for v in scene_rows.values() if v.get("success"))
         out += (
-            f"<h4>{esc(model)} <span class=ci>· сцена <code>{esc(scene)}</code> "
+            f"<h4>{esc(pretty_model(model))} <span class=ci>· сцена <code>{esc(scene)}</code> "
             f"· {n_ok} из {len(scene_rows)} вариантов успешны</span></h4>"
             f"<div class=vrow>{cards}</div>"
         )
@@ -154,6 +154,18 @@ def load_published_baselines() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8")).get("baselines", {})
 
 
+def load_validation_pool() -> list[dict[str, Any]]:
+    """The harness-validation pool, if it has been collected on this machine.
+
+    Kept separate from the pilot on purpose (run_ids collide by design, see
+    rollouts/RUNS.md); read here only to report the English baseline on the
+    wider scene set."""
+    path = VALIDATION_POOL / "rollout_annotations.jsonl"
+    if not path.is_file():
+        return []
+    return [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
+
+
 def build_baseline_check(rows: list[dict[str, Any]]) -> str:
     """Does our harness reproduce a number the authors published?
 
@@ -162,9 +174,16 @@ def build_baseline_check(rows: list[dict[str, Any]]) -> str:
     first, including where it clearly failed.
     """
     published = load_published_baselines()
+    validation = load_validation_pool()
     body = ""
-    for m in sorted({r["model"] for r in rows}):
-        en = [r for r in rows if r["model"] == m and r["variant"] == "en_canonical"]
+    for m in sorted({r["model"] for r in rows} | {r["model"] for r in validation}):
+        # Same rule as the banner: where a dedicated validation run covers a
+        # model, its wider scene set is the number to report — otherwise this
+        # table and the banner above would disagree about the same check.
+        en = [r for r in validation if r["model"] == m and r["variant"] == "en_canonical"]
+        source_note = " <span class=ci>(валидационный прогон)</span>" if en else ""
+        if not en:
+            en = [r for r in rows if r["model"] == m and r["variant"] == "en_canonical"]
         if not en:
             continue
         k, n = sum(r["success"] for r in en), len(en)
@@ -185,8 +204,8 @@ def build_baseline_check(rows: list[dict[str, Any]]) -> str:
         else:
             verdict, cls = "НИЖЕ заявленного", "zero"
         body += (
-            f"<tr><th class=m>{esc(m)}</th>"
-            f"<td><b>{k}/{n}</b> = {100*k/n:.0f}%<br>"
+            f"<tr><th class=m>{esc(pretty_model(m))}</th>"
+            f"<td><b>{k}/{n}</b> = {100*k/n:.0f}%{source_note}<br>"
             f"<span class=ci>[{100*lo:.0f};{100*hi:.0f}]</span></td>"
             f"<td>{esc(ref_label or '—')}<br><span class=ci>{esc(ref.get('scope') or '')}</span></td>"
             f"<td class={cls}>{verdict}</td>"
@@ -217,10 +236,7 @@ def build_validation_banner(rows: list[dict[str, Any]]) -> str:
     # A dedicated validation run, when one exists, replaces the pilot's own
     # en_canonical count for the models it covers: it is the same check on a
     # wider scene set, so its interval is the one worth reporting.
-    validation_path = VALIDATION_POOL / "rollout_annotations.jsonl"
-    validation: list[dict[str, Any]] = []
-    if validation_path.is_file():
-        validation = [json.loads(l) for l in open(validation_path, encoding="utf-8") if l.strip()]
+    validation = load_validation_pool()
 
     groups: dict[str, list[tuple[str, int, int, float]]] = {"preliminary": [], "excluded": []}
     for model in sorted({r["model"] for r in rows} | {r["model"] for r in validation}):
@@ -240,7 +256,7 @@ def build_validation_banner(rows: list[dict[str, Any]]) -> str:
 
     def items(entries: list[tuple[str, int, int, float]]) -> str:
         return "".join(
-            f"<li><b>{esc(model)}</b> — у нас {hits}/{total} = {100 * hits / total:.0f}% "
+            f"<li><b>{esc(pretty_model(model))}</b> — у нас {hits}/{total} = {100 * hits / total:.0f}% "
             f"на <code>en_canonical</code> против заявленных {100 * reference:.0f}%</li>"
             for model, hits, total, reference in entries
         )
@@ -313,7 +329,7 @@ def build_mt_ablation(rows: list[dict[str, Any]]) -> str:
         p_txt = (f"нет расхождений<br><span class=ci>0 из {len(shared)}</span>"
                  if b is None else f"{b:.3f}<br><span class=ci>{d_mt}:{d_ru}</span>")
         body += (
-            f"<tr><th class=m>{esc(m)}</th><td>{len(shared)}</td>"
+            f"<tr><th class=m>{esc(pretty_model(m))}</th><td>{len(shared)}</td>"
             f"<td>{mt_k}/{len(shared)}</td><td>{ru_k}/{len(shared)}</td>"
             f"<td>{p_txt}</td><td class=ci>{tok_txt}</td></tr>"
         )
@@ -343,7 +359,7 @@ def build_contact_profile(rows: list[dict[str, Any]]) -> str:
                 f"<td>{100*p['wrong_target']:.0f}%</td>"
                 f"<td>{100*p['no_contact']:.0f}%</td></tr>"
             )
-        out += (f"<h4>{esc(m)}</h4><table class=t2><tr><th>вариант</th><th>n</th>"
+        out += (f"<h4>{esc(pretty_model(m))}</h4><table class=t2><tr><th>вариант</th><th>n</th>"
                 f"<th>верный target</th><th>не тот объект</th>"
                 f"<th>не коснулся вовсе</th></tr>{body}</table>")
     return out
@@ -366,7 +382,7 @@ def build_failure_mix(rows: list[dict[str, Any]]) -> str:
             ) + "</tr>"
         if body:
             head = "".join(f"<th>{l.replace('_error','').replace('_or_timeout','')}</th>" for l in labels)
-            out += f"<h4>{esc(m)}</h4><table class=t2><tr><th>вариант</th>{head}</tr>{body}</table>"
+            out += f"<h4>{esc(pretty_model(m))}</h4><table class=t2><tr><th>вариант</th>{head}</tr>{body}</table>"
     return out
 
 
@@ -408,7 +424,7 @@ def build_caveats(rows: list[dict[str, Any]], all_rows: list[dict[str, Any]]) ->
         cl = cluster_summary(shared)
         tb, tc = paired_by_task(en, ru)
         items.append(
-            f"<li><b>Мощность на пределе.</b> У {esc(m)} значимость даёт расклад "
+            f"<li><b>Мощность на пределе.</b> У {esc(pretty_model(m))} значимость даёт расклад "
             f"{b}:{c} по дискордантным сценам (p={mcnemar_exact(b, c):.3f}). "
             f"При n={len(shared)} минимум для p&lt;0.05 — это 6:0; одна сцена в "
             f"обратную сторону, и p={mcnemar_exact(max(b-1, 0), c+0) or 1:.3f}. "
@@ -431,16 +447,25 @@ def build_caveats(rows: list[dict[str, Any]], all_rows: list[dict[str, Any]]) ->
             floor.append(m)
     if floor:
         items.append(
-            "<li><b>Floor effect.</b> У " + esc(", ".join(floor)) +
+            "<li><b>Floor effect.</b> У " + esc(", ".join(pretty_model(f) for f in floor)) +
             " SR близок к нулю уже на английском, поэтому их Δlang≈0 означает "
             "«измерять нечем», а не «языкового эффекта нет». Эти строки нельзя "
             "читать как свидетельство против эффекта.</li>"
         )
 
     items.append(
-        "<li><b>n=1 повтор</b> на (сцена × вариант × модель) — осознанное решение ради "
-        "простоты сравнения. У pi0/pi0.5/SmolVLA действие сэмплируется из "
-        "flow-matching головы, так что их числа шумнее детерминированных OpenVLA-OFT/GreenVLA.</li>"
+        "<li><b>Валидация стенда пройдена одной моделью из семи.</b> Только у OpenVLA-OFT "
+        "английская база сходится с опубликованной авторами. Это ограничение всего "
+        "пилота, а не отдельной таблицы: у остальных моделей неизвестно, что именно "
+        "измеряется — язык или дефект нашего пайплайна.</li>"
+    )
+    items.append(
+        "<li><b>n=1 повтор</b> на (сцена × вариант × модель). Политики сэмплируют действия, "
+        "поэтому часть разброса — шум: при повторном прогоне 12 одинаковых эпизодов на другом "
+        "железе совпало 9 исходов из 12. Пилот проверяет работоспособность подхода, а не даёт "
+        "финальную оценку; шум снимается объёмом на большом наборе сцен, а не повторами здесь. "
+        "У \u03c00/\u03c00.5/SmolVLA действие сэмплируется из flow-matching головы, так что их "
+        "числа шумнее.</li>"
     )
     items.append(
         "<li><b>Авторазметка не прошла ручную валидацию.</b> Обязательная по task.md проверка "
@@ -476,7 +501,7 @@ def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path
             cls = "hi" if k / n >= 0.3 else ("mid" if k else "zero")
             tds += (f"<td class={cls}><b>{k}/{n}</b><br><span class=ci>"
                     f"{100*k/n:.0f}% [{100*lo:.0f};{100*hi:.0f}]</span></td>")
-        body += f"<tr><th class=m>{esc(m)}</th>{tds}</tr>"
+        body += f"<tr><th class=m>{esc(pretty_model(m))}</th>{tds}</tr>"
 
     # ---- language effect, per model, en_canonical anchored, PAIRED
     #
@@ -513,7 +538,7 @@ def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path
             )
         lo, hi = bootstrap_ci([float(x) for x in en.values()])
         lang += (
-            f"<h4>{esc(m)} <span class=ci>SR<sub>en_canonical</sub> = "
+            f"<h4>{esc(pretty_model(m))} <span class=ci>SR<sub>en_canonical</sub> = "
             f"{100*sr_en:.0f}% ({sum(en.values())}/{len(en)}) "
             f"[bootstrap {100*lo:.0f};{100*hi:.0f}]</span></h4>"
             f"<table class=t2><tr><th>вариант</th><th>парных сцен</th>"
@@ -606,8 +631,8 @@ gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
 дискордантных пар нет вовсе, то есть данных для суждения нет — это не то же самое,
 что «различий нет».</p>
 <p class=ci><b>Оговорка о метриках.</b> <code>final_relation_success</code> в этом
-пилоте тождественно равен <code>success</code> (проверено: совпадает во всех 550
-эпизодах): у каждой сцены ровно один success-предикат, и это буквально тот же
+пилоте тождественно равен <code>success</code> (проверено: совпадает во всех
+{n_total} эпизодах): у каждой сцены ровно один success-предикат, и это буквально тот же
 предикат, который проверяет нативный <code>env.check_success()</code>. Поэтому
 отдельной колонкой «relation success» он не выводится — это было бы то же число
 под другим именем.</p>

@@ -23,7 +23,7 @@ D2  object_lexicon.csv        словарь физических типов о�
 D3  selected_tasks_v0.jsonl   заморозка 20 сцен под квоты v0 (16 LIBERO + 4 SimplerEnv)
 D4  frames_v0.jsonl           grounded target/reference/relation/forbidden +
                                RU/EN instruction variants (заморожено, tag slava-pilot-v0)
-D5  rollout_annotations.jsonl прогон 5 VLA-моделей × 127 промптов в симуляторе,
+D5  rollout_annotations.jsonl прогон 7 моделей × 127 промптов в симуляторе,
                                авторазметка успеха/провала
 ```
 
@@ -41,7 +41,8 @@ cd SLAVA_dev
 # D1-D4: окружения для сбора/разметки данных (slava-notebook, slava-libero, slava-simpler)
 bash scripts/bootstrap.sh
 
-# D5: окружения для 5 VLA-моделей (slava-greenvla, slava-openvla, slava-lerobot)
+# D5: окружения моделей — три conda env (slava-greenvla, slava-openvla, slava-lerobot)
+# на семь клеток «модель × среда» из MODEL_REGISTRY
 # — отдельный скрипт, т.к. у моделей несовместимые друг с другом версии
 # python/torch. См. предупреждение в самом файле — реконструирован из
 # истории реальной отладочной сессии, не самостоятельная чистая проверка
@@ -59,7 +60,7 @@ bash scripts/bootstrap_models.sh
 | [`src/slava_inventory/`](src/slava_inventory) | Общий код D1-D4: схемы фреймов, IO, notebook-виджеты |
 | [`src/slava_rollout/`](src/slava_rollout) | Общий код D5: env-worker'ы, model-клиенты, авторазметка, схема аннотаций |
 | [`scripts/`](scripts) | Все точки входа (по одному скрипту на шаг пайплайна, см. таблицы ниже) |
-| [`scripts/model_servers/`](scripts/model_servers) | HTTP model-серверы для 5 VLA-моделей |
+| [`scripts/model_servers/`](scripts/model_servers) | HTTP model-серверы (по одному на семейство: GreenVLA, OpenVLA-OFT, lerobot) |
 | [`data/`](data) | Датасеты D1-D4 (inventory, lexicon, frames, prompts) |
 | [`notebooks/`](notebooks) | Интерактивный сбор/ревью (01) и дашборд камер роллаутов (02) |
 | [`docs/`](docs) | Публикуемые артефакты (GitHub Pages): галерея сцен, отчёт по роллаутам |
@@ -162,7 +163,7 @@ python scripts/apply_frames_review.py path/to/frames_review_corrections.json
 
 ## D5: Model rollouts
 
-Прогон 5 VLA-моделей на `data/pilot_v0_release/prompts_v0.jsonl` в закрытом цикле
+Прогон 7 моделей на `data/pilot_v0_release/prompts_v0.jsonl` в закрытом цикле
 (closed-loop) в симуляторе, с авторазметкой успеха и типа ошибки.
 
 ### Модели и среды

@@ -25,6 +25,17 @@ from slava_rollout.provenance import partition  # noqa: E402
 DATA_DIR = PROJECT_ROOT / "data"
 ROLLOUTS_DIR = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0"
 
+# Display-only spelling of model names. The identity stored in annotations,
+# MODEL_REGISTRY and published_baselines.json stays ASCII ("pi0") — renaming it
+# there would desync 536 already-collected rows and every lookup keyed by it.
+# The papers write these two as pi with a subscript, so the reports do too.
+PRETTY_MODEL_NAMES = {"pi0": "\u03c00", "pi0.5": "\u03c00.5"}
+
+
+def pretty_model(name: str) -> str:
+    return PRETTY_MODEL_NAMES.get(name, name)
+
+
 VARIANT_ORDER = [
     "en_canonical", "en_paraphrase", "mt_russian", "ru_literal",
     "ru_free_order", "ru_case_swap", "ru_negation", "code_switch",
@@ -478,7 +489,7 @@ def render_html(
             )
         else:
             verdict = '<span class="badge success">валидно</span> все эпизоды на финальном коде'
-        provenance_rows += f"<tr><td>{model}</td><td>{s['n']}</td><td>{verdict}</td></tr>"
+        provenance_rows += f"<tr><td>{pretty_model(model)}</td><td>{s['n']}</td><td>{verdict}</td></tr>"
 
     models_rows = ""
     for m in setup["models"]:
@@ -487,7 +498,7 @@ def render_html(
             for e in m["environments"]
         )
         models_rows += (
-            f"<tr><td>{m['display_name']}</td><td><code>{m['backbone']}</code></td>"
+            f"<tr><td>{pretty_model(m['display_name'])}</td><td><code>{m['backbone']}</code></td>"
             f"<td>{env_lines}</td><td>{m['n_prompts']}</td></tr>"
         )
 
@@ -527,7 +538,7 @@ def render_html(
             )
         if rows:
             per_model_sections += (
-                f"<h3>{model}</h3><table class=\"data-table\"><thead><tr>"
+                f"<h3>{pretty_model(model)}</h3><table class=\"data-table\"><thead><tr>"
                 "<th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>"
                 "<th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>"
                 f"</tr></thead><tbody>{rows}</tbody></table>"
@@ -586,7 +597,7 @@ def render_html(
         return "".join(parts)
 
     language_effect_by_model_sections = "".join(
-        f"<h3>{model}</h3><table class=\"data-table\"><thead><tr><th>Effect</th>"
+        f"<h3>{pretty_model(model)}</h3><table class=\"data-table\"><thead><tr><th>Effect</th>"
         f"<th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead>"
         f"<tbody>{_lang_effect_rows_html(rows)}</tbody></table>"
         for model, rows in language_effect_by_model.items()
@@ -597,7 +608,7 @@ def render_html(
     for c in coverage:
         status_class = {"complete": "success", "partial": "", "not started": "fail"}[c["status"]]
         coverage_rows += (
-            f"<tr><td>{c['display_name']}</td><td>{c['done']} / {c['planned']}</td>"
+            f"<tr><td>{pretty_model(c['display_name'])}</td><td>{c['done']} / {c['planned']}</td>"
             f"<td><span class=\"badge {status_class}\">{c['status']}</span></td></tr>"
         )
 
@@ -660,7 +671,7 @@ def render_html(
 <body>
 <header>
   <h1>SLAVA — pilot v0 rollout technical report</h1>
-  <p>Первые model rollouts на 5 моделях × LIBERO/SimplerEnv, по контракту task.md. {n_annotations} эпизодов размечено на момент генерации отчёта.</p>
+  <p>Первые model rollouts на 7 моделях × LIBERO/SimplerEnv, по контракту task.md. {n_annotations} эпизодов размечено на момент генерации отчёта.</p>
 </header>
 <main>
 
@@ -700,7 +711,7 @@ def render_html(
     <div class="stat"><b>{setup['n_task_uids']}</b><span>сцен (task_uid)</span></div>
     <div class="stat"><b>{setup['n_prompts_total']}</b><span>промптов (task_uid × variant), {prompts_by_env_str}</span></div>
     <div class="stat"><b>{setup['n_repeats']}</b><span>повторов на (сцена × вариант × модель)</span></div>
-    <div class="stat"><b>{setup['planned_episodes']}</b><span>запланировано эпизодов (5 моделей)</span></div>
+    <div class="stat"><b>{setup['planned_episodes']}</b><span>запланировано эпизодов (7 моделей)</span></div>
     <div class="stat"><b>{n_annotations}</b><span>фактически размечено эпизодов</span></div>
     <div class="stat"><b>{max_steps_str}</b><span>лимит шагов на эпизод</span></div>
   </div>
@@ -710,13 +721,10 @@ def render_html(
   <code>.claude/skills/slava-model-rollouts/SKILL.md</code>.</p>
 
   <h3>Фактическое покрытие прогонов (эпизодов сделано / запланировано)</h3>
-  <div class="warn"><b>Прогон ограничен по времени</b> (жёсткий дедлайн сессии) — покрытие ниже
-  частичное для всех моделей кроме OpenVLA-OFT (завершён полностью, 99/99, после фикса SR=0% —
-  см. раздел 6). Метрики ниже посчитаны честно по тому, что реально есть на момент генерации отчёта —
-  читайте их с поправкой на неполное покрытие для pi0/pi0.5/SmolVLA/GreenVLA, а не как финальный
-  полный пилот. Все 4 GPU были заняты параллельно до последнего момента; отчёт можно перегенерировать
-  (<code>python scripts/generate_rollout_report.py</code>) против более полного
-  <code>rollout_annotations.jsonl</code> в будущем без изменений кода.</div>
+  <p class="muted">Покрытие полное: каждая клетка «модель × среда», под которую существует
+  опубликованный чекпойнт, заполнена целиком. Клетки, где чекпойнта не существует
+  (GreenVLA на LIBERO, OpenVLA-OFT и SmolVLA на SimplerEnv), в план не входят и не
+  считаются пропуском — см. <code>docs/CHECKPOINTS.md</code>.</p>
   <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
   <tbody>{coverage_rows}</tbody></table>
 </section>
@@ -786,9 +794,14 @@ def render_html(
   не выполнена. Требуется ручная сверка выборки эпизодов (камера + <code>rollout_annotations.jsonl</code> +
   <code>failure_type_auto</code>) против того, что реально произошло.</p>
   <p><b>v0.1 (projection 3D → 2D crosshair) и pointing-зонд GreenVLA</b> — не начаты, вне scope pilot v0.</p>
-  <p><b>Полное покрытие всех моделей × 127 промптов</b> — не достигнуто в рамках этой сессии; см. таблицу
-  покрытия в разделе 2. Прогон можно продолжить отдельным запуском —
-  <code>load_completed_run_ids()</code> резюмирует по уже готовым <code>run_id</code> без дублирования.</p>
+  <p><b>Валидация стенда пройдена одной моделью из семи.</b> На <code>en_canonical</code>
+  воспроизводится только OpenVLA-OFT; у остальных опубликованное авторами число не
+  достигается, поэтому их кросс-язычные числа читаются как предварительные или не
+  читаются вовсе — см. шапку компактного отчёта и <code>docs/OPEN_ISSUES.md</code>.</p>
+  <p><b>Один эпизод на клетку</b> (сцена × вариант × модель). Политики сэмплируют действия,
+  поэтому часть разброса — шум: при повторном прогоне 12 одинаковых эпизодов на другом
+  железе совпало 9 исходов. Пилот проверяет работоспособность подхода, а не даёт финальную
+  оценку; шум снимается объёмом на большом наборе сцен.</p>
   </div>
 </section>
 
