@@ -25,6 +25,7 @@ lifetime).
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -45,7 +46,27 @@ from scipy.spatial.transform import Rotation
 # sidesteps the whole error class regardless of root cause — a blunter fix
 # than pinning dtype, but the one that actually works. Only affects this
 # process (env-worker/other model-servers are separate processes/envs).
-torch.backends.cudnn.enabled = False
+#
+# Both that fallback and the float32 pin below are workarounds for ONE piece of
+# hardware, so they are selected by hardware rather than hardcoded — otherwise
+# every future user pays a Volta tax on a card that never had the problem. The
+# bf16 kernels these two settings route around exist from compute capability
+# 8.0 (Ampere) on; before that they do not, which is the whole failure. See
+# docs/CHECKPOINTS.md for what the released pilot data was collected on.
+#
+# SLAVA_COMPAT_V100=1 forces the pilot's exact settings on any card, for
+# reproducing the released numbers rather than collecting new ones.
+def _volta_workarounds_needed() -> bool:
+    if os.environ.get("SLAVA_COMPAT_V100") == "1":
+        return True
+    if not torch.cuda.is_available():
+        return False
+    return torch.cuda.get_device_capability()[0] < 8
+
+
+_LEGACY_GPU = _volta_workarounds_needed()
+if _LEGACY_GPU:
+    torch.backends.cudnn.enabled = False
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from base_server import base_arg_parser, serve  # noqa: E402
@@ -148,7 +169,13 @@ class LerobotBackend:
         # pass `config=` explicitly to from_pretrained) sidesteps this
         # entirely. Same hasattr guard so this is a no-op for any backend
         # without a `dtype` field.
-        if hasattr(policy_cfg, "dtype"):
+        # Same hardware condition as the cuDNN switch above. On Volta the
+        # checkpoint default ("bfloat16" for pi0.5, read from `config.dtype`)
+        # is not a slow path but a hard crash, so it is pinned to float32
+        # there. From Ampere on, bf16 is native: keeping the checkpoint's own
+        # default is both what its authors ran and half the weights' memory,
+        # which is what lets several model-server shards share one card.
+        if hasattr(policy_cfg, "dtype") and _LEGACY_GPU:
             policy_cfg.dtype = "float32"
         policy_cls = get_policy_class(policy_cfg.type)
         self.policy = policy_cls.from_pretrained(checkpoint, config=policy_cfg)
