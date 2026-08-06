@@ -7,17 +7,37 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Single unified directory for every model/run's logs — user's explicit requirement,
-# not split per model or per launch. See AGENTS.md "Выход и требования к запуску".
 ROLLOUTS_ROOT = PROJECT_ROOT / "rollouts"
 
+# One directory per *pool* of episodes, not per model and not per launch: a pool
+# is a set of episodes that were collected by one code state and may be
+# aggregated together. `final/` holds the pools that current results are read
+# from; `archive/` holds superseded ones, kept because they are the only record
+# of what compromised runs actually did. Every pool directory carries a README.md
+# saying what it is, on what hardware, and whether it may be trusted — see
+# rollouts/RUNS.md for the index.
+#
+# The active pool is overridable so a run can be collected into a fresh pool
+# without touching the finished ones (SLAVA_RUN_POOL=<name>, resolved under
+# final/). Everything downstream — resume, episode frames, per-episode logs —
+# follows from here, so there is exactly one place that decides where a run
+# lands.
+import os as _os
 
-def annotations_path() -> Path:
-    return ROLLOUTS_ROOT / "rollout_annotations.jsonl"
+DEFAULT_POOL = "pilot_v0"
+POOL_NAME = _os.environ.get("SLAVA_RUN_POOL", DEFAULT_POOL)
 
 
-def episode_dir(run_id: str) -> Path:
-    return ROLLOUTS_ROOT / "episodes" / run_id
+def pool_root(pool: str | None = None) -> Path:
+    return ROLLOUTS_ROOT / "final" / (pool or POOL_NAME)
+
+
+def annotations_path(pool: str | None = None) -> Path:
+    return pool_root(pool) / "rollout_annotations.jsonl"
+
+
+def episode_dir(run_id: str, pool: str | None = None) -> Path:
+    return pool_root(pool) / "episodes" / run_id
 
 
 def steps_path(run_id: str) -> Path:
@@ -28,8 +48,8 @@ def camera_dir(run_id: str, camera: str) -> Path:
     return episode_dir(run_id) / "camera" / camera
 
 
-def run_log_path(run_id: str) -> Path:
-    return ROLLOUTS_ROOT / "logs" / f"{run_id}.log"
+def run_log_path(run_id: str, pool: str | None = None) -> Path:
+    return pool_root(pool) / "logs" / f"{run_id}.log"
 
 
 def ensure_episode_dirs(run_id: str, has_wrist: bool) -> None:

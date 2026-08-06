@@ -41,8 +41,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from slava_rollout.auto_label import label_episode  # noqa: E402
 from slava_rollout.schema import validate_rollout_annotation  # noqa: E402
 
-ANNOTATIONS = PROJECT_ROOT / "rollouts" / "rollout_annotations.jsonl"
-EPISODES = PROJECT_ROOT / "rollouts" / "episodes"
+ANNOTATIONS = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0" / "rollout_annotations.jsonl"
+EPISODES = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0" / "episodes"
 PROMPTS = PROJECT_ROOT / "data" / "pilot_v0_release" / "prompts_v0.jsonl"
 
 DERIVED_FIELDS = (

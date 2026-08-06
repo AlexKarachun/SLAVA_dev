@@ -536,7 +536,7 @@ Diagnostic, cheap, run it after ANY dependency change:
 
 ```bash
 grep -cE "Could not load state dict|Missing key|might need handling" \
-  rollouts/logs/model_server_*.log
+  rollouts/final/pilot_v0/logs/model_server_*.log
 ```
 
 Nonzero for a pi0-family server means the numbers from that run are void.
@@ -568,7 +568,7 @@ time, and every one of them will hit the next person to bootstrap from scratch.
 Symptom is not an obvious ImportError in the foreground: the model-server dies
 at startup, and the *orchestrator* reports
 `TimeoutError: http://127.0.0.1:PORT did not become healthy in 600.0s`. Read
-`rollouts/logs/model_server_*.log`, not the orchestrator log. All three are now
+`rollouts/final/pilot_v0/logs/model_server_*.log`, not the orchestrator log. All three are now
 installed by `bootstrap_models.sh`.
 
 **pi0/pi0.5 need a gated HuggingFace repo.** Their tokenizer is

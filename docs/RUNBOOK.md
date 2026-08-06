@@ -168,8 +168,17 @@ python3 scripts/validate_frames.py
 conda run -n slava-notebook python scripts/run_rollouts.py --smoke-test
 ```
 
+**Куда пишется прогон.** В пул — папку `rollouts/final/<pool>/`, по умолчанию
+`pilot_v0`, переопределяется `SLAVA_RUN_POOL=<имя>`. Заводите новый пул, если
+изменился код инференса, железо или набор промптов: пул — это набор эпизодов,
+которые допустимо агрегировать вместе, и смешивать в нём два состояния кода
+нельзя. У каждого пула свой `README.md` (железо, параметры, достоверность),
+индекс — `rollouts/RUNS.md`. Заполните этот `README.md` сразу, а не потом:
+через неделю железо и настройки уже не восстановить.
+
 Затем полный прогон. Resume по `run_id` включён всегда — повторный запуск
-досчитывает недостающее и не портит уже собранное.
+досчитывает недостающее и не портит уже собранное (в пределах одного пула:
+`run_id` между пулами намеренно совпадают).
 
 ```bash
 conda run -n slava-notebook python scripts/run_rollouts.py
@@ -250,8 +259,8 @@ python3 scripts/relabel_rollouts.py --write
 
 | Симптом | Где написано |
 | --- | --- |
-| **SR≈0 у pi0/pi0.5 — проверить ПЕРВЫМ делом** | `slava-lerobot-policies` → «transformers out of lerobot's pin». Версия вне пина грузит модель без башни зрения и только предупреждает. Проверка: `grep -cE "Could not load state dict\|Missing key" rollouts/logs/model_server_*.log` — не ноль означает, что числа этого прогона недействительны |
-| `did not become healthy in 600.0s` | смотреть `rollouts/logs/model_server_*.log`, а не лог оркестратора: почти всегда это упавший на старте сервер — нехватка пакета или `torch.OutOfMemoryError` |
+| **SR≈0 у pi0/pi0.5 — проверить ПЕРВЫМ делом** | `slava-lerobot-policies` → «transformers out of lerobot's pin». Версия вне пина грузит модель без башни зрения и только предупреждает. Проверка: `grep -cE "Could not load state dict\|Missing key" rollouts/final/pilot_v0/logs/model_server_*.log` — не ноль означает, что числа этого прогона недействительны |
+| `did not become healthy in 600.0s` | смотреть `rollouts/final/pilot_v0/logs/model_server_*.log`, а не лог оркестратора: почти всегда это упавший на старте сервер — нехватка пакета или `torch.OutOfMemoryError` |
 | `401 ... restricted` при старте pi0/pi0.5 | gated-репозиторий `google/paligemma-3b-pt-224`: принять лицензию на HF **и** авторизоваться. Токен в `~/.bashrc` неинтерактивным шеллам не виден — нужен `hf auth login`, проверять `hf auth whoami`, не `echo` |
 | GPU загружены на 1-30%, кажется что всё стоит | так и должно быть у pi0-семейства из-за чанкинга действий. Мерить прогресс эпизодами в минуту, а не `nvidia-smi`; см. `slava-lerobot-policies` → «Throughput» |
 | Мало шардов / OOM при старте | там же: SmolVLA ~1.15 ГБ на шард (влезает 8), pi0/pi0.5 в bf16 ~10 ГБ (влезает **2** на 24 ГБ) |

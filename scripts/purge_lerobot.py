@@ -20,7 +20,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_KEYS = ("pi0", "pi05", "smolvla")
-ARCHIVE = PROJECT_ROOT / "rollouts" / "episodes_archived_pre_reset_fix"
+ARCHIVE = PROJECT_ROOT / "rollouts" / "archive" / "lerobot_pre_reset_fix" / "episodes"
 
 
 def is_target(run_id: str) -> bool:
@@ -28,7 +28,7 @@ def is_target(run_id: str) -> bool:
 
 
 def main() -> None:
-    annotations = PROJECT_ROOT / "rollouts" / "rollout_annotations.jsonl"
+    annotations = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0" / "rollout_annotations.jsonl"
     lines = [l for l in annotations.read_text(encoding="utf-8").splitlines() if l.strip()]
     rows = [(json.loads(l)["run_id"], l) for l in lines]
 
@@ -43,7 +43,7 @@ def main() -> None:
     ARCHIVE.mkdir(parents=True, exist_ok=True)
     moved = 0
     for run_id in drop:
-        src = PROJECT_ROOT / "rollouts" / "episodes" / run_id
+        src = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0" / "episodes" / run_id
         if src.is_dir():
             dest = ARCHIVE / run_id
             if dest.exists():

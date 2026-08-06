@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Generate the pilot v0 rollout technical report (data overview, setup,
 camera demos, behavioral-pilot / cleaned-language-effect metric tables from
-task.md). Reads whatever is currently in rollouts/rollout_annotations.jsonl —
+task.md). Reads whatever is currently in the active pool's
+rollout_annotations.jsonl (rollouts/final/pilot_v0/, see rollouts/RUNS.md) —
 safe to run against partial (smoke-test) data or the full run.
 
 Usage: python scripts/generate_rollout_report.py [--output data/rollout_report.html]
@@ -22,7 +23,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from slava_rollout.provenance import partition  # noqa: E402
 
 DATA_DIR = PROJECT_ROOT / "data"
-ROLLOUTS_DIR = PROJECT_ROOT / "rollouts"
+ROLLOUTS_DIR = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0"
 
 VARIANT_ORDER = [
     "en_canonical", "en_paraphrase", "mt_russian", "ru_literal",

@@ -647,6 +647,40 @@ indecisive middle band is R0 97%, R1 0%, R2 7% — so binarization would
 matter a lot for R0 and almost nothing for R1/R2. It is not the universal
 explanation; the frame bug is the one that hits all three stages equally.
 
+## Full bridge-set validation on 2×RTX 3090 (2026-08-07) — R0's zero is real, and the pilot's scene set was the confound
+
+The pilot's four SimplerEnv scenes are **all `widowx_stack_cube`**, the hardest
+of the four bridge tasks, while GreenVLA's published averages cover all four.
+So "R1 1/4 vs 72.9%" was comparing different task sets, not just a small sample.
+Re-run on the authors' own full set (22 scenes × 4 tasks, `en_canonical` only,
+success straight from the simulator):
+
+```
+                 stack_cube  carrot_on_plate  spoon_on_towel  eggplant_in_basket  total
+GreenVLA-R0         0/8            0/8             0/3              0/3            0/22
+GreenVLA-R1         1/8            1/8             1/3              2/3            5/22
+```
+
+Two things follow, and they point in opposite directions:
+
+1. **The SimplerEnv harness is alive.** R1 solves 2 of 3 eggplant episodes and
+   scores on every task except none — reaching, grasping and placing all work.
+   A pipeline that were broken the way R0's numbers suggest could not do that.
+2. **R0's zero is not a sampling artifact.** 0/22 across all four tasks, on the
+   same scenes, same env-worker and same server that R1 scores on, including the
+   easy task where the paper claims 88.5%. Whatever is wrong with R0 is specific
+   to that checkpoint (or to how we configure it), not to the environment. This
+   supersedes the older "R0 fails on the easy tasks too" section: it is now
+   established on 22 episodes and four tasks rather than on `eggplant` alone.
+
+R1 at 5/22 = 23% [10;43] still does not reach the published 72.9%, so the
+harness is not validated for GreenVLA either — but the gap is now a quantified
+one on a comparable task set, not a comparison of different benchmarks.
+
+Reproduce with `scripts/export_prompts_simpler_en.py` +
+`run_rollouts.py --variants en_canonical --prompts …`; see
+`docs/HARNESS_VALIDATION.md`.
+
 ## Still open
 
 - **R0/R1 rerun with the gripper fix completed (2026-08-05, 28/28 each) —

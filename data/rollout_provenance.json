@@ -33,7 +33,8 @@
       "evidence": "PreTrainedConfig.from_pretrained('lerobot/smolvla_base').output_features == {'action': shape=(6,)}; the postprocessor's UnnormalizerProcessorStep carries only so100/so100-red/so100-blue action statistics; SimplerEnv's base_controller asserts action.shape == (7,). The 15 episodes collected for this pair are 0/15 successful with 9 labelled no_action_or_timeout, which is the signature of a command that means nothing to the robot rather than of a policy that tried and failed.",
       "affects": "15 episodes (SmolVLA x SimplerEnv). SmolVLA's 99 LIBERO episodes are unaffected: HuggingFaceVLA/smolvla_libero is fine-tuned on that embodiment and declares the matching action space.",
       "clears_when": "never for this checkpoint -- it would need a SmolVLA fine-tuned on bridge/WidowX, which is a different model, not a rerun",
-      "short_reason": "чекпойнт обучен на другом манипуляторе (SO-100) и не определён на WidowX/bridge: пара «модель × среда» не оценивается zero-shot"
+      "short_reason": "чекпойнт обучен на другом манипуляторе (SO-100) и не определён на WidowX/bridge: пара «модель × среда» не оценивается zero-shot",
+      "note": "Строк с этой парой в текущих аннотациях нет вовсе: 13 папок кадров вынесены в rollouts/archive/smolvla_simplerenv_excluded/ (07.08.2026). Поэтому генераторы отчётов печатают «matched nothing» — это ожидаемо, правило остаётся как объявление, что пара не оценивается, а не как отложенный пересбор."
     }
   ]
 }

@@ -306,24 +306,49 @@ touching a model-server file.
 
 User's explicit decision: one PNG per step per camera (not video, not every
 N steps), stored at
-`rollouts/episodes/<run_id>/camera/{agentview,wrist}/step_<NNNN>.png`
+`rollouts/final/pilot_v0/episodes/<run_id>/camera/{agentview,wrist}/step_<NNNN>.png`
 (`wrist/` omitted entirely for SimplerEnv episodes, not written as empty).
 
 ## Unified output layout
 
 Everything lands under `rollouts/` at the project root (`src/slava_rollout/
 storage.py` is the single source of truth for these paths — import it,
-don't reconstruct paths inline in new scripts):
+don't reconstruct paths inline in new scripts).
+
+The unit of storage is a **pool** (restructured 2026-08-07): a set of episodes
+collected by one state of the code, which may therefore be aggregated together.
+One pool = one directory with its own annotations, episodes, logs and a
+`README.md` recording hardware, parameters and trustworthiness.
 
 ```
 rollouts/
-  rollout_annotations.jsonl      # one line per episode, ALL models/runs appended here
-  episodes/<run_id>/
-    steps.jsonl                  # per-step log: object poses, contacts, gripper state, action, instruction, task_uid, seed, model
-    camera/agentview/step_0000.png ...
-    camera/wrist/step_0000.png ...   # only if the environment has a wrist camera
-  logs/<run_id>.log              # env-worker/model-server stdout for that episode's run, for debugging
+  RUNS.md                        # index of every pool: what it is, on what hardware, usable for what
+  final/<pool>/                  # pools current results are read from; default pool is pilot_v0
+    rollout_annotations.jsonl    # one line per episode, appended by every model in THIS pool
+    README.md                    # hardware, parameters, validity — written when the pool is created
+    episodes/<run_id>/
+      steps.jsonl                # per-step log: object poses, contacts, gripper state, action, instruction, task_uid, seed, model
+      camera/agentview/step_0000.png ...
+      camera/wrist/step_0000.png ...   # only if the environment has a wrist camera
+    logs/<run_id>.log            # env-worker/model-server stdout for that episode's run
+  archive/<pool>/                # superseded pools, kept as the only record of what compromised runs did
 ```
+
+`SLAVA_RUN_POOL=<name>` selects the active pool (default `pilot_v0`); resume,
+frames and logs all follow from it, so a new collection never has to be
+untangled from a finished one afterwards.
+
+**`run_id` is unique within a pool, not across pools.** `pilot_v0` and
+`harness_validation_greenvla` share 12 identical `run_id`s — the same scenes
+collected twice on different hardware, where 9 of 12 outcomes agreed. So never
+concatenate two pools' annotation files, and never dedupe them by `run_id`:
+the first silently doubles episodes, the second silently drops half. Aggregate
+per pool.
+
+Only `rollout_annotations.jsonl`, `README.md` and `RUNS.md` are tracked in git;
+frames and logs are ignored (see `.gitignore` — it excludes entry by entry
+rather than as a directory, because git cannot re-include a file whose parent
+directory is excluded).
 
 `run_id` convention: `<prompt_id>__<model_key>__seed<seed:03d>` (see
 `schema.py::build_run_id`) — `prompt_id` already uniquely identifies
@@ -509,7 +534,7 @@ than re-deriving the rules from prose.
 - **Update 2026-08-05, later same day: the full run was stopped early by the
   user (time budget), not completed.** Final coverage: GreenVLA-R0 28/28,
   GreenVLA-R1 28/28, OpenVLA-OFT 21/99, pi0/pi0.5/SmolVLA 0/127 each — 77
-  episodes total in `rollouts/rollout_annotations.jsonl`. To resume the
+  episodes total in `rollouts/final/pilot_v0/rollout_annotations.jsonl`. To resume the
   remaining models: env-workers were stopped too (clean `kill -TERM`, not
   crashed) before the machine migration below, so first restart them
   (`conda run -n slava-libero python -m slava_rollout.env_worker_libero

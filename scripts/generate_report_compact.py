@@ -42,7 +42,10 @@ from slava_rollout.stats import (  # noqa: E402
     wilson,
 )
 
-ROLLOUTS = PROJECT_ROOT / "rollouts"
+# Pool layout lives in one place (src/slava_rollout/storage.py); the report
+# reads the finished pilot pool and, when present, the harness-validation pool.
+ROLLOUTS = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0"
+VALIDATION_POOL = PROJECT_ROOT / "rollouts" / "final" / "harness_validation_greenvla"
 VARIANT_ORDER = [
     "en_canonical", "en_paraphrase", "mt_russian", "ru_literal",
     "ru_case_swap", "ru_negation", "code_switch",
@@ -192,6 +195,62 @@ def build_baseline_check(rows: list[dict[str, Any]]) -> str:
     return (
         "<table><tr><th></th><th>наш en_canonical</th><th>заявлено авторами</th>"
         f"<th>вердикт</th><th>источник</th></tr>{body}</table>"
+    )
+
+
+def build_validation_banner(rows: list[dict[str, Any]]) -> str:
+    """Models whose English baseline does not reproduce, stated before anything else.
+
+    A model that cannot hit its own published number on the authors' own English
+    string is not measuring language: whatever is wrong sits in our pipeline, and
+    its Russian numbers would be an artefact of that. They are named here with
+    both figures and then left out of the analysis, rather than quietly carried
+    into tables where they would read as findings.
+    """
+    published = load_published_baselines()
+    # A dedicated validation run, when one exists, replaces the pilot's own
+    # en_canonical count for the models it covers: it is the same check on a
+    # wider scene set, so its interval is the one worth reporting.
+    validation_path = VALIDATION_POOL / "rollout_annotations.jsonl"
+    validation: list[dict[str, Any]] = []
+    if validation_path.is_file():
+        validation = [json.loads(l) for l in open(validation_path, encoding="utf-8") if l.strip()]
+    failed = []
+    for model in sorted({r["model"] for r in rows} | {r["model"] for r in validation}):
+        en = [r for r in validation if r["model"] == model and r["variant"] == "en_canonical"]
+        if not en:
+            en = [r for r in rows if r["model"] == model and r["variant"] == "en_canonical"]
+        reference = (published.get(model) or {}).get("sr")
+        if not en or reference is None:
+            continue
+        hits, total = sum(r["success"] for r in en), len(en)
+        low, high = wilson(hits, total)
+        if high - low > 0.40 or low <= reference <= high or hits / total >= reference:
+            continue
+        failed.append((model, hits, total, reference))
+    if not failed:
+        return ""
+    items = "".join(
+        f"<li><b>{esc(model)}</b> — у нас {hits}/{total} = {100 * hits / total:.0f}% "
+        f"на <code>en_canonical</code> против заявленных {100 * reference:.0f}%</li>"
+        for model, hits, total, reference in failed
+    )
+    return (
+        "<div class=banner><b>Результаты по этим моделям считаем недостоверными.</b>"
+        f"<ul>{items}</ul>"
+        "<p>Расхождение такого размера на родной английской строке задачи — это "
+        "дефект нашего пайплайна инференса, а не свойство модели. Пока он не "
+        "найден, кросс-язычные выводы по этим моделям не имели бы смысла: их "
+        "нули на русском неотличимы от эффекта пола. Ниже они присутствуют "
+        "только в сводных таблицах, полнотой ради; анализ языкового эффекта по "
+        "ним в этом отчёте не приводится.</p>"
+        + (
+            "<p class=ci>Числа GreenVLA здесь — по отдельному прогону на полном "
+            "bridge-наборе SimplerEnv (22 сцены, все четыре задачи), а не по "
+            "четырём сценам пилота: те покрывали одну задачу и с публикуемым "
+            "средним по четырём не сопоставимы.</p>" if validation else ""
+        )
+        + "</div>"
     )
 
 
@@ -448,6 +507,7 @@ def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path
     # data/rollout_provenance.json — that belongs to the repository's record,
     # not to a results write-up.
     baseline_html = build_baseline_check(rows)
+    validation_banner = build_validation_banner(rows)
     mt_html = build_mt_ablation(rows)
     contact_html = build_contact_profile(rows)
     failure_html = build_failure_mix(rows)
@@ -482,10 +542,13 @@ code{{background:#f4f4f4;padding:1px 4px;border-radius:3px}}
 .caveats{{padding-left:20px;font-size:13px}} .caveats li{{margin:6px 0}}
 table.t2 td:first-child{{text-align:left;white-space:nowrap}}
 td.sig{{font-weight:700;background:#f0fff4}}
+.banner{{background:#fff4f4;border-left:3px solid #d33;padding:10px 14px;margin:14px 0;font-size:13.5px}}
+.banner ul{{margin:6px 0 6px 18px;padding:0}} .banner p{{margin:6px 0 0}}
 .f{{background:#f7f7f9;padding:8px 10px;border-radius:5px;font-family:ui-monospace,monospace;font-size:12.5px}}
 </style>
 <h1>SLAVA — кросс-язычный бенчмарк VLA</h1>
 <p class=ci>{n_total} эпизодов в метриках · n=1 повтор на (сцена × вариант × модель)</p>
+{validation_banner}
 
 <h2>1. Воспроизводим ли мы известные числа</h2>
 <p>Всё остальное в этом отчёте имеет смысл только если харнесс корректен. Самая

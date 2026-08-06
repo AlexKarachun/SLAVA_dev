@@ -45,6 +45,7 @@ from slava_rollout.schema import (  # noqa: E402
 )
 from slava_rollout.storage import (  # noqa: E402
     append_annotation,
+    pool_root,
     camera_dir,
     ensure_episode_dirs,
     load_completed_run_ids,
@@ -103,8 +104,8 @@ for _key, _default_port in _DEFAULT_MODEL_PORTS.items():
     )
 
 
-def load_prompts() -> list[dict[str, Any]]:
-    path = PROJECT_ROOT / "data" / "pilot_v0_release" / "prompts_v0.jsonl"
+def load_prompts(path: Path | None = None) -> list[dict[str, Any]]:
+    path = path or PROJECT_ROOT / "data" / "pilot_v0_release" / "prompts_v0.jsonl"
     with open(path, encoding="utf-8") as handle:
         return [json.loads(line) for line in handle if line.strip()]
 
@@ -400,10 +401,16 @@ def run_episode(
 
 
 def select_prompts(
-    prompts: list[dict[str, Any]], model_key: str, smoke_test: bool
+    prompts: list[dict[str, Any]], model_key: str, smoke_test: bool,
+    variants: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     envs = environments_for_model(model_key)
     filtered = [p for p in prompts if p["environment"] in envs]
+    if variants:
+        # Used to buy statistical power on one axis without re-running the
+        # whole grid: extra seeds of en_canonical alone tighten the harness-
+        # validation interval, which is what a short rented box is for.
+        filtered = [p for p in filtered if p["variant"] in variants]
     if not smoke_test:
         return filtered
     # smoke-test: 2 task_uids, en_canonical only (SKILL.md "Smoke test"). For a
@@ -473,6 +480,16 @@ def main() -> None:
     parser.add_argument("--smoke-test", action="store_true", help="2 scenes/model, en_canonical only")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
+        "--prompts", default=None,
+        help="Alternative prompts JSONL (same flat schema as prompts_v0.jsonl). Used for "
+             "harness validation on a wider scene set than the frozen pilot manifest.",
+    )
+    parser.add_argument(
+        "--variants", nargs="+", default=None,
+        help="Restrict to these instruction variants (e.g. en_canonical). Combined with "
+             "--seed this adds episodes to one cell without re-running the whole grid.",
+    )
+    parser.add_argument(
         "--num-shards", type=int, default=1,
         help="Split each model's selected episodes across N independent processes for "
              "multi-GPU parallelism. Each shard must be launched as its own process with "
@@ -485,13 +502,13 @@ def main() -> None:
     if not (0 <= args.shard_index < args.num_shards):
         parser.error("--shard-index must be in [0, num_shards)")
 
-    prompts = load_prompts()
+    prompts = load_prompts(Path(args.prompts) if args.prompts else None)
     completed = load_completed_run_ids()
-    pool = WorkerPool(PROJECT_ROOT / "rollouts" / "logs")
+    pool = WorkerPool(pool_root() / "logs")
 
     try:
         for model_key in args.models:
-            selected = select_prompts(prompts, model_key, args.smoke_test)
+            selected = select_prompts(prompts, model_key, args.smoke_test, args.variants)
             if args.num_shards > 1:
                 # Round-robin by index: every row is an independent (task_uid,
                 # variant) episode with its own reset/run_id, so any disjoint
