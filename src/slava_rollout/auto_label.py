@@ -36,6 +36,7 @@ def label_episode(
     reference_object: Optional[str],
     forbidden_objects: list[str],
     relation: Optional[str],
+    variant: Optional[str] = None,
     action: Optional[str],
     final_object_poses: dict[str, list[float]],
     success_predicates: list[dict[str, Any]],
@@ -86,7 +87,18 @@ def label_episode(
         and target_object is not None
         and first_contact_object != target_object
     )
-    forbidden_object_touched = bool(set(touched_objects) & set(forbidden_objects))
+    # `forbidden_objects` приходит из слотов фрейма и заполнен у ВСЕХ вариантов
+    # сцены, а не только у `ru_negation` — это удобный сырой сигнал «тронул ли
+    # робот тот объект, который в негации назван неправильным». Но метка
+    # negation_error по task.md означает нарушение запрета, а запрет существует
+    # только там, где инструкция его произносит, то есть в `ru_negation`.
+    # До 07.08.2026 метка ставилась по любому варианту: из 21 negation_error в
+    # пилоте лишь 4 приходились на `ru_negation`, остальные 17 — на
+    # en_canonical/mt_russian/ru_literal/code_switch, где никакого запрета в
+    # инструкции не было. Найдено пользователем при ручной валидации.
+    touched_forbidden = bool(set(touched_objects) & set(forbidden_objects))
+    negation_axis = variant is None or variant == "ru_negation"
+    forbidden_object_touched = touched_forbidden
 
     # conditional_execution_success: task.md defines this as separating
     # grounding failure from physical failure — meaningful only once grounding
@@ -106,7 +118,8 @@ def label_episode(
         # that is task.md's "нет осмысленного действия"; if the episode was cut
         # short by an error, we cannot attribute anything and say so.
         failure_type_auto = "no_action_or_timeout" if ran_to_completion else "unclear"
-    elif forbidden_object_touched:
+    elif touched_forbidden and negation_axis:
+        # Только на оси отрицания (см. negation_axis выше).
         # NOTE (precedence is a real judgement call, not an oversight): this
         # sits above target_grounding_error, and `forbidden_object_touched`
         # uses "touched at any point" while `wrong_object` uses "first

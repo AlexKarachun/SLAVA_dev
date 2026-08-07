@@ -376,6 +376,7 @@ def run_episode(
         target_object=prompt.get("target_object"),
         reference_object=prompt.get("reference_object"),
         forbidden_objects=prompt.get("forbidden_objects") or [],
+        variant=prompt.get("variant"),
         relation=prompt.get("relation"),
         action=prompt.get("action"),
         final_object_poses=final_object_poses,

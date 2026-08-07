@@ -148,3 +148,44 @@ class TestDerivedFields(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NegationAxisTest(unittest.TestCase):
+    """negation_error принадлежит оси отрицания, а не любой сцене.
+
+    `forbidden_objects` заполнены у всех вариантов сцены — это удобный сырой
+    сигнал. Но запрет существует только там, где инструкция его произносит:
+    до 07.08.2026 метка ставилась на en_canonical/mt_russian/ru_literal/
+    code_switch, где никакого «не X, а Y» в тексте не было (17 эпизодов из 21).
+    """
+
+    def _label(self, variant):
+        return label_episode(
+            env_success=False,
+            first_contact_object="bowl",
+            touched_objects=["bowl", "forbidden_thing"],
+            target_object="plate",
+            reference_object=None,
+            forbidden_objects=["forbidden_thing"],
+            variant=variant,
+            relation=None,
+            action="pick",
+            final_object_poses={},
+            success_predicates=[{"type": "state"}],
+            step_count=50,
+        )
+
+    def test_negation_error_only_on_the_negation_variant(self) -> None:
+        self.assertEqual(self._label("ru_negation")["failure_type_auto"], "negation_error")
+
+    def test_other_variants_fall_through_to_the_normal_rules(self) -> None:
+        for variant in ("en_canonical", "mt_russian", "ru_literal", "code_switch"):
+            with self.subTest(variant=variant):
+                self.assertEqual(
+                    self._label(variant)["failure_type_auto"], "target_grounding_error"
+                )
+
+    def test_raw_signal_is_still_recorded_for_every_variant(self) -> None:
+        # Поле остаётся: по нему можно пересчитать более строгое правило, не
+        # перезапуская прогоны.
+        self.assertTrue(self._label("en_canonical")["forbidden_object_touched"])

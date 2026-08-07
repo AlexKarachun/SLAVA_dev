@@ -91,6 +91,7 @@ def relabel(row: dict[str, Any], prompts: dict[tuple[str, str], dict[str, Any]])
         target_object=prompt.get("target_object"),
         reference_object=prompt.get("reference_object"),
         forbidden_objects=prompt.get("forbidden_objects") or [],
+        variant=row["variant"],
         relation=prompt.get("relation"),
         action=prompt.get("action"),
         final_object_poses=last.get("object_poses") or {},
