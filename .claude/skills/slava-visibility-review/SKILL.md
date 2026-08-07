@@ -1,7 +1,10 @@
 ---
 name: slava-visibility-review
-description: Judge and record visible_agentview/visible_wrist for scene objects in task_inventory.jsonl (via data/visibility_review.html (в git не лежит — сгенерировать соответствующим скриптом)), including known pitfalls around composite/addressable objects and partial visibility. Use when doing or reviewing visibility labeling, especially when scaling from the 20-scene pilot to 120–180-task full-sets.
+description: Judge and record visible_agentview/visible_wrist for scene objects in task_inventory.jsonl (via data/visibility_review.html), including known pitfalls around composite/addressable objects and partial visibility. Use when doing or reviewing visibility labeling, especially when scaling from the 20-scene pilot to 120–180-task full-sets.
 ---
+
+> **В свежем клоне `data/visibility_review.html` нет** — файл gitignore'ится.
+> Сгенерировать соответствующим скриптом из `scripts/` перед разметкой.
 
 # SLAVA object visibility review
 
