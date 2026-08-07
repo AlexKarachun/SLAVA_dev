@@ -65,6 +65,16 @@ used on the card, next to the automation's answer:
 - **A visible counter and an explicit export button.** Progress in
   `localStorage` is not something an agent can read; the exported JSON is.
 
+## Второй режим того же дашборда: «что вообще определимо кодом»
+
+`generate_label_review.py --video-only` собирает только провальные эпизоды и
+задаёт другой вопрос: не «правильна ли метка», а «выводится ли она из логов
+вообще». Успехи в такой проход не берутся — они бесполезны для вопроса.
+
+Важная деталь: **в этом режиме предзаполнение выключено намеренно**. В обычном
+проходе автомат подсказывает вердикт и это экономит клики; здесь его подсказка
+была бы ответом на сам вопрос.
+
 ## Prefilling the automation's answer: allowed, but never as the "done" signal
 
 The reviewer will ask for the automatic values to be pre-selected, and they are

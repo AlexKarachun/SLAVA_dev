@@ -44,6 +44,11 @@ LABEL_SHORT = {
     "no_action_or_timeout": "не двигался",
     "unclear": "непонятно",
 }
+VIDEO_ONLY_LABELS = [
+    "по логам определимо",
+    "только по видео",
+    "не уверен",
+]
 LABELS = [
     "success", "target_grounding_error", "reference_grounding_error",
     "relation_binding_error", "negation_error", "physical_execution_error",
@@ -157,7 +162,7 @@ def esc_attr(value: str) -> str:
     return str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
 
 
-def render(sample: list[dict]) -> str:
+def render(sample: list[dict], video_only: bool = False) -> str:
     # One click, not two: a row of buttons rather than a <select>, because the
     # reviewer goes through 100 cards and every extra click is paid 100 times.
     options = "".join(
@@ -165,6 +170,8 @@ def render(sample: list[dict]) -> str:
         for label in LABELS
     )
     cards = []
+    yes_label = "определимо кодом" if video_only else "успех"
+    no_label = "только по видео" if video_only else "провал"
     for index, record in enumerate(sample, start=1):
         run_id = record["run_id"]
         agent = frames(run_id, "agentview", 24)
@@ -181,8 +188,8 @@ def render(sample: list[dict]) -> str:
         )
         cards.append(f"""
 <article class="card" data-run-id="{run_id}" data-agent='{json.dumps(agent)}' data-wrist='{json.dumps(wrist)}'
-         data-auto-success="{str(bool(record['success'])).lower()}"
-         data-auto-label="{esc_attr(record['failure_type_auto'] or '')}">
+         data-auto-success="{'' if video_only else str(bool(record['success'])).lower()}"
+         data-auto-label="{'' if video_only else esc_attr(record['failure_type_auto'] or '')}">
   <header>
     <span class="n">{index}/{len(sample)}</span>
     <span class="model">{record['model']}</span>
@@ -209,10 +216,10 @@ def render(sample: list[dict]) -> str:
   </dl>
   <div class="verdict">
     <div class="seg v-success">
-      <button type="button" class="ok" data-value="true">успех</button>
-      <button type="button" class="bad" data-value="false">провал</button>
+      <button type="button" class="ok" data-value="true">{yes_label}</button>
+      <button type="button" class="bad" data-value="false">{no_label}</button>
     </div>
-    <div class="seg v-label">{options}</div>
+    {'' if video_only else '<div class="seg v-label">' + options + '</div>'}
     <input class="v-note" placeholder="заметка">
   </div>
 </article>""")
@@ -412,13 +419,26 @@ document.getElementById('export').onclick = () => {{
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--size", type=int, default=100)
+    parser.add_argument(
+        "--video-only", action="store_true",
+        help="Режим T9: только провальные эпизоды, вопрос — можно ли эту ошибку "
+             "определить кодом или только глазами по видео.",
+    )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "data" / "label_review.html")
+    parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
 
+    if args.output is None:
+        name = "video_only_review.html" if args.video_only else "label_review.html"
+        args.output = PROJECT_ROOT / "data" / name
+
     rows = load_annotations()
+    if args.video_only:
+        # Только провалы: вопрос этого прохода не «правильна ли метка», а
+        # «выводится ли она вообще из логов». Успехи для этого бесполезны.
+        rows = [r for r in rows if not r["success"]]
     sample = stratified_sample(rows, args.size, args.seed)
-    args.output.write_text(render(sample), encoding="utf-8")
+    args.output.write_text(render(sample, args.video_only), encoding="utf-8")
     print(f"{len(sample)} episodes -> {args.output}")
     for model, count in collections.Counter(r["model"] for r in sample).most_common():
         successes = sum(1 for r in sample if r["model"] == model and r["success"])
