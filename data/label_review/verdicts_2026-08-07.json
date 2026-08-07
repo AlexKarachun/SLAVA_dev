@@ -1,0 +1,401 @@
+[
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init000__en_canonical__openvla_oft__seed000",
+  "success": true,
+  "failure_type_manual": "success",
+  "kept_auto": true,
+  "note": null
+ },
+ {
+  "run_id": "libero_goal__push_the_plate_to_the_front_of_the_stove__init017__en_canonical__openvla_oft__seed000",
+  "success": true,
+  "failure_type_manual": "success",
+  "kept_auto": true,
+  "note": null
+ },
+ {
+  "run_id": "libero_object__pick_up_the_butter_and_place_it_in_the_basket__init000__mt_russian__openvla_oft__seed000",
+  "success": true,
+  "failure_type_manual": "success",
+  "kept_auto": true,
+  "note": null
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode004__seed000__en_paraphrase__greenvla_r1_bridge__seed000",
+  "success": true,
+  "failure_type_manual": "success",
+  "kept_auto": true,
+  "note": null
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init003__ru_case_swap__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": false,
+  "note": "не уверен, что это \"не тот target\". тут ru_case_swap, но робот сделал обычное действие, а не инвертированное"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init004__ru_case_swap__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": false,
+  "note": "снова ru_case_swap промпт, а модель сделал то, что было в прямом промте"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode000__seed000__en_paraphrase__greenvla_r1_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": null
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode000__seed000__ru_negation__greenvla_r1_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": false,
+  "note": "всю сцену тянулся то к одному кубику то к другому, но так и не решился не один из них взять"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode004__seed000__ru_negation__greenvla_r2_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "снова всю сцену колебался между в выборе кубиков (ну мне так кажется)"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode008__seed000__en_canonical__greenvla_r2_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": "уронил зеленый кубик немного не донеся до желтого"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__ru_case_swap__greenvla_r2_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "unclear",
+  "kept_auto": false,
+  "note": "он коснулся правильного желтого кубика, но не взял его и соответственно на зеленый не поставил. не уверен что здесь надо поставить именно \"непонятно\""
+ },
+ {
+  "run_id": "libero_goal__push_the_plate_to_the_front_of_the_stove__init034__code_switch__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": false,
+  "note": "выполнил не ту инструкцию - понес bowl на plate вместо того, что просят"
+ },
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init034__ru_negation__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "не могу сказать, что он делал именно что-то неосмысленное - скорее попытался что-то в воздухе взять и поставить на тумбочку. так что не уверен что это \"не двигался\""
+ },
+ {
+  "run_id": "libero_goal__push_the_plate_to_the_front_of_the_stove__init034__en_canonical__openvla_oft__seed000",
+  "success": true,
+  "failure_type_manual": "success",
+  "kept_auto": false,
+  "note": null
+ },
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init034__ru_literal__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": false,
+  "note": "опять. он не делал что-то совсем безсмысленное - попытался взять несуществующий объект в воздухе и поставить его на тумбочку. не уверен что это \"не двигался\""
+ },
+ {
+  "run_id": "libero_object__pick_up_the_butter_and_place_it_in_the_basket__init000__mt_russian__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": false,
+  "note": "попытался взять не тот объект, но взять не смог"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init003__en_canonical__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": "не смог взять нужный объект, хотя коснулся его"
+ },
+ {
+  "run_id": "libero_goal__push_the_plate_to_the_front_of_the_stove__init017__ru_negation__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": true,
+  "note": "попытался взять distractor объект, но не смог и начал в бок съезжать"
+ },
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init000__ru_negation__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "negation_error",
+  "kept_auto": true,
+  "note": "и запрет ru_case_swap нарушил - коснулся запретного объекта и вообще делал довольно безсмысленные действия после этого"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init004__en_canonical__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": "не смог взять этот бедный black_bowl"
+ },
+ {
+  "run_id": "libero_goal__open_the_middle_drawer_of_the_cabinet__init000__ru_literal__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": true,
+  "note": "да, вообще не то действие делал (вместо открытия тумбочки переложил bowl)"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_tomato_sauce_and_place_it_in_the_basket__init000__en_canonical__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": "несколько раз попытался но не смог схватить этот tomato sauce и даже не коснулся"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init000__ru_negation__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": "несколько раз попытался но не смог взять таргет и даже не коснулся"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init003__ru_literal__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "reference_grounding_error",
+  "kept_auto": false,
+  "note": null
+ },
+ {
+  "run_id": "libero_goal__push_the_plate_to_the_front_of_the_stove__init017__ru_negation__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": false,
+  "note": null
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init003__mt_russian__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "reference_grounding_error",
+  "kept_auto": false,
+  "note": "взял таргет но и понес не в ту сторону и уронил, зацепив за тумбочку."
+ },
+ {
+  "run_id": "libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init000__en_paraphrase__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "physical_execution_error",
+  "kept_auto": false,
+  "note": "снова это из тех запусков где он много пытался взять таргет, но не взял и даже не докоснулся"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__ru_case_swap__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "вообще не двигался, только клешней поводил"
+ },
+ {
+  "run_id": "libero_goal__open_the_middle_drawer_of_the_cabinet__init034__en_canonical__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "просто довольно хаотично крутился, клешней почти не двигал"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode000__seed000__ru_case_swap__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "очень хаотично улетел в сторону какую-то"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__code_switch__pi05__seed000",
+  "success": false,
+  "failure_type_manual": "reference_grounding_error",
+  "kept_auto": false,
+  "note": "и не смог взять таргет и потом потянулся не в ту сторону. как по мне это и \"не тот reference\" и \"физика\" от части"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode000__seed000__ru_case_swap__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "робот очень хаотично и резко улетел куда-то за пределы сцены"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_butter_and_place_it_in_the_basket__init000__ru_literal__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "робот просто плавно перевернулся"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_tomato_sauce_and_place_it_in_the_basket__init000__en_canonical__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "робот слегка дергано перевернулся"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode000__seed000__en_canonical__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "очень дергано слетели за пределы видимости"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_tomato_sauce_and_place_it_in_the_basket__init000__mt_russian__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "довольно дергано перевернулись"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init003__ru_case_swap__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "довольно плавно перевернулись"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_milk_and_place_it_in_the_basket__init034__ru_literal__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "довольно плавно перевернулись"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_tomato_sauce_and_place_it_in_the_basket__init000__ru_literal__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "несколько дергано перевернулись"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__code_switch__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "что-то робот вообще не вдуплял. приподнялся и поводил клешню свою"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init003__code_switch__pi0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "довольно плавно перевернулись"
+ },
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init017__ru_literal__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": false,
+  "note": "модель включила плиту (не то действие) а потом потянулась к бутылке вина (нужное действие)"
+ },
+ {
+  "run_id": "libero_goal__open_the_middle_drawer_of_the_cabinet__init000__mt_russian__openvla_oft__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": false,
+  "note": null
+ },
+ {
+  "run_id": "libero_goal__open_the_middle_drawer_of_the_cabinet__init034__ru_negation__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "робот попытался взять не тот таргет но довольно плавно избыточно косился в сторону. в объект не попал, а просто развернулся"
+ },
+ {
+  "run_id": "libero_goal__push_the_plate_to_the_front_of_the_stove__init017__mt_russian__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": false,
+  "note": "довольно не связанные действия - просто затылся клешней в дистракторы"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init000__en_paraphrase__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "просто немного колеблясь повернулся вверх"
+ },
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init034__mt_russian__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "target_grounding_error",
+  "kept_auto": true,
+  "note": "потянулась, но не к тому таргету и не попала в него. жалкое зрелище"
+ },
+ {
+  "run_id": "libero_object__pick_up_the_cream_cheese_and_place_it_in_the_basket__init000__ru_literal__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "довольно хаотрутичные движения"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__mt_russian__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": false,
+  "note": "затылся носом в таргету - наверное это \"не двигался\", но как и в прошлых случаях я не уверен что затыкуться носом - это не двигаться"
+ },
+ {
+  "run_id": "libero_goal__put_the_wine_bottle_on_the_rack__init017__en_paraphrase__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "relation_binding_error",
+  "kept_auto": true,
+  "note": "высоковато над стойкой поднял бутылку, но в остальном все правильно"
+ },
+ {
+  "run_id": "libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001__ru_case_swap__smolvla__seed000",
+  "success": false,
+  "failure_type_manual": "relation_binding_error",
+  "kept_auto": true,
+  "note": "потянулся к неверному таргету, но и его взять не смог и поехал слегка в бок"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__ru_negation__greenvla_r2_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "робот слегка колебался между обоими кубиками и так и не определился и поднял свою руку горизонтально над столом"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode004__seed000__ru_case_swap__greenvla_r2_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "потянулся к нужному кубику, но не дотянулся и не взял и отвел руку. не уверен, что это \"не двигался\""
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__ru_case_swap__greenvla_r1_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "снова потянулся к желтому, но не дотянулся и отвел руку и вывел в горизон"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__en_canonical__greenvla_r1_bridge__seed000",
+  "success": false,
+  "failure_type_manual": "unclear",
+  "kept_auto": false,
+  "note": "уз, кубик буквально слетел от прикосновения робота. проблема симуляции, модель винить не в чем"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__ru_case_swap__greenvla_r0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "рука плавненько поднялась наверх"
+ },
+ {
+  "run_id": "simpler__widowx_stack_cube__episode001__seed000__ru_literal__greenvla_r0__seed000",
+  "success": false,
+  "failure_type_manual": "no_action_or_timeout",
+  "kept_auto": true,
+  "note": "рука колебалась чуть вниз чуть вверх"
+ }
+]
