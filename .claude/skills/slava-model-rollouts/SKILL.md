@@ -381,6 +381,15 @@ seam was frames 27→28 — 27 written 2026-08-06 by the valid run, 28..60 writt
 2026-08-05 by the run it replaced (`stat -f %Sm` on the frames shows it
 immediately).
 
+**Тот же дефект во втором артефакте (найдено 07.08.2026 следом).** `steps.jsonl`
+открывался на дозапись, поэтому у 6 эпизодов лог содержал два прогона подряд
+(до 428 строк при лимите 300) — видно по тому, что нумерация шагов начинается
+заново. Это ломает всё, что читает траекторию: длину эпизода, подъём цели,
+контакты. Чинит `scripts/clean_stale_steps.py` (оставляет последний прогон),
+предотвращает — тот же `ensure_episode_dirs`, который теперь удаляет файл.
+Мораль та же и подтверждена дважды: **артефакт, который не читает ни одна
+метрика, ничем не валидируется.**
+
 **Metrics were never affected** — `rollout_annotations.jsonl` and
 `steps.jsonl` are authoritative and both came from the new run — which is
 exactly why no audit caught it: nothing that gets counted was wrong.
