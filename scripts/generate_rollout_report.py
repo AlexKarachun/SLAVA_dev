@@ -224,6 +224,34 @@ def _target_acc(rows: list[dict[str, Any]]) -> Optional[float]:
     return hits / len(rows)
 
 
+FAILURE_LABELS = [
+    "success", "target_grounding_error", "reference_grounding_error",
+    "relation_binding_error", "negation_error", "physical_execution_error",
+    "no_action_or_timeout", "unclear",
+]
+
+
+def compute_label_mix(annotations: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Сколько эпизодов каждого варианта получило каждую метку из task.md.
+
+    Отдельно от `compute_behavioral_pilot`: метки исхода и поведенческие
+    метрики — разные величины, и путать их нельзя. Колонки поведенческой
+    таблицы заданы task.md («Table - behavioral pilot»), а этот набор из восьми
+    меток — контракт авторазметки оттуда же.
+    """
+    out: dict[str, dict[str, int]] = {}
+    for variant in VARIANT_ORDER:
+        rows = [r for r in annotations if r["variant"] == variant]
+        counts = {label: 0 for label in FAILURE_LABELS}
+        for row in rows:
+            label = row.get("failure_type_auto")
+            if label in counts:
+                counts[label] += 1
+        counts["n"] = len(rows)
+        out[variant] = counts
+    return out
+
+
 def compute_behavioral_pilot(annotations: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in annotations:
@@ -471,6 +499,7 @@ def render_html(
     examples: dict[str, Any],
     coverage: list[dict[str, Any]],
     behavioral: dict[str, dict[str, Any]],
+    label_mix: dict[str, dict[str, int]],
     behavioral_by_model: dict[str, dict[str, dict[str, Any]]],
     language_effect: list[dict[str, Any]],
     language_effect_by_model: dict[str, list[dict[str, Any]]],
@@ -489,6 +518,40 @@ def render_html(
         models_rows += (
             f"<tr><td>{pretty_model(m['display_name'])}</td><td><code>{m['backbone']}</code></td>"
             f"<td>{env_lines}</td><td>{m['n_prompts']}</td></tr>"
+        )
+
+    label_mix_header = "".join(f"<th><code>{l}</code></th>" for l in FAILURE_LABELS)
+    label_mix_rows = ""
+    for variant in VARIANT_ORDER:
+        row = label_mix.get(variant, {})
+        cells = "".join(
+            f"<td>{row.get(l) or '<span class=\"muted\">—</span>'}</td>" for l in FAILURE_LABELS
+        )
+        label_mix_rows += f"<tr><td>{variant}</td><td>{row.get('n', 0)}</td>{cells}</tr>"
+
+    # Сводка Δlang для раздела с research questions: считается из тех же строк,
+    # что и таблица, чтобы не разъезжалась при пересчёте. Зонд ru_case_swap
+    # держится отдельно — он меряет не деградацию, а следование перевёрнутой
+    # инструкции, и его +100 п.п. в среднем с остальными несопоставимы.
+    _eff = [r for rows in language_effect_by_model.values() for r in rows if r.get("value") is not None]
+    _lang = [r for r in _eff if r["effect"] != "ru_case_swap"]
+    if _lang:
+        _vals = [r["value"] for r in _lang]
+        _avg = 100 * sum(_vals) / len(_vals)
+        _lo = min(_lang, key=lambda r: r["value"])
+        _hi = max(_lang, key=lambda r: r["value"])
+        rq1_answer = (
+            f"Δlang положителен на всех вариантах: в среднем <b>+{_avg:.1f} п.п.</b>, "
+            f"от +{100*_lo['value']:.1f} (<code>{_lo['effect']}</code>) "
+            f"до +{100*_hi['value']:.1f} (<code>{_hi['effect']}</code>)."
+        )
+    else:
+        rq1_answer = "Данных для Δlang недостаточно."
+    _probe = next((r for r in _eff if r["effect"] == "ru_case_swap"), None)
+    if _probe:
+        rq1_answer += (
+            f" Зонд <code>ru_case_swap</code> отдельно: +{100*_probe['value']:.1f} п.п. — "
+            "перестановка ролей не распознана ни разу."
         )
 
     behavioral_rows = ""
@@ -828,9 +891,17 @@ def render_html(
 
 <section>
   <h2>6. Что происходит на сцене: поведение по вариантам инструкции</h2>
-  <p class="muted">SR говорит только «получилось или нет». Остальные колонки говорят, на каком
-  шаге рвётся исполнение: дотянулся ли робот до нужного предмета и выполнил ли требуемое
-  отношение. Все значения — по всем эпизодам соответствующего варианта.</p>
+
+  <h3>Исходы по меткам</h3>
+  <p class="muted">Сколько эпизодов каждого варианта получило каждую метку. Набор меток —
+  из task.md, названия сохранены как есть.</p>
+  <table class="data-table"><thead><tr>
+    <th>Вариант инструкции</th><th>Эпизодов</th>{label_mix_header}
+  </tr></thead><tbody>{label_mix_rows}</tbody></table>
+
+  <h3>Поведенческие метрики</h3>
+  <p class="muted">Набор колонок задан task.md («Table — behavioral pilot»): это не метки
+  исхода, а отдельные величины, показывающие, на каком шаге рвётся исполнение.</p>
   <div class="f">
   SR = успешных эпизодов / всего эпизодов варианта<br>
   Дотянулся до нужного предмета = эпизодов, где первый тронутый предмет — целевой / всего эпизодов варианта<br>
@@ -838,26 +909,13 @@ def render_html(
   Отношение выполнено = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
   Тронул запрещённый предмет = эпизодов, где запрещённый предмет тронут хотя бы раз / всего эпизодов варианта
   </div>
-  <p class="muted">Оговорка к чтению: «дотянулся» и «тронул не тот» не дополняют друг друга до
-  100% — эпизод, в котором робот не тронул вообще ничего, не попадает ни в одну из колонок.</p>
-  <p class="muted">«Отношение выполнено» почти везде совпадает с SR, потому что обе величины
-  читаются из одного критерия успеха среды. Исключение — строка <code>ru_case_swap</code>, и
-  она же самая интересная. Этот вариант меняет роли предметов местами («поставь тарелку на
-  миску» вместо «миску на тарелку»), поэтому успехом для него считается выполнение
-  <b>перевёрнутой</b> инструкции, посчитанное из финальных поз, а «отношение выполнено»
-  по-прежнему отвечает на вопрос об исходной задаче. Результат: <b>отношение выполнено 100%,
-  SR 0%</b> — единственная достоверная модель во всех четырёх сценах сделала то, что требовала
-  исходная инструкция, и перестановку ролей не заметила вовсе.</p>
   <table class="data-table"><thead><tr>
     <th>Вариант инструкции</th><th>Эпизодов</th><th>SR</th><th>Дотянулся до нужного предмета</th>
     <th>Тронул не тот предмет</th><th>Отношение выполнено</th><th>Тронул запрещённый предмет</th>
   </tr></thead><tbody>{behavioral_rows}</tbody></table>
 
   <p class="muted">Пустая строка одна: <code>ru_free_order</code>. Вариант написан для всех 20
-  сцен, но в прогон не попал — <code>export_prompts.py</code> выгружает семь вариантов, и
-  свободный порядок слов в этот список не вошёл. Эпизодов по нему нет ни одного, добирается
-  следующим прогоном. У <code>ru_case_swap</code> сцен всего 4, потому что перестановка ролей
-  осмысленна не везде: нужны два предмета, которых можно поменять местами.</p>
+  сцен, но в прогон не попал — наша ошибка, добираем следующим прогоном.</p>
 </section>
 
 <section>
@@ -866,10 +924,11 @@ def render_html(
   gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
   <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
   </div>
-  <p class="muted">Сравнение идёт по сценам, а не по средним: берутся только те сцены, где робот
-  отработал и по-английски, и по-английски-иначе, и на проверяемом варианте — иначе разница
-  между вариантами включала бы разницу в наборе сцен. Сколько таких сцен нашлось, показано в
-  колонке «Сцен».</p>
+  <p class="muted">Каждая сцена прогоняется всеми вариантами инструкции, поэтому варианты
+  сравниваются на одних и тех же сценах, а не по общим средним. Это важно, потому что сцены
+  разной трудности: если у одного варианта случайно окажется больше лёгких сцен, его SR
+  вырастет сам по себе, без всякого отношения к языку. Колонка «Сцен» показывает, на скольких
+  сценах сравнение получилось — там, где по варианту собрано меньше эпизодов, число ниже.</p>
   {language_effect_by_model_sections or '<p class="muted">Недостаточно данных.</p>'}
 </section>
 
@@ -879,7 +938,7 @@ def render_html(
   <tbody>
     <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>
         <td><b>сырой ответ есть</b></td>
-        <td>Δlang по вариантам, раздел 6.</td></tr>
+        <td>{rq1_answer}</td></tr>
     <tr><td class="k">RQ2. Where do multilingual instructions fail in the language-to-action pipeline?</td>
         <td><b>ответа нет</b></td>
         <td>Нужен послойный разбор; поведенческие колонки места сбоя не дают.</td></tr>
@@ -938,6 +997,7 @@ def main() -> None:
     reportable = [r for r in valid if r["model"] in reportable_models]
 
     behavioral = compute_behavioral_pilot(reportable)
+    label_mix = compute_label_mix(reportable)
     behavioral_by_model = compute_behavioral_pilot_by_model(reportable)
     language_effect = []  # pooled Δlang intentionally not reported — see render_html
     by_model_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -953,7 +1013,7 @@ def main() -> None:
     gallery = build_camera_gallery(valid, assets_dir=assets_dir)
 
     html = render_html(
-        data_overview, setup, examples, coverage, behavioral, behavioral_by_model,
+        data_overview, setup, examples, coverage, behavioral, label_mix, behavioral_by_model,
         language_effect, language_effect_by_model, gallery, len(annotations),
         provenance, episodes=valid,
     )

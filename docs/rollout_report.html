@@ -695,9 +695,17 @@
 
 <section>
   <h2>6. Что происходит на сцене: поведение по вариантам инструкции</h2>
-  <p class="muted">SR говорит только «получилось или нет». Остальные колонки говорят, на каком
-  шаге рвётся исполнение: дотянулся ли робот до нужного предмета и выполнил ли требуемое
-  отношение. Все значения — по всем эпизодам соответствующего варианта.</p>
+
+  <h3>Исходы по меткам</h3>
+  <p class="muted">Сколько эпизодов каждого варианта получило каждую метку. Набор меток —
+  из task.md, названия сохранены как есть.</p>
+  <table class="data-table"><thead><tr>
+    <th>Вариант инструкции</th><th>Эпизодов</th><th><code>success</code></th><th><code>target_grounding_error</code></th><th><code>reference_grounding_error</code></th><th><code>relation_binding_error</code></th><th><code>negation_error</code></th><th><code>physical_execution_error</code></th><th><code>no_action_or_timeout</code></th><th><code>unclear</code></th>
+  </tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>15</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>1</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td></tr><tr><td>en_paraphrase</td><td>16</td><td>15</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>1</td><td><span class="muted">—</span></td></tr><tr><td>mt_russian</td><td>16</td><td>9</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>7</td><td><span class="muted">—</span></td></tr><tr><td>ru_literal</td><td>16</td><td>9</td><td>2</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>5</td><td><span class="muted">—</span></td></tr><tr><td>ru_free_order</td><td>0</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td></tr><tr><td>ru_case_swap</td><td>4</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>4</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td></tr><tr><td>ru_negation</td><td>15</td><td>8</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>7</td><td><span class="muted">—</span></td></tr><tr><td>code_switch</td><td>16</td><td>14</td><td>1</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>1</td><td><span class="muted">—</span></td></tr></tbody></table>
+
+  <h3>Поведенческие метрики</h3>
+  <p class="muted">Набор колонок задан task.md («Table — behavioral pilot»): это не метки
+  исхода, а отдельные величины, показывающие, на каком шаге рвётся исполнение.</p>
   <div class="f">
   SR = успешных эпизодов / всего эпизодов варианта<br>
   Дотянулся до нужного предмета = эпизодов, где первый тронутый предмет — целевой / всего эпизодов варианта<br>
@@ -705,26 +713,13 @@
   Отношение выполнено = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
   Тронул запрещённый предмет = эпизодов, где запрещённый предмет тронут хотя бы раз / всего эпизодов варианта
   </div>
-  <p class="muted">Оговорка к чтению: «дотянулся» и «тронул не тот» не дополняют друг друга до
-  100% — эпизод, в котором робот не тронул вообще ничего, не попадает ни в одну из колонок.</p>
-  <p class="muted">«Отношение выполнено» почти везде совпадает с SR, потому что обе величины
-  читаются из одного критерия успеха среды. Исключение — строка <code>ru_case_swap</code>, и
-  она же самая интересная. Этот вариант меняет роли предметов местами («поставь тарелку на
-  миску» вместо «миску на тарелку»), поэтому успехом для него считается выполнение
-  <b>перевёрнутой</b> инструкции, посчитанное из финальных поз, а «отношение выполнено»
-  по-прежнему отвечает на вопрос об исходной задаче. Результат: <b>отношение выполнено 100%,
-  SR 0%</b> — единственная достоверная модель во всех четырёх сценах сделала то, что требовала
-  исходная инструкция, и перестановку ролей не заметила вовсе.</p>
   <table class="data-table"><thead><tr>
     <th>Вариант инструкции</th><th>Эпизодов</th><th>SR</th><th>Дотянулся до нужного предмета</th>
     <th>Тронул не тот предмет</th><th>Отношение выполнено</th><th>Тронул запрещённый предмет</th>
   </tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>93.8%</td><td>81.2%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>16</td><td>93.8%</td><td>75.0%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>16</td><td>56.2%</td><td>50.0%</td><td>0.0%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>16</td><td>56.2%</td><td>50.0%</td><td>12.5%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_free_order</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_case_swap</td><td>4</td><td>0.0%</td><td>100.0%</td><td>0.0%</td><td>100.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>15</td><td>53.3%</td><td>53.3%</td><td>0.0%</td><td>53.3%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>16</td><td>87.5%</td><td>68.8%</td><td>6.2%</td><td>87.5%</td><td>6.2%</td></tr></tbody></table>
 
   <p class="muted">Пустая строка одна: <code>ru_free_order</code>. Вариант написан для всех 20
-  сцен, но в прогон не попал — <code>export_prompts.py</code> выгружает семь вариантов, и
-  свободный порядок слов в этот список не вошёл. Эпизодов по нему нет ни одного, добирается
-  следующим прогоном. У <code>ru_case_swap</code> сцен всего 4, потому что перестановка ролей
-  осмысленна не везде: нужны два предмета, которых можно поменять местами.</p>
+  сцен, но в прогон не попал — наша ошибка, добираем следующим прогоном.</p>
 </section>
 
 <section>
@@ -733,10 +728,11 @@
   gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
   <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
   </div>
-  <p class="muted">Сравнение идёт по сценам, а не по средним: берутся только те сцены, где робот
-  отработал и по-английски, и по-английски-иначе, и на проверяемом варианте — иначе разница
-  между вариантами включала бы разницу в наборе сцен. Сколько таких сцен нашлось, показано в
-  колонке «Сцен».</p>
+  <p class="muted">Каждая сцена прогоняется всеми вариантами инструкции, поэтому варианты
+  сравниваются на одних и тех же сценах, а не по общим средним. Это важно, потому что сцены
+  разной трудности: если у одного варианта случайно окажется больше лёгких сцен, его SR
+  вырастет сам по себе, без всякого отношения к языку. Колонка «Сцен» показывает, на скольких
+  сценах сравнение получилось — там, где по варианту собрано меньше эпизодов, число ниже.</p>
   <h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Вариант инструкции</th><th>Сцен</th><th>Δlang</th></tr></thead><tbody><tr><td>mt_russian</td><td>16</td><td class="pos">+37.5 п.п.</td></tr><tr><td>ru_literal</td><td>16</td><td class="pos">+37.5 п.п.</td></tr><tr><td>ru_case_swap</td><td>4</td><td class="pos">+100.0 п.п.</td></tr><tr><td>ru_negation</td><td>15</td><td class="pos">+40.0 п.п.</td></tr><tr><td>code_switch</td><td>16</td><td class="pos">+6.2 п.п.</td></tr></tbody></table>
 </section>
 
@@ -746,7 +742,7 @@
   <tbody>
     <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>
         <td><b>сырой ответ есть</b></td>
-        <td>Δlang по вариантам, раздел 6.</td></tr>
+        <td>Δlang положителен на всех вариантах: в среднем <b>+30.3 п.п.</b>, от +6.2 (<code>code_switch</code>) до +40.0 (<code>ru_negation</code>). Зонд <code>ru_case_swap</code> отдельно: +100.0 п.п. — перестановка ролей не распознана ни разу.</td></tr>
     <tr><td class="k">RQ2. Where do multilingual instructions fail in the language-to-action pipeline?</td>
         <td><b>ответа нет</b></td>
         <td>Нужен послойный разбор; поведенческие колонки места сбоя не дают.</td></tr>
