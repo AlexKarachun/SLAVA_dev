@@ -762,6 +762,15 @@ def render_html(
   .badge.fail {{ color:var(--bad); background:#fee2e2; border:1px solid #fca5a5; }}
   .callout {{ padding:12px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; margin:0 0 14px; }}
   .warn {{ padding:12px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; margin:0 0 14px; }}
+  .f {{ padding:12px 16px; background:#fbfbf9; border:1px solid var(--line); border-radius:10px;
+    margin:0 0 14px; font-family:ui-serif,Georgia,'Times New Roman',serif; font-size:15px;
+    line-height:2.6; overflow-x:auto; }}
+  .f .def {{ display:block; margin:2px 0; }}
+  .f .name {{ font-style:italic; }}
+  .frac {{ display:inline-flex; flex-direction:column; vertical-align:middle;
+    text-align:center; margin:0 .25em; font-size:.82em; line-height:1.25; }}
+  .frac .num {{ padding:0 .45em .1em; border-bottom:1.3px solid currentColor; white-space:nowrap; }}
+  .frac .den {{ padding:.1em .45em 0; white-space:nowrap; }}
 </style>
 </head>
 <body>
@@ -909,11 +918,11 @@ def render_html(
   <p class="muted">Набор колонок задан task.md («Table — behavioral pilot»): это не метки
   исхода, а отдельные величины, показывающие, на каком шаге рвётся исполнение.</p>
   <div class="f">
-  SR = успешных эпизодов / всего эпизодов варианта<br>
-  Дотянулся до нужного предмета = эпизодов, где первый тронутый предмет — целевой / всего эпизодов варианта<br>
-  Тронул не тот предмет = эпизодов, где первый тронутый предмет — <b>не</b> целевой / всего эпизодов варианта<br>
-  Отношение выполнено = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
-  Тронул запрещённый предмет = эпизодов, где запрещённый предмет тронут хотя бы раз / всего эпизодов варианта
+  <span class="def"><span class="name">SR</span> = <span class="frac"><span class="num">успешных эпизодов</span><span class="den">всего эпизодов варианта</span></span></span>
+  <span class="def"><span class="name">Дотянулся до нужного предмета</span> = <span class="frac"><span class="num">эпизодов, где первый тронутый предмет — целевой</span><span class="den">всего эпизодов варианта</span></span></span>
+  <span class="def"><span class="name">Тронул не тот предмет</span> = <span class="frac"><span class="num">эпизодов, где первый тронутый предмет — <b>не</b> целевой</span><span class="den">всего эпизодов варианта</span></span></span>
+  <span class="def"><span class="name">Отношение выполнено</span> = <span class="frac"><span class="num">эпизодов с выполненным финальным отношением</span><span class="den">эпизодов, где отношение определено</span></span></span>
+  <span class="def"><span class="name">Тронул запрещённый предмет</span> = <span class="frac"><span class="num">эпизодов, где запрещённый предмет тронут хотя бы раз</span><span class="den">всего эпизодов варианта</span></span></span>
   </div>
   <table class="data-table"><thead><tr>
     <th>Вариант инструкции</th><th>Эпизодов</th><th>SR</th><th>Дотянулся до нужного предмета</th>
@@ -927,8 +936,8 @@ def render_html(
 <section>
   <h2>7. Языковой эффект (Δlang)</h2>
   <div class="f">
-  gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
-  <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
+  <span class="def">gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub></span>
+  <span class="def"><b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b></span>
   </div>
   <p class="muted">Каждая сцена прогоняется всеми вариантами инструкции, поэтому варианты
   сравниваются на одних и тех же сценах, а не по общим средним. Это важно, потому что сцены

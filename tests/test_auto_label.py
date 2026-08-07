@@ -226,6 +226,18 @@ class CaseSwapSuccessTest(unittest.TestCase):
         out = self._label("ru_case_swap", {"bowl_1": [0.0, 0.0, 0.90], "plate_1": [0.4, 0.3, 0.87]})
         self.assertFalse(out["success"])
 
+    def test_relation_success_follows_the_instruction_not_the_environment(self) -> None:
+        """`final_relation_success` на оси перестановки следует за инструкцией.
+
+        Иначе строка отчёта противоречит сама себе: предикат среды проверяет
+        исходное отношение, поэтому эпизод, где робот проигнорировал
+        перестановку, получал метку `relation_binding_error` и одновременно
+        «отношение выполнено». Колонка должна значить одно и то же везде.
+        """
+        out = self._label("ru_case_swap", {"bowl_1": [0.0, 0.0, 0.90], "plate_1": [0.4, 0.3, 0.87]})
+        self.assertFalse(out["success"])
+        self.assertFalse(out["final_relation_success"])
+
     def test_other_variants_keep_the_environment_predicate(self) -> None:
         out = self._label("ru_literal", {})
         self.assertTrue(out["success"])

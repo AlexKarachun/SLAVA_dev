@@ -12,16 +12,28 @@ def _resolve_relation_success(
     final_object_poses: dict[str, list[float]],
     success_predicates: list[dict[str, Any]],
     env_success: bool,
+    swapped: Optional[bool] = None,
 ) -> Optional[bool]:
-    """final_relation_success.
+    """final_relation_success — выполнено ли отношение, которого требовала
+    инструкция.
 
     Our 20 frames each carry exactly one success_predicate, and for LIBERO it
     is literally the BDDL goal state libero's own env.check_success() already
     evaluates; for SimplerEnv it is literally what env.evaluate()/info["success"]
-    checks. So in this pilot final_relation_success == env_success — see
-    SKILL.md "Native success" section for why this collapses instead of being
-    computed independently from raw poses.
+    checks. So for every ordinary variant final_relation_success == env_success
+    — see SKILL.md "Native success" section for why this collapses instead of
+    being computed independently from raw poses.
+
+    Исключение — `ru_case_swap` (`swapped` не None). Там инструкция просит
+    ПЕРЕВЁРНУТОЕ отношение, а предикат среды по-прежнему проверяет исходное,
+    поэтому возврат `env_success` означал бы «выполнено» ровно в тех эпизодах,
+    где инструкция как раз НЕ выполнена. В отчёте это выглядело прямым
+    противоречием: метка `relation_binding_error` при «отношение выполнено
+    100%». Колонка должна значить одно и то же во всех строках, поэтому на оси
+    перестановки ролей она следует за инструкцией, как и `success`.
     """
+    if swapped is not None:
+        return swapped
     if not success_predicates:
         return None
     return env_success
@@ -133,7 +145,7 @@ def label_episode(
         success = bool(swapped)
         success_source = "swapped_predicate"
     final_relation_success = _resolve_relation_success(
-        final_object_poses, success_predicates, env_success
+        final_object_poses, success_predicates, env_success, swapped=swapped
     )
 
     wrong_object = bool(
