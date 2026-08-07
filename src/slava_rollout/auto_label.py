@@ -141,6 +141,17 @@ def label_episode(
     success_source = "env"
     if swapped is None:
         success = bool(env_success)
+        # Зонд перестановки ролей молча не должен превращаться в обычный SR.
+        # `_swapped_success` умеет только отношение `on`; на любом другом
+        # (`left_of`, `next_to`, `in`) он возвращает None, и мы падаем на
+        # предикат среды, который отвечает про ИСХОДНУЮ задачу — то есть на
+        # этой оси измеряет ровно обратное задуманному. В пилоте все восемь
+        # сцен `ru_case_swap` были `on`, поэтому не выстрелило; на полном
+        # наборе квота по отношениям шире (`task.md`, «Квоты v0»). Помечаем
+        # такие строки отдельно, чтобы это было видно в данных, а не
+        # обнаружилось после прогона.
+        if variant == "ru_case_swap" and relation not in (None, "on"):
+            success_source = "env_fallback_unsupported_relation"
     else:
         success = bool(swapped)
         success_source = "swapped_predicate"

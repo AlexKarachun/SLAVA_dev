@@ -238,6 +238,30 @@ class CaseSwapSuccessTest(unittest.TestCase):
         self.assertFalse(out["success"])
         self.assertFalse(out["final_relation_success"])
 
+    def test_unsupported_relation_is_marked_not_silent(self) -> None:
+        """На неподдерживаемом отношении зонд обязан быть виден в данных.
+
+        `_swapped_success` умеет только `on`. На `left_of`/`next_to`/`in` он
+        возвращает None, и успех берётся из предиката среды — то есть на этой
+        оси измеряется ровно обратное задуманному. В пилоте все сцены были
+        `on`, поэтому дефект не проявился; на полном наборе квота шире.
+        """
+        out = label_episode(
+            env_success=True,
+            first_contact_object="bowl_1",
+            touched_objects=["bowl_1"],
+            target_object="bowl_1",
+            reference_object="plate_1",
+            forbidden_objects=[],
+            variant="ru_case_swap",
+            relation="left_of",
+            action="pick_place",
+            final_object_poses={"bowl_1": [0.0, 0.0, 0.9], "plate_1": [0.4, 0.3, 0.87]},
+            success_predicates=[{"type": "spatial_relation"}],
+            step_count=50,
+        )
+        self.assertEqual(out["success_source"], "env_fallback_unsupported_relation")
+
     def test_other_variants_keep_the_environment_predicate(self) -> None:
         out = self._label("ru_literal", {})
         self.assertTrue(out["success"])

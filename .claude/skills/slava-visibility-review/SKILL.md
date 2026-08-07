@@ -1,6 +1,6 @@
 ---
 name: slava-visibility-review
-description: Judge and record visible_agentview/visible_wrist for scene objects in task_inventory.jsonl (via data/visibility_review.html), including known pitfalls around composite/addressable objects and partial visibility. Use when doing or reviewing visibility labeling, especially when scaling from the 20-scene pilot to ~200 scenes.
+description: Judge and record visible_agentview/visible_wrist for scene objects in task_inventory.jsonl (via data/visibility_review.html (в git не лежит — сгенерировать соответствующим скриптом)), including known pitfalls around composite/addressable objects and partial visibility. Use when doing or reviewing visibility labeling, especially when scaling from the 20-scene pilot to 120–180-task full-sets.
 ---
 
 # SLAVA object visibility review
@@ -72,14 +72,14 @@ point for new work:
      exactly as it was;
    - `sync_selected_tasks_visibility.py`, a required step after applying
      corrections: `task_inventory.jsonl` (full pool) and
-     `selected_tasks_v0.jsonl` (the frozen subset, or its 200-scene
+     `selected_tasks_v0.jsonl` (the frozen subset, or its full-set
      successor) both carry copies of `objects_raw[].visible_*`. Editing the
      dashboard only touches the inventory; forgetting to run the sync step
      leaves the frozen manifest holding stale visibility values — a second,
      easy-to-miss source-of-truth split, distinct from the inherited
      parent→sub-object one described below.
 
-If you're asked to do a visibility pass at ~200-scene scale and no browser
+If you're asked to do a visibility pass at 120–180-task full-set scale and no browser
 dashboard is practical for the setting you're in, the two notebook classes
 are still there and still work — but pick `VisibilityReviewer` (bulk-first)
 over `InventoryReviewer` (one dropdown at a time) for a visibility-only pass;
@@ -101,7 +101,7 @@ review in the same pass.
   nothing useful: the former is `null`/N/A, the latter is a real `false` or
   `visible_partial` judgment — don't default both to `null`.
 
-## Scaling from 20 to ~200 scenes
+## Scaling from 20 to 120–180-task full-sets
 
 At pilot scale, cross-checking every scene by eye was feasible. At ~200:
 

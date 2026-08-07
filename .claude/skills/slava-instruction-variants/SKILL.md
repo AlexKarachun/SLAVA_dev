@@ -1,6 +1,6 @@
 ---
 name: slava-instruction-variants
-description: Author Tier-1 instruction variants (en_paraphrase, ru_literal, ru_free_order, ru_case_swap, ru_negation, code_switch) for a SLAVA grounded_frame. Use when writing or reviewing variants.* in data/pilot_v0_release/frames_v0.jsonl, or when scaling frame authoring from the 20-scene pilot to the 200-scene set.
+description: Author Tier-1 instruction variants (en_paraphrase, ru_literal, ru_free_order, ru_case_swap, ru_negation, code_switch) for a SLAVA grounded_frame. Use when writing or reviewing variants.* in data/pilot_v0_release/frames_v0.jsonl, or when scaling frame authoring from the 20-scene pilot to the full set (120-180 tasks x 12-13 variants per task.md). Records two pilot defects that must not repeat: axes authored but never exported, and ru_case_swap being a probe whose success predicate must NOT be swapped.
 ---
 
 # SLAVA instruction-variant authoring
@@ -92,7 +92,7 @@ decision, not re-derive its own.** Two concrete patterns this produces:
 Getting the *object* right (correct `raw_name` → correct row) but the
 *strategy* wrong (grabbing `canonical_name_ru` when `en_canonical` uses the
 subtype, or vice versa) is the failure mode this section exists to prevent.
-When scaling to ~200 scenes: for every new task, read `en_canonical` first,
+When scaling to 120–180-task full-sets: for every new task, read `en_canonical` first,
 identify which word it actually uses for each named object, and let *that*
 — not a fixed field-priority rule — decide what every other variant uses for
 that object.
@@ -346,7 +346,75 @@ forbidden), pull `object_lexicon.csv`'s row by `raw_name` and check every RU
 variant's noun/color choice against `canonical_name_ru`/`semantic_subtype_
 ru`/`color_ru`/`allowed_synonyms_ru`, and every `code_switch` NP against
 `canonical_name_en`/`semantic_subtype_en`. Do this as an actual script pass
-at ~200-scene scale, not eyeballing — it's what caught the `code_switch`
+at 120–180-task full-set scale, not eyeballing — it's what caught the `code_switch`
 article/basket-translation bugs and the `ru_colloquial` "плитка" near-miss
 documented above, none of which were visible from reading the sentences in
 isolation.
+
+## Написать вариант ≠ запустить его (дефект пилота, 08.08.2026)
+
+**Во фреймах пилота заполнено 11 осей, а `scripts/export_prompts.py` выгружает
+7.** В стол ушли `ru_free_order` (20 сцен), `ru_colloquial` (20), `ru_translit`
+(20), `ru_anaphora` (11) — 71 написанная инструкция, по которой нет ни одного
+эпизода. Трёх последних нет даже в `VARIANT_ORDER` генератора отчёта, то есть
+они невидимы и в таблицах. Обнаружилось это только когда пользователь спросил,
+почему в отчёте пустая строка.
+
+Гейт — константа `PRIMARY_VARIANTS` в `scripts/export_prompts.py`. Она
+зафиксирована по списку task.md «Сначала затравка» (6 primary + `mt_russian`), а
+полный набор требует **12–13 осей** (task.md, «Потом полный набор»). То есть на
+масштабе этот список неверен по построению, а не «забыли одну ось».
+
+**Правило: ось считается сделанной, только когда она (а) заполнена во фреймах,
+(б) добавлена в `PRIMARY_VARIANTS`, (в) добавлена в `VARIANT_ORDER` генератора
+отчёта, (г) появилась в `prompts_*.jsonl` после перезапуска экспорта.** Три
+множества должны совпадать; расхождение — потерянная работа, а не мелочь.
+Проверять это стоит скриптом (в `validate_frames.py` напрашивается ассерт:
+каждая непустая, не-`axis_na` ось присутствует в экспорте либо стоит в явном
+списке исключений с причиной).
+
+## `ru_case_swap` — зонд, а не задача
+
+Самая контринтуитивная ось в наборе. Её легко «починить» и тем самым сломать.
+
+**Предикат успеха намеренно НЕ переворачивается вместе с текстом.** Если
+перевернуть и его, получится другая физическая задача с другой сложностью, и
+провал станет неотличим от «стало объективно труднее». Поэтому
+`slots.success_predicates` для этой оси остаются как у исходной сцены.
+
+Следствие: `env_success` на этой оси отвечает на вопрос «сделал ли робот
+ИСХОДНОЕ задание», то есть высокий SR означает «модель не заметила
+перестановку». Успех считается отдельно — из финальных поз против перевёрнутой
+инструкции (`auto_label._swapped_success`), а источник записывается в поле
+`success_result_source`/`success_source` строки аннотации. **Не переворачивайте
+`arg1`/`arg2` в предикатах при авторинге.**
+
+Что показал пилот: у OpenVLA-OFT по старому критерию было 4/4, по правильному —
+0/4. Единственная модель, воспроизводящая свою английскую базу, во всех четырёх
+сценах выполнила исходную задачу и перестановки не заметила вовсе.
+
+**Мина на полном наборе:** `_swapped_success` умеет только отношение `on`. На
+`left_of`/`right_of`/`next_to`/`in` он возвращает `None`, и успех берётся из
+предиката среды — то есть измеряется обратное задуманному. В пилоте все 8 сцен
+были `on`, поэтому не выстрелило; квоты task.md по отношениям шире. С 08.08.2026
+такие строки помечаются `success_source = "env_fallback_unsupported_relation"`,
+чтобы это было видно в данных. **Перед сбором полного набора либо расширьте
+`_swapped_success` на остальные отношения, либо не авторьте `ru_case_swap` вне
+`on`.**
+
+**Знаменатель у этой оси свой.** Она применима только там, где есть два реально
+переставляемых предмета: в пилоте 8 сцен из 20. Её SR несопоставим с
+`ru_literal` без стратификации; `axis_na` обязана фиксировать неприменимость.
+
+## Черновики вариантов: `build_frames_v0.py` не масштабируется
+
+Скрипт называют «LLM-draft regenerator», и это вводит в заблуждение. Внутри —
+десять рукописных словарей `TEMPLATES` по семействам задач, с литеральными
+русскими строками и картой ролей по литеральным `sim_handle`. На незнакомую
+задачу он не обобщается никак. На 120–180 задачах это либо файл на несколько
+тысяч строк, либо переписывание.
+
+**Переход на данные вместо кода — предварительный шаг, а не рефакторинг «потом»:**
+варианты и роли должны лежать в JSONL/CSV, ключом по семейству задачи, а скрипт
+их потреблять.
+

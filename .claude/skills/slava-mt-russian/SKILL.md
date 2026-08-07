@@ -51,7 +51,7 @@ SR по `mt_russian` — нижняя оценка, загрязнённая о�
 эпизодов затронуто, и сказать это в Limitations рядом с числом. Скрин
 воспроизводится сравнением `canonical_name_ru` цели с текстом `mt_russian`.
 
-При масштабировании на ~200 сцен этот скрин надо гонять как обязательный шаг
+При масштабировании на 120–180 задач полного набора этот скрин надо гонять как обязательный шаг
 после MT-прогона — не чтобы чинить, а чтобы знать долю.
 
 ## Auth
@@ -156,3 +156,15 @@ a gated HF token, anything else this project ends up calling out to):
 `mt_russian`/`mt_metadata` to `null`, same as it does for `token_len` — it's
 a draft generator, not the final-state writer. Re-running it means
 re-running `run_mt_translate.py` too.
+
+## Что ещё стирает повторный запуск `build_frames_v0.py` (уточнено 08.08.2026)
+
+Список сбрасываемого шире, чем описано выше. Регенерация обнуляет также
+**`ru_translit`, `ru_colloquial`, `ru_anaphora`** (сейчас заполнены для всех 20
+сцен пилота) и возвращает `validation.native_check` в `"pending"`, а
+`validation.author` — в строку LLM-черновика.
+
+**Жёсткое правило: не запускать `build_frames_v0.py` поверх файла, прошедшего
+native check, без предварительного дифа и слияния.** На 20 сценах потеря
+восстанавливалась вручную; на 120–180 она означает выброшенный проход ручной
+проверки.

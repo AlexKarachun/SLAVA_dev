@@ -71,3 +71,20 @@ diagram. When scaling the manifest size up (20 → ~200), re-derive quota
 counts from the actual `quota_eligibility` fields across the candidate pool
 rather than assuming the pilot's proportions generalize — a bigger pool
 changes which quotas are the binding constraint.
+
+## Контракт полей
+
+Актуальные таблицы полей lexicon и `quota_eligibility` — в
+[`docs/DATA_SCHEMAS.md`](../../../docs/DATA_SCHEMAS.md); сверено с живыми данными
+08.08.2026. Там же описан `referring_strategy`, который на этапе авторинга
+инструкций полагается записывать во фрейм, а не держать в голове.
+
+## Масштабирование квот: две копии константы, которые разъедутся
+
+Числа квот в task.md («Квоты v0») — абсолютные счётчики для 20 задач
+(`ru_case_swap` 6/20, `ru_negation` 12/20 и т.д.). На полном наборе их надо
+читать как **доли**, а не как абсолютные значения.
+
+Осторожно: целевое число `"ru_case_swap": 6` захардкожено в **двух** местах —
+`scripts/generate_selected_scenes.py` и `src/slava_inventory/notebook_ui.py`.
+Менять надо оба, иначе отбор и интерфейс будут расходиться молча.

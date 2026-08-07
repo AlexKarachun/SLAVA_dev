@@ -145,3 +145,12 @@ there exactly one `target`? Is `reference` non-null iff `relation` is
 non-null? Does every id in `forbidden` actually appear in the text of a
 filled-in `ru_negation`? If any answer is "not sure," go look at the render
 again — don't reason from the object list alone.
+
+## `success_predicates` и `ru_case_swap`: не переворачивать
+
+Для оси `ru_case_swap` предикат успеха остаётся **как у исходной сцены**.
+Перевернуть `arg1`/`arg2` вместе с текстом — значит превратить зонд в другую
+физическую задачу, и провал станет неотличим от «стало объективно труднее».
+Успех по этой оси пересчитывается ниже по цепочке из финальных поз
+(`auto_label._swapped_success`). Подробности и мина с отношениями кроме `on` —
+skill `slava-instruction-variants`, раздел «`ru_case_swap` — зонд, а не задача».

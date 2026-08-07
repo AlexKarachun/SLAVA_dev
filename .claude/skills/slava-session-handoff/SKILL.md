@@ -128,7 +128,7 @@ project:
    external file, a soft non-blocking issue), list them explicitly by name
    — they're easy to lose track of if left implicit in "see AGENTS.md".
 4. An explicit boundary on scope: what NOT to start without the user asking
-   (e.g. "don't scale to ~200 scenes", "don't tag the freeze without
+   (e.g. "don't scale to 120–180-task full-sets", "don't tag the freeze without
    explicit go-ahead") — carried over from the current session's own scope
    boundary, not invented fresh.
 5. Any live operational gotcha that would otherwise cost a repeat

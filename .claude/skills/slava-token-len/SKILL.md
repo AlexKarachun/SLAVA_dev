@@ -83,3 +83,15 @@ after: any `build_frames_v0.py` regeneration, any edit to `variants.*` text
 (dashboard corrections change token counts), or once `mt_russian` gets a
 real MT pass (it's excluded from `token_len` until then purely because it's
 still `null`, not by design — rerun picks it up automatically once filled).
+
+## Что ещё стирает повторный запуск `build_frames_v0.py` (уточнено 08.08.2026)
+
+Список сбрасываемого шире, чем описано выше. Регенерация обнуляет также
+**`ru_translit`, `ru_colloquial`, `ru_anaphora`** (сейчас заполнены для всех 20
+сцен пилота) и возвращает `validation.native_check` в `"pending"`, а
+`validation.author` — в строку LLM-черновика.
+
+**Жёсткое правило: не запускать `build_frames_v0.py` поверх файла, прошедшего
+native check, без предварительного дифа и слияния.** На 20 сценах потеря
+восстанавливалась вручную; на 120–180 она означает выброшенный проход ручной
+проверки.

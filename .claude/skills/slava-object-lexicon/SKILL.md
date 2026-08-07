@@ -1,6 +1,6 @@
 ---
 name: slava-object-lexicon
-description: Add or edit rows in data/object_lexicon.csv (category, semantic subtype, canonical EN/RU name, visual attributes, color, recoverability, synonyms, usable_v0). Use when a new raw_name/asset needs a lexicon entry, or when scaling scene collection past the 20-scene pilot to ~200 scenes.
+description: Add or edit rows in data/object_lexicon.csv (category, semantic subtype, canonical EN/RU name, visual attributes, color, recoverability, synonyms, usable_v0). Use when a new raw_name/asset needs a lexicon entry, or when scaling scene collection past the 20-scene pilot to 120–180-task full-sets.
 ---
 
 # SLAVA object lexicon authoring
@@ -109,10 +109,10 @@ unsanctioned synonym, a `code_switch` NP that didn't match `canonical_name_
 en`) only shows up when you diff authored prompt text against the CSV,
 row by row, after authoring, not while writing the CSV itself.
 
-## Scaling from 20 to ~200 scenes
+## Scaling from 20 to 120–180-task full-sets
 
 The pilot's lexicon is small enough to eyeball for cross-row consistency by
-hand. At ~200 scenes, do an explicit consistency pass instead of trusting
+hand. At 120–180-task full-sets, do an explicit consistency pass instead of trusting
 memory:
 
 - group rows by `category_en` and sanity-check that `color_ru` genders match
@@ -130,7 +130,7 @@ memory:
   actual script over every scene, not a read-through — at 20 scenes a
   careful read-through mostly worked but still missed real bugs (the
   `code_switch` article, the untranslated `basket_1` reference, a colloquial
-  synonym not in `allowed_synonyms_ru`); at ~200 scenes a read-through won't
+  synonym not in `allowed_synonyms_ru`); at 120–180-task full-sets a read-through won't
   scale and will miss more, not less. The check is mechanical: for every
   object actually named in a variant (target/reference/forbidden), pull its
   lexicon row by `raw_name` and confirm the word used is one of
@@ -138,3 +138,10 @@ memory:
   a scene-safe bare truncation of one, per the modifier-dropping rule) — flag
   anything that isn't, don't silently assume it's fine because it reads
   naturally.
+
+## Контракт полей
+
+Актуальные таблицы полей lexicon и `quota_eligibility` — в
+[`docs/DATA_SCHEMAS.md`](../../../docs/DATA_SCHEMAS.md); сверено с живыми данными
+08.08.2026. Там же описан `referring_strategy`, который на этапе авторинга
+инструкций полагается записывать во фрейм, а не держать в голове.
