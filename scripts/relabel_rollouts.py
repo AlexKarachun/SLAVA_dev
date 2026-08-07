@@ -73,8 +73,12 @@ def read_steps(run_id: str) -> list[dict[str, Any]]:
     return out
 
 
-def relabel(row: dict[str, Any], prompts: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any] | None:
-    """Return a new row with re-derived fields, or None if raw data is missing."""
+def relabel(
+    row: dict[str, Any],
+    prompts: dict[tuple[str, str], dict[str, Any]],
+    include_case_swap: bool = False,
+) -> dict[str, Any] | None:
+    """Return a new row with re-derived fields, or None if it can't be relabeled."""
     steps = read_steps(row["run_id"])
     if not steps:
         return None
@@ -82,11 +86,16 @@ def relabel(row: dict[str, Any], prompts: dict[tuple[str, str], dict[str, Any]])
     if prompt is None:
         return None
 
-    if row["variant"] == "ru_case_swap":
-        # Собранные ru_case_swap не переписываем: их критерий успеха сменился
-        # 07.08.2026, и они помечены устаревшими в data/rollout_provenance.json.
-        # Пересчёт задним числом подменил бы результаты, чего пользователь
-        # явно просил не делать.
+    if row["variant"] == "ru_case_swap" and not include_case_swap:
+        # Собранные ru_case_swap по умолчанию не переписываем: их критерий
+        # успеха сменился 07.08.2026, и они помечены устаревшими в
+        # data/rollout_provenance.json.
+        #
+        # Но данные для пересчёта на месте — финальные позы объектов есть во
+        # всех 36 `steps.jsonl`, и `auto_label._swapped_success` считается по
+        # ним без GPU. Раньше это отражалось в выводе как «skipped (no raw
+        # data)», что было неверно: пропуск был решением, а не отсутствием
+        # данных. Включается флагом --include-case-swap.
         return None
 
     target = prompt.get("target_object")
@@ -129,6 +138,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--write", action="store_true", help="rewrite the file (default: dry run)")
     parser.add_argument("--annotations", type=Path, default=ANNOTATIONS)
+    parser.add_argument(
+        "--include-case-swap", action="store_true",
+        help="Also recompute the 36 ru_case_swap episodes under the corrected "
+             "success criterion (success computed from final poses by "
+             "auto_label._swapped_success, not from the env predicate). Their "
+             "`success` is EXPECTED to change, so the usual guard is relaxed "
+             "for exactly those rows and only when success_source says the "
+             "value came from the swapped predicate.",
+    )
     args = parser.parse_args()
 
     rows = load_jsonl(args.annotations)
@@ -140,7 +158,7 @@ def main() -> None:
     field_changes: Counter = Counter()
 
     for row in rows:
-        new = relabel(row, prompts)
+        new = relabel(row, prompts, include_case_swap=args.include_case_swap)
         if new is None:
             skipped.append(row["run_id"])
             new_rows.append(row)
@@ -153,7 +171,10 @@ def main() -> None:
         validate_rollout_annotation(new)
         new_rows.append(new)
 
-    print(f"episodes: {len(rows)}   relabeled: {len(rows) - len(skipped)}   skipped (no raw data): {len(skipped)}")
+    # Не «no raw data»: по умолчанию сюда попадают ещё и ru_case_swap, у
+    # которых данные есть, а пропуск — сознательное решение (см. relabel()).
+    reason = "skipped" if args.include_case_swap else "skipped (ru_case_swap by default, or no raw data)"
+    print(f"episodes: {len(rows)}   relabeled: {len(rows) - len(skipped)}   {reason}: {len(skipped)}")
     if skipped:
         for run_id in skipped[:5]:
             print(f"  skipped: {run_id}")
@@ -175,9 +196,27 @@ def main() -> None:
     # checker, recorded per step at collection time. If it moves, the raw data
     # and the annotations disagree about what happened, which is a data-integrity
     # problem, not a labeling one.
-    if field_changes.get("success"):
+    # Исключение для ru_case_swap: у этого варианта успех НЕ берётся из
+    # предиката среды — он считается из финальных поз, потому что предикат
+    # отвечает на другой вопрос (выполнена ли ИСХОДНАЯ задача). Поэтому смена
+    # `success` здесь ожидаема и не является нарушением целостности. Ослабление
+    # узкое: только строки ru_case_swap и только если сам пересчёт пометил их
+    # success_source == "swapped_predicate".
+    case_swap_success_changes = sum(
+        1 for old_row, new_row in zip(rows, new_rows)
+        if old_row["variant"] == "ru_case_swap"
+        and old_row.get("success") != new_row.get("success")
+        and new_row.get("success_source") == "swapped_predicate"
+    )
+    unexplained_success_changes = field_changes.get("success", 0) - case_swap_success_changes
+    if case_swap_success_changes:
         print(
-            f"\nREFUSING TO WRITE: `success` changed on {field_changes['success']} episodes. "
+            f"\n{case_swap_success_changes} ru_case_swap эпизодов сменили `success` — "
+            "это ожидаемо: критерий для них считается из финальных поз."
+        )
+    if unexplained_success_changes > 0:
+        print(
+            f"\nREFUSING TO WRITE: `success` changed on {unexplained_success_changes} episodes. "
             "That value comes from the environment, not from these rules — "
             "investigate the raw steps.jsonl before trusting either file.",
             file=sys.stderr,
