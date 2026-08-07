@@ -289,6 +289,12 @@ function stop(card) {{ clearInterval(card._timer); card._timer = null; }}
 
 cards.forEach(card => {{
   observer.observe(card);
+  // Написать комментарий — тоже осмотреть карточку: помечаем проверенной,
+  // иначе заметка не сохранится и не уедет в выгрузку.
+  card.querySelector('.v-note').addEventListener('input', () => {{
+    if (card.querySelector('.v-note').value) markReviewed(card);
+    refresh();
+  }});
   card.querySelector('.scrub').addEventListener('input', e => {{ stop(card); setFrame(card, +e.target.value); }});
   card.querySelectorAll('.strip img').forEach(img =>
     img.addEventListener('click', () => {{ stop(card); setFrame(card, +img.dataset.i); }}));
@@ -346,6 +352,24 @@ document.addEventListener('keydown', e => {{
   if (next) next.scrollIntoView({{behavior: 'smooth', block: 'center'}});
 }});
 
+function record(c) {{
+  return {{
+    run_id: c.dataset.runId,
+    success: selected(c, 'v-success') === 'true',
+    failure_type_manual: selected(c, 'v-label') || null,
+    kept_auto: selected(c, 'v-success') === c.dataset.autoSuccess
+               && selected(c, 'v-label') === c.dataset.autoLabel,
+    note: c.querySelector('.v-note').value || null,
+    reviewed: !!c.dataset.reviewed,
+  }};
+}}
+// Хранится всё, где человек хоть что-то сделал — включая карточки с одной
+// заметкой без подтверждённого вердикта: иначе перезагрузка страницы молча
+// стирает комментарий, который писали вдумчиво. В выгрузку идут только
+// подтверждённые (см. filter ниже).
+function snapshot() {{
+  return cards.filter(c => c.dataset.reviewed || c.querySelector('.v-note').value).map(record);
+}}
 function collect() {{
   return cards.filter(c => c.dataset.reviewed && selected(c, 'v-success')).map(c => ({{
     run_id: c.dataset.runId,
@@ -359,17 +383,22 @@ function collect() {{
 function refresh() {{
   cards.forEach(c => c.classList.toggle('done', !!c.dataset.reviewed));
   document.getElementById('count').textContent = collect().length;
-  localStorage.setItem('slava_label_review', JSON.stringify(collect()));
+  localStorage.setItem('slava_label_review', JSON.stringify(snapshot()));
 }}
 document.addEventListener('change', refresh);
 document.addEventListener('input', refresh);
 JSON.parse(localStorage.getItem('slava_label_review') || '[]').forEach(v => {{
   const c = cards.find(c => c.dataset.runId === v.run_id);
   if (!c) return;
+  c.querySelector('.v-note').value = v.note || '';
+  if (v.reviewed === false) {{
+    // Карточка с заметкой, но без вердикта: заметку вернуть, «проверено» — нет.
+    prefill(c);
+    return;
+  }}
   select(c, 'v-success', String(v.success));
   select(c, 'v-label', v.failure_type_manual || '');
   markReviewed(c);
-  c.querySelector('.v-note').value = v.note || '';
 }});
 refresh();
 document.getElementById('export').onclick = () => {{

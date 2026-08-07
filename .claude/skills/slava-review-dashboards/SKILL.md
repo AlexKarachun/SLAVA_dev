@@ -83,6 +83,28 @@ State the anchoring cost out loud when handing the dashboard over — prefilling
 does bias a reviewer toward agreement, and that limitation belongs in whatever
 the pass reports, not just in the code.
 
+## Persist more than you export
+
+Two separate questions, and conflating them loses work: **what counts as
+reviewed** (goes into the export) versus **what gets saved between reloads**
+(goes into `localStorage`). The first version saved only the export set, so a
+card where the reviewer typed a comment but kept the pre-filled verdict was
+stored nowhere — the comment lived in the DOM until the next reload and then
+vanished. It was also not highlighted as done, which is how the user noticed.
+
+Rules that follow:
+
+- **Any deliberate action on a card counts as reviewing it** — clicking a
+  verdict, pressing a key, *or typing a note*. Someone who bothered to write a
+  comment has looked at the episode more carefully than someone who pressed
+  Enter.
+- **Save a superset, export a subset.** The snapshot keeps every card with any
+  human input and records `reviewed` per card; the export filters to confirmed
+  verdicts.
+- **Regenerating the page while a review is in progress is a data-loss event**
+  for anything held only in the DOM. Say so before telling the user to refresh,
+  and give them a way to flush first.
+
 ## Subsampling frames: uniform, first and last included
 
 An episode is 27–300 frames and a card shows ~24, so the frames are subsampled —
