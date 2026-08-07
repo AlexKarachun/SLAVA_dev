@@ -27,6 +27,51 @@ def _resolve_relation_success(
     return env_success
 
 
+def _is_on(top: Optional[list[float]], bottom: Optional[list[float]]) -> Optional[bool]:
+    """Грубая проверка «A стоит на B» по финальным позам.
+
+    Нужна там, где предикат среды отвечает на другой вопрос (см.
+    `_swapped_success`). Пороги сознательно широкие: 6 см по горизонтали и
+    1-12 см по высоте покрывают и кубик 3 см на кубике, и тарелку на миске, а
+    промахи мимо цели в наших сценах измеряются десятками сантиметров.
+    Возвращает None, если поз нет — «не знаю» не то же самое, что «нет».
+    """
+    if not top or not bottom or len(top) < 3 or len(bottom) < 3:
+        return None
+    dx, dy = abs(top[0] - bottom[0]), abs(top[1] - bottom[1])
+    dz = top[2] - bottom[2]
+    return dx <= 0.06 and dy <= 0.06 and 0.01 <= dz <= 0.12
+
+
+def _swapped_success(
+    variant: Optional[str],
+    relation: Optional[str],
+    target_object: Optional[str],
+    reference_object: Optional[str],
+    final_object_poses: dict[str, list[float]],
+) -> Optional[bool]:
+    """Успех для `ru_case_swap` — выполнил ли робот ПЕРЕВЁРНУТУЮ инструкцию.
+
+    Предикат среды в этом варианте намеренно не меняется (иначе получилась бы
+    другая задача с другой физикой, и провал нельзя было бы отличить от «стало
+    объективно труднее»). Но тогда `env_success` отвечает на вопрос «сделал ли
+    робот ИСХОДНОЕ задание», то есть высокий SR означал «модель не заметила
+    перестановку ролей» — величина, которую невозможно читать как обычный SR.
+    Решение пользователя 07.08.2026: считать успехом то, о чём просила
+    перевёрнутая инструкция, то есть отношение между теми же объектами в
+    обратную сторону.
+
+    Возвращает None, если вариант не тот, отношение не `on` или поз не хватает —
+    вызывающий код тогда остаётся на `env_success`.
+    """
+    if variant != "ru_case_swap" or relation != "on":
+        return None
+    if not target_object or not reference_object:
+        return None
+    # Перевёрнутая инструкция просит поставить исходный reference на исходный target.
+    return _is_on(final_object_poses.get(reference_object), final_object_poses.get(target_object))
+
+
 def label_episode(
     *,
     env_success: bool,
@@ -77,7 +122,15 @@ def label_episode(
     rather than of the models. Termination is now expressed directly by
     `ran_to_completion` instead of being inferred from a step budget.
     """
-    success = bool(env_success)
+    swapped = _swapped_success(
+        variant, relation, target_object, reference_object, final_object_poses
+    )
+    success_source = "env"
+    if swapped is None:
+        success = bool(env_success)
+    else:
+        success = bool(swapped)
+        success_source = "swapped_predicate"
     final_relation_success = _resolve_relation_success(
         final_object_poses, success_predicates, env_success
     )
@@ -150,6 +203,7 @@ def label_episode(
 
     return {
         "success": success,
+        "success_source": success_source,
         "first_contact_object": first_contact_object,
         "wrong_object": wrong_object,
         "forbidden_object_touched": forbidden_object_touched,

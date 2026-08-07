@@ -189,3 +189,49 @@ class NegationAxisTest(unittest.TestCase):
         # Поле остаётся: по нему можно пересчитать более строгое правило, не
         # перезапуская прогоны.
         self.assertTrue(self._label("en_canonical")["forbidden_object_touched"])
+
+
+class CaseSwapSuccessTest(unittest.TestCase):
+    """У `ru_case_swap` успех — про перевёрнутую инструкцию, а не про предикат среды.
+
+    Предикат намеренно не переворачивается вместе с текстом, поэтому env_success
+    отвечает «сделал ли робот ИСХОДНОЕ задание»: высокий SR означал бы «модель не
+    заметила перестановку». Решение пользователя 07.08.2026 — считать успехом то,
+    о чём просила перевёрнутая инструкция.
+    """
+
+    def _label(self, variant, poses, env_success=True):
+        return label_episode(
+            env_success=env_success,
+            first_contact_object="bowl_1",
+            touched_objects=["bowl_1"],
+            target_object="bowl_1",
+            reference_object="plate_1",
+            forbidden_objects=[],
+            variant=variant,
+            relation="on",
+            action="pick_place",
+            final_object_poses=poses,
+            success_predicates=[{"type": "spatial_relation"}],
+            step_count=50,
+        )
+
+    def test_following_the_swap_counts_as_success(self) -> None:
+        # Тарелка оказалась на миске — робот сделал то, о чём просили.
+        out = self._label("ru_case_swap", {"bowl_1": [0.0, 0.0, 0.87], "plate_1": [0.0, 0.0, 0.90]})
+        self.assertTrue(out["success"])
+        self.assertEqual(out["success_source"], "swapped_predicate")
+
+    def test_ignoring_the_swap_is_a_failure_even_if_the_env_says_success(self) -> None:
+        out = self._label("ru_case_swap", {"bowl_1": [0.0, 0.0, 0.90], "plate_1": [0.4, 0.3, 0.87]})
+        self.assertFalse(out["success"])
+
+    def test_other_variants_keep_the_environment_predicate(self) -> None:
+        out = self._label("ru_literal", {})
+        self.assertTrue(out["success"])
+        self.assertEqual(out["success_source"], "env")
+
+    def test_missing_poses_fall_back_to_the_environment(self) -> None:
+        # «Не знаю» не должно превращаться в «не выполнил».
+        out = self._label("ru_case_swap", {})
+        self.assertEqual(out["success_source"], "env")

@@ -23,6 +23,12 @@ ROLLOUT_ANNOTATION_FIELDS = (
     "instruction",
     "seed",
     "success",
+    # Чем посчитан success: "env" — предикатом среды (обычный случай);
+    # "swapped_predicate" — нашей проверкой перевёрнутой инструкции для
+    # ru_case_swap, где предикат среды отвечает на другой вопрос (см.
+    # auto_label._swapped_success). Поле обязательное с 07.08.2026: без него
+    # нельзя понять, что означает единица в колонке success.
+    "success_source",
     "first_contact_object",
     "target_object",
     "reference_object",
