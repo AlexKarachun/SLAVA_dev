@@ -1,0 +1,130 @@
+{
+  "_README": [
+    "Происхождение сцен из data/full_set/. Одна запись на сеанс сбора сцен.",
+    "Это НЕ то же, что data/collection_runs.json — тот про сеансы сбора роллаутов",
+    "(железо, precision). Здесь — чем и с какими параметрами отрендерены сами сцены.",
+    "Всё, что нужно для точного воспроизведения, должно лежать здесь: пины",
+    "репозиториев, версии, параметры сэмплирования и рендера."
+  ],
+  "runs": [
+    {
+      "id": "full-set-2026-08-08",
+      "date": "2026-08-08",
+      "purpose": "пул кандидатов полномасштабного набора (120-180 отбираемых сцен)",
+      "host": {
+        "gpu": "NVIDIA GeForce RTX 2080 Ti",
+        "cpu_cores": 32,
+        "ram_gb": 125,
+        "provider": "vast.ai, арендован на ~1.5 часа, погашен после сбора"
+      },
+      "slava_repo_commit": "0852df87cc8dcd285115857e6805f4144fe59d2c",
+      "environments": {
+        "LIBERO": {
+          "repo": "https://github.com/Lifelong-Robot-Learning/LIBERO.git",
+          "commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "python": "3.8.13",
+          "robosuite": "1.4.0",
+          "renderer": "MUJOCO_GL=egl, MUJOCO_EGL_DEVICE_ID=0"
+        },
+        "SimplerEnv": {
+          "repo": "https://github.com/simpler-env/SimplerEnv.git",
+          "commit": "06accaca93535902d408da4855f21cece12bceb7",
+          "python": "3.10",
+          "pins": "setuptools<81, numpy==1.24.4, opencv-python<4.10",
+          "renderer": "SAPIEN, MUJOCO_GL=egl не применяется"
+        }
+      },
+      "sampling": {
+        "libero_suites": [
+          "libero_10",
+          "libero_goal",
+          "libero_object",
+          "libero_spatial"
+        ],
+        "libero_tasks_per_suite": 10,
+        "libero_init_state_ids": [
+          0,
+          3,
+          5,
+          8,
+          10,
+          13,
+          15,
+          18,
+          21,
+          23,
+          26,
+          28,
+          31,
+          34,
+          36,
+          39,
+          41,
+          44,
+          46,
+          49
+        ],
+        "libero_init_state_rule": "round(i*49/19) для i в 0..19 — 20 значений, равномерно по доступным 50, а не подряд: ради разнообразия раскладок",
+        "simpler_tasks": [
+          "widowx_carrot_on_plate",
+          "widowx_put_eggplant_in_basket",
+          "widowx_spoon_on_towel",
+          "widowx_stack_cube"
+        ],
+        "simpler_episode_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        "reset_seed": 0
+      },
+      "render": {
+        "settle_steps": 40,
+        "image_size": 256,
+        "settle_note": "40 шагов нулевого действия до съёмки, чтобы предметы улеглись. В ПИЛОТНОМ инвентаре (data/task_inventory.jsonl) settle_steps не выставлялся вовсе — кадры сняты в полёте, наборы напрямую несравнимы."
+      },
+      "counts": {
+        "libero_scenes": 800,
+        "simpler_scenes": 96,
+        "total_scenes": 896,
+        "libero_tasks": 40,
+        "simpler_tasks": 4,
+        "images": 1696,
+        "objects": 5312
+      },
+      "excluded": {
+        "libero_90": "270 сцен собраны и отложены в data/full_set_archive_libero90/: ни один наш чекпойнт на этом сьюте не дообучен (OpenVLA-OFT: ...-libero-spatial-object-goal-10), опубликованных базовых линий нет"
+      },
+      "parallelism": {
+        "peak_processes": 26,
+        "decomposition": "по процессу на (сьют × задача), 40 частей",
+        "throughput_scenes_per_min": 52,
+        "bottleneck": "CPU (физика MuJoCo); GPU был загружен на 8-18%"
+      },
+      "not_recorded": [
+        "точные версии numpy/mujoco внутри окружения LIBERO — фиксировались только пины из bootstrap.sh"
+      ]
+    }
+  ]
+}
