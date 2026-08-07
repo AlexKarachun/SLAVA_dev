@@ -33,13 +33,13 @@
       "report_treatment": "primary"
     },
     "GreenVLA-R0": {
-      "sr": 0.333,
-      "label": "33.3% success / 91.7% pick",
-      "scope": "Cubes, SimplerEnv WidowX",
-      "source": "arXiv:2602.00919, Table 4; зафиксировано в .claude/skills/slava-greenvla",
-      "comparable": "indicative",
+      "sr": null,
+      "label": "не опубликовано для этого чекпойнта",
+      "scope": "SimplerEnv WidowX",
+      "source": "Проверено 08.08.2026 (docs/EVAL_PARITY.md, T12.4): Table 4 статьи arXiv:2602.00919 целиком относится к бэкбону PaliGemma 3B, а числа линейки Qwen3-VL-4B публикуются отдельно (README, сайт проекта) и содержат только R1 и R2. Строки R0 для Qwen3-VL-4B нет нигде. Прежде стоявшие здесь 33.3% — это Cubes task success из PaliGemma-строки R0; наш чекпойнт GreenVLA-5b-base-stride-1 объявляет base_vlm_model = Qwen3-VL-4B-Instruct-action, то есть сравнивался с другой моделью.",
+      "comparable": "unpublished",
       "report_treatment": "excluded",
-      "report_treatment_note": "Исключена по тому же правилу, что pi0.5: 0/22 на en_canonical (полный bridge-набор) — английская база на полу, значит нули на русском неотличимы от эффекта пола. R1 и R2 остаются preliminary: у них база ненулевая (по 5/22)."
+      "report_treatment_note": "Исключена по тому же правилу, что pi0.5: 0/22 на en_canonical (полный bridge-набор) — английская база на полу, значит нули на русском неотличимы от эффекта пола. R1 и R2 остаются preliminary: у них база ненулевая (по 5/22). Отдельно: валидацию стенда для R0 нельзя назвать проваленной, поскольку сравнивать не с чем — она неопределима (см. source)."
     },
     "GreenVLA-R1 (bridge)": {
       "sr": 0.729,

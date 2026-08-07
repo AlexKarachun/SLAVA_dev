@@ -46,7 +46,7 @@ python scripts/harness_validation.py --pool harness_validation_greenvla --by-tas
 
 ```
 модель                     наше en_canonical    95% CI      заявлено   вывод
-GreenVLA-R0                  0/22 =  0.0%    [ 0.0;14.9]     33.3%    НЕ совпадает
+GreenVLA-R0                  0/22 =  0.0%    [ 0.0;14.9]        —     сравнить не с чем
 GreenVLA-R1 (bridge)         5/22 = 22.7%    [10.1;43.4]     72.9%    НЕ совпадает
 GreenVLA-R2 (bridge, RL)     5/22 = 22.7%    [10.1;43.4]     80.5%    НЕ совпадает
 ```

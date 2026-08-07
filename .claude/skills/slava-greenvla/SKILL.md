@@ -4,11 +4,40 @@ description: GreenVLA (R0/R1/R2) model-server specifics for SLAVA rollouts — A
 ---
 
 > **⚠ Валидация стенда не пройдена (07.08.2026).** На полном bridge-наборе
-> (22 сцены, все четыре задачи, только `en_canonical`): R0 0/22 против
-> заявленных 33.3%, R1 5/22 против 72.9%, R2 5/22 против 80.5%. При этом стенд
-> жив — R1 берёт 2 из 3 эпизодов `eggplant`, — значит дефект не в среде.
+> (22 сцены, все четыре задачи, только `en_canonical`): R1 5/22 против
+> заявленных 72.9%, R2 5/22 против 80.5%. При этом стенд жив — R1 берёт 2 из 3
+> эпизодов `eggplant`, — значит дефект не в среде.
 > **Цифры этих моделей нельзя читать как поведение модели.** Разбор —
 > `docs/HARNESS_VALIDATION.md`, гипотезы — `docs/HYPOTHESES.md`.
+>
+> **R0 — отдельный случай: её валидация не провалена, а неопределима.**
+> Опубликованной базовой линии для чекпойнта `GreenVLA-5b-base-stride-1`
+> (бэкбон Qwen3-VL-4B) не существует: в таблице SimplerEnv WidowX есть строки
+> PaliGemma-3B R0/R1/R2 и Qwen3-VL-4B **R1/R2**, но строки Qwen-R0 нет.
+> Стоявшие у нас 33.3% взяты из строки PaliGemma-3B — другого бэкбона.
+> Исправлено 08.08.2026, см. `docs/EVAL_PARITY.md`.
+
+## Три ловушки, проверенные 08.08.2026 (T12.4) — не переоткрывать
+
+1. **Авторского eval-скрипта не существует.** В `examples/` только
+   `example_inference_{bridge,calvin,fractal}.py` и `example_vqa.ipynb` —
+   одношаговый инференс без цикла по эпизодам и подсчёта успеха. Рычага
+   «прогнать их eval и сравнить» здесь нет, в отличие от lerobot.
+2. **Их пример врёт про delta-to-absolute.** Комментарии в
+   `example_inference_bridge.py` дважды говорят, что `output_transforms` делает
+   «denormalize + delta-to-absolute conversion» и что `state` нужен именно для
+   этого. В коде `BridgeOutputsTransform.__call__` — только `actions[:, :7]`,
+   `state` не используется. **Выход политики это дельта; не «чинить» это по
+   комментарию авторов.**
+3. **Авторы сами объявляют шум ±6%** (`docs/INFERENCE.md`, «Benchmarking
+   Notes») и просят усреднять по нескольким прогонам. Наши сравнения —
+   одиночный прогон; для R1/R2 разрыв всё равно много больше 6%, но оговорку
+   надо нести в Limitations.
+
+Заодно измерено, что шкала действия у GreenVLA **верная**: контроллер руки
+WidowX объявлен с `normalize_action=False`, то есть ждёт метры, и GreenVLA даёт
+3-8 мм за шаг. Подозрение в недо-денормализации с неё снято (а вот у π0/π0.5 на
+том же роботе 10-33 см за шаг — см. `docs/EVAL_PARITY.md`).
 
 # GreenVLA (R0 / R1-bridge / R2-bridge) — model-server notes
 
@@ -518,6 +547,11 @@ pure-upstream harness:
 | `widowx_put_eggplant_in_basket` | **0/10** | **88.5%** |
 | `widowx_carrot_on_plate` | **0/10** | 25.0% |
 | `widowx_stack_cube` | 0/20 | 33.3% |
+
+> **Оговорка 08.08.2026 (T12.4): правая колонка — это PaliGemma-3B R0.**
+> Table 4 статьи целиком про тот бэкбон; для линейки Qwen3-VL-4B, к которой
+> относится наш чекпойнт, строки R0 не опубликовано нигде. Контраст с R1/R2 на
+> наших же сценах остаётся содержательным, авторским опровержением — нет.
 
 **Eggplant is the paper's easiest bridge task and we score zero on it.**
 A generalist checkpoint being weak does not produce 0/10 where the authors
