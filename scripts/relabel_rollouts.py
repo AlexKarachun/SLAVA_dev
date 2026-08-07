@@ -82,6 +82,23 @@ def relabel(row: dict[str, Any], prompts: dict[tuple[str, str], dict[str, Any]])
     if prompt is None:
         return None
 
+    if row["variant"] == "ru_case_swap":
+        # Собранные ru_case_swap не переписываем: их критерий успеха сменился
+        # 07.08.2026, и они помечены устаревшими в data/rollout_provenance.json.
+        # Пересчёт задним числом подменил бы результаты, чего пользователь
+        # явно просил не делать.
+        return None
+
+    target = prompt.get("target_object")
+    start_z = None
+    max_lift = 0.0
+    for step in steps:
+        pose = (step.get("object_poses") or {}).get(target)
+        if pose and len(pose) >= 3:
+            if start_z is None:
+                start_z = pose[2]
+            max_lift = max(max_lift, pose[2] - start_z)
+
     last = steps[-1]
     label = label_episode(
         env_success=bool(last.get("success_so_far", False)),
@@ -97,6 +114,7 @@ def relabel(row: dict[str, Any], prompts: dict[tuple[str, str], dict[str, Any]])
         final_object_poses=last.get("object_poses") or {},
         success_predicates=prompt.get("success_predicates") or [],
         step_count=len(steps),
+        target_lifted=(max_lift >= 0.02) if start_z is not None else None,
         # Every row that exists in rollout_annotations.jsonl was written after
         # its episode loop finished normally: run_episode() only appends after
         # the loop, and any error propagates out of it so no row is written at

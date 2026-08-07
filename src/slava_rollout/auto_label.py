@@ -86,6 +86,7 @@ def label_episode(
     final_object_poses: dict[str, list[float]],
     success_predicates: list[dict[str, Any]],
     step_count: int,
+    target_lifted: Optional[bool] = None,
     ran_to_completion: bool = True,
     max_steps: Optional[int] = None,
 ) -> dict[str, Any]:
@@ -187,6 +188,14 @@ def label_episode(
         failure_type_auto = "negation_error"
     elif wrong_object:
         failure_type_auto = "target_grounding_error"
+    elif relation is not None and reference_object is not None and target_lifted is False:
+        # Цель ни разу не оторвалась от поверхности — нарушать отношение было
+        # нечем. Это неудачный захват, а не ошибка привязки отношения.
+        # Найдено при ручной валидации 100 роллаутов: `relation_binding_error`
+        # там, где человек видит «коснулся, но не смог взять», — самое частое
+        # расхождение после починки negation (5 случаев из 24). Порог подъёма
+        # 2 см: меньше даёт дрожание контакта, больше — уже перенос.
+        failure_type_auto = "physical_execution_error"
     elif relation is not None and reference_object is not None:
         # target contact was correct; relation unmet. task.md distinguishes
         # reference_grounding_error (wrong reference) from relation_binding_error

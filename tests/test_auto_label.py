@@ -235,3 +235,32 @@ class CaseSwapSuccessTest(unittest.TestCase):
         # «Не знаю» не должно превращаться в «не выполнил».
         out = self._label("ru_case_swap", {})
         self.assertEqual(out["success_source"], "env")
+
+
+class LiftRuleTest(unittest.TestCase):
+    """Нельзя нарушить отношение объектом, который ни разу не подняли.
+
+    До 07.08.2026 такие эпизоды получали `relation_binding_error` по остаточному
+    принципу (цель тронута, отношение не достигнуто) — и это было самое частое
+    расхождение с человеком после починки negation: он видел «коснулся, но не
+    смог взять», то есть `physical_execution_error`.
+    """
+
+    def _label(self, target_lifted):
+        return label_episode(
+            env_success=False, first_contact_object="bowl", touched_objects=["bowl"],
+            target_object="bowl", reference_object="plate", forbidden_objects=[],
+            variant="en_canonical", relation="on", action="pick_place",
+            final_object_poses={}, success_predicates=[{"type": "spatial_relation"}],
+            step_count=100, target_lifted=target_lifted,
+        )
+
+    def test_never_lifted_is_a_physical_failure(self) -> None:
+        self.assertEqual(self._label(False)["failure_type_auto"], "physical_execution_error")
+
+    def test_lifted_but_relation_unmet_stays_a_relation_error(self) -> None:
+        self.assertEqual(self._label(True)["failure_type_auto"], "relation_binding_error")
+
+    def test_unknown_lift_keeps_the_previous_behaviour(self) -> None:
+        # None означает «поз не было» — не повод менять вывод.
+        self.assertEqual(self._label(None)["failure_type_auto"], "relation_binding_error")

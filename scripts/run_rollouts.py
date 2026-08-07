@@ -285,6 +285,10 @@ def run_episode(
     touched_objects: set[str] = set()
     first_contact_object: Optional[str] = None
     final_object_poses: dict[str, list[float]] = {}
+    # Максимальный подъём цели над её стартовой высотой: отличает «взял и не
+    # донёс» от «коснулся и не смог взять» (auto_label, порог 2 см).
+    target_start_z: Optional[float] = None
+    target_max_lift = 0.0
     env_success = False
     step_count = 0
     # Did the policy get its full allotted horizon? True once the environment
@@ -320,6 +324,11 @@ def run_episode(
             if first_contact_object is None:
                 first_contact_object = info.get("first_contact_object")
             final_object_poses = info.get("object_poses", final_object_poses)
+            target_pose = (info.get("object_poses") or {}).get(prompt.get("target_object"))
+            if target_pose and len(target_pose) >= 3:
+                if target_start_z is None:
+                    target_start_z = target_pose[2]
+                target_max_lift = max(target_max_lift, target_pose[2] - target_start_z)
             env_success = info.get("success", False)
 
             steps_handle.write(
@@ -382,6 +391,7 @@ def run_episode(
         final_object_poses=final_object_poses,
         success_predicates=prompt.get("success_predicates") or [],
         step_count=step_count,
+        target_lifted=(target_max_lift >= 0.02) if target_start_z is not None else None,
         ran_to_completion=ran_to_completion,
     )
 
