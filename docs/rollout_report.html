@@ -69,27 +69,27 @@
 <body>
 <header>
   <h1>SLAVA — пилотный прогон v0: технический отчёт</h1>
-  <p>Первые model rollouts на 7 моделях × LIBERO/SimplerEnv, по контракту task.md. 536 эпизодов размечено на момент генерации отчёта.</p>
+  <p>Первые прогоны 7 моделей в средах LIBERO и SimplerEnv. Размечено 536 эпизодов.</p>
 </header>
 <main>
 
 <section>
   <h2>1. Обзор данных сбора v0 (20 сцен)</h2>
   <div class="stat-grid">
-    <div class="stat"><b>117</b><span>сцен-кандидатов (task_inventory.jsonl)</span></div>
-    <div class="stat"><b>41</b><span>usable_for_slava=true</span></div>
+    <div class="stat"><b>117</b><span>сцен рассмотрено</span></div>
+    <div class="stat"><b>41</b><span>из них пригодны для SLAVA</span></div>
     <div class="stat"><b>20</b><span>отобрано в набор v0 (LIBERO: 16, SimplerEnv: 4)</span></div>
-    <div class="stat"><b>27</b><span>записей в object_lexicon.csv</span></div>
-    <div class="stat"><b>20</b><span>grounded frames (frames_v0.jsonl)</span></div>
-    <div class="stat"><b>20/20</b><span>native_check = passed</span></div>
-    <div class="stat"><b>98.6%</b><span>объектов видно на agentview</span></div>
-    <div class="stat"><b>32.4%</b><span>объектов видно на wrist</span></div>
+    <div class="stat"><b>27</b><span>объектов в словаре</span></div>
+    <div class="stat"><b>20</b><span>сцен размечено семантически</span></div>
+    <div class="stat"><b>20/20</b><span>прошли проверку носителем языка</span></div>
+    <div class="stat"><b>98.6%</b><span>объектов видно на обзорной камере</span></div>
+    <div class="stat"><b>32.4%</b><span>объектов видно на камере в схвате</span></div>
   </div>
-  <h3>Пример записи словаря объектов (object_lexicon.csv) — все поля</h3>
+  <h3>Пример записи словаря объектов — все поля</h3>
   <table class="data-table"><tbody><tr><td class="k">raw_name</td><td>akita_black_bowl</td></tr><tr><td class="k">category_en</td><td>bowl</td></tr><tr><td class="k">category_ru</td><td>миска</td></tr><tr><td class="k">semantic_subtype_en</td><td>ceramic bowl</td></tr><tr><td class="k">semantic_subtype_ru</td><td>керамическая миска</td></tr><tr><td class="k">canonical_name_en</td><td>black bowl</td></tr><tr><td class="k">canonical_name_ru</td><td>черная миска</td></tr><tr><td class="k">visual_attributes_en</td><td>black round bowl</td></tr><tr><td class="k">visual_attributes_ru</td><td>черная круглая миска</td></tr><tr><td class="k">semantic_identity_visually_recoverable</td><td>yes</td></tr><tr><td class="k">color_en</td><td>black</td></tr><tr><td class="k">color_ru</td><td>черная</td></tr><tr><td class="k">allowed_synonyms_ru</td><td>пиала</td></tr><tr><td class="k">usable_v0</td><td>yes</td></tr><tr><td class="k">notes</td><td><span class="muted">—</span></td></tr></tbody></table>
 
   <h3>Пример сцены и всех её вариантов инструкции</h3>
-  <p class="muted">Сцена <code>libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
+  <p class="muted">Сцена <code>libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001</code> — все 7 вариантов инструкции для одной и той же сцены — задача и стартовое положение предметов одни и те же, меняется только формулировка:</p>
   <table class="data-table"><thead><tr><th>Вариант</th><th>Инструкция</th></tr></thead>
   <tbody><tr><td>en_canonical</td><td>&laquo;pick up the black bowl from table center and place it on the plate&raquo;</td></tr><tr><td>en_paraphrase</td><td>&laquo;grab the black bowl at the center of the table and set it on the plate&raquo;</td></tr><tr><td>mt_russian</td><td>&laquo;возьмите чёрную миску со средины стола и поставьте её на тарелку&raquo;</td></tr><tr><td>ru_literal</td><td>&laquo;подними черную миску по центру стола и поставь ее на тарелку&raquo;</td></tr><tr><td>ru_case_swap</td><td>&laquo;поставь тарелку на черную миску по центру стола&raquo;</td></tr><tr><td>ru_negation</td><td>&laquo;подними не ту миску, что рядом с формочкой, а ту, что по центру стола, и поставь на тарелку&raquo;</td></tr><tr><td>code_switch</td><td>&laquo;подними black bowl по центру стола и поставь на plate&raquo;</td></tr></tbody></table>
 </section>
@@ -123,8 +123,8 @@
   <p class="muted">Проверка одна: на <code>en_canonical</code> — канонической английской строке
   задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.</p>
   <table class="data-table"><thead><tr>
-    <th>Модель</th><th>Наш SR <span class="muted">(только en_canonical)</span></th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
-  </tr></thead><tbody><tr><td>GreenVLA-R0</td><td>0/22 = 0.0% <span class="muted">(отдельный прогон)</span></td><td>[0.0%; 14.9%]</td><td>—</td><td>опубликованного числа нет</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>5/22 = 22.7% <span class="muted">(отдельный прогон)</span></td><td>[10.1%; 43.4%]</td><td>72.9%</td><td><span class="badge">предварительно, база ненулевая</span></td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>5/22 = 22.7% <span class="muted">(отдельный прогон)</span></td><td>[10.1%; 43.4%]</td><td>80.5%</td><td><span class="badge">предварительно, база ненулевая</span></td></tr><tr><td>OpenVLA-OFT</td><td>15/16 = 93.8%</td><td>[71.7%; 98.9%]</td><td>97.0%</td><td><span class="badge success">воспроизводится</span></td></tr><tr><td>SmolVLA</td><td>2/16 = 12.5%</td><td>[3.5%; 36.0%]</td><td>92.7%</td><td><span class="badge fail">не воспроизводится</span></td></tr><tr><td>π0</td><td>4/20 = 20.0%</td><td>[8.1%; 41.6%]</td><td>74.7%</td><td><span class="badge fail">не воспроизводится</span></td></tr><tr><td>π0.5</td><td>0/20 = 0.0%</td><td>[0.0%; 16.1%]</td><td>97.5%</td><td><span class="badge fail">не воспроизводится</span></td></tr></tbody></table>
+    <th>Модель</th><th>Наш SR <span class="muted">(только en_canonical)</span></th><th>Опубликовано</th><th>Вывод</th>
+  </tr></thead><tbody><tr><td>GreenVLA-R0</td><td>0/22 = 0.0% <span class="muted">(на полном наборе сцен)</span></td><td>—</td><td>опубликованного числа нет</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>5/22 = 22.7% <span class="muted">(на полном наборе сцен)</span></td><td>72.9%</td><td><span class="badge">предварительно, база ненулевая</span></td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>5/22 = 22.7% <span class="muted">(на полном наборе сцен)</span></td><td>80.5%</td><td><span class="badge">предварительно, база ненулевая</span></td></tr><tr><td>OpenVLA-OFT</td><td>15/16 = 93.8%</td><td>97.0%</td><td><span class="badge success">воспроизводится</span></td></tr><tr><td>SmolVLA</td><td>2/16 = 12.5%</td><td>92.7%</td><td><span class="badge fail">не воспроизводится</span></td></tr><tr><td>π0</td><td>4/20 = 20.0%</td><td>74.7%</td><td><span class="badge fail">не воспроизводится</span></td></tr><tr><td>π0.5</td><td>0/20 = 0.0%</td><td>97.5%</td><td><span class="badge fail">не воспроизводится</span></td></tr></tbody></table>
   <p class="muted">Что означают вердикты. <b>Воспроизводится</b> — наш SR на английском
   сходится с опубликованным, числам модели можно верить.
   <b>Не воспроизводится</b> — не сходится.
@@ -143,10 +143,10 @@
   вручную по видеозаписям; вердикт человека считается истиной.</p>
 
   <table class="data-table"><thead><tr>
-    <th>Что проверялось</th><th>Согласие с человеком</th><th>95% CI</th>
+    <th>Что проверялось</th><th>Согласие с человеком</th>
   </tr></thead><tbody>
-    <tr><td>Факт успеха (получилось / не получилось)</td><td><b>99 / 100</b></td><td>[95%; 100%]</td></tr>
-    <tr><td>Тип ошибки (какая именно из восьми меток)</td><td><b>80 / 100</b></td><td>[71%; 87%]</td></tr>
+    <tr><td>Факт успеха (получилось / не получилось)</td><td><b>99 / 100</b></td></tr>
+    <tr><td>Тип ошибки (какая именно из восьми меток)</td><td><b>80 / 100</b></td></tr>
   </tbody></table>
 
   <p class="muted">Вывод: <b>факт успеха определяется надёжно, тип ошибки промахивается
@@ -712,7 +712,6 @@
   </tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>15</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>1</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td></tr><tr><td>en_paraphrase</td><td>16</td><td>15</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>1</td><td><span class="muted">—</span></td></tr><tr><td>mt_russian</td><td>16</td><td>9</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>7</td><td><span class="muted">—</span></td></tr><tr><td>ru_literal</td><td>16</td><td>9</td><td>2</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>5</td><td><span class="muted">—</span></td></tr><tr><td>ru_free_order</td><td>0</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td></tr><tr><td>ru_case_swap</td><td>4</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>4</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td></tr><tr><td>ru_negation</td><td>15</td><td>8</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>7</td><td><span class="muted">—</span></td></tr><tr><td>code_switch</td><td>16</td><td>14</td><td>1</td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td><span class="muted">—</span></td><td>1</td><td><span class="muted">—</span></td></tr></tbody></table></div>
 
   <h3>Поведенческие метрики</h3>
-  <p class="muted">Не метки исхода, а отдельные величины: на каком шаге рвётся исполнение.</p>
   <div class="f">
   <span class="def"><span class="name">SR</span> = <span class="frac"><span class="num">успешных эпизодов</span><span class="den">всего эпизодов варианта</span></span></span>
   <span class="def"><span class="name">Дотянулся до нужного предмета</span> = <span class="frac"><span class="num">эпизодов, где первый тронутый предмет — целевой</span><span class="den">всего эпизодов варианта</span></span></span>

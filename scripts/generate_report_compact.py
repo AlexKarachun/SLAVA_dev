@@ -196,17 +196,16 @@ def build_baseline_check(rows: list[dict[str, Any]]) -> str:
             # With n this small the interval spans most of [0,1] and would
             # "contain" almost any reference value — declaring a match from it
             # would be an artefact of the sample size, not a reproduction.
-            verdict, cls = f"не проверяемо (n={n}, CI шире 40 п.п.)", "na"
+            verdict, cls = f"не проверяемо (слишком мало эпизодов, n={n})", "na"
         elif lo <= ref_sr <= hi:
-            verdict, cls = "совпадает (в CI)", "hi"
+            verdict, cls = "совпадает", "hi"
         elif k / n >= ref_sr:
             verdict, cls = "выше заявленного", "hi"
         else:
             verdict, cls = "НИЖЕ заявленного", "zero"
         body += (
             f"<tr><th class=m>{esc(pretty_model(m))}</th>"
-            f"<td><b>{k}/{n}</b> = {100*k/n:.0f}%{source_note}<br>"
-            f"<span class=ci>[{100*lo:.0f};{100*hi:.0f}]</span></td>"
+            f"<td><b>{k}/{n}</b> = {100*k/n:.0f}%{source_note}</td>"
             f"<td>{esc(ref_label or '—')}<br><span class=ci>{esc(ref.get('scope') or '')}</span></td>"
             f"<td class={cls}>{verdict}</td>"
             f"<td class=ci>{esc(ref.get('source') or '')}</td></tr>"
@@ -502,10 +501,9 @@ def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path
                 tds += "<td class=na>—</td>"
                 continue
             k, n = sum(vals), len(vals)
-            lo, hi = wilson(k, n)
             cls = "hi" if k / n >= 0.3 else ("mid" if k else "zero")
-            tds += (f"<td class={cls}><b>{k}/{n}</b><br><span class=ci>"
-                    f"{100*k/n:.0f}% [{100*lo:.0f};{100*hi:.0f}]</span></td>")
+            tds += (f"<td class={cls}><b>{k}/{n}</b><br>"
+                    f"<span class=ci>{100*k/n:.0f}%</span></td>")
         body += f"<tr><th class=m>{esc(pretty_model(m))}</th>{tds}</tr>"
 
     # ---- language effect, per model, en_canonical anchored, PAIRED
@@ -530,24 +528,20 @@ def render(rows: list[dict[str, Any]], rules: list[dict[str, Any]], assets: Path
             d = delta_lang(by_variant, v)
             if d is None:
                 continue
-            lo, hi = d["ci"]
             p = d["p_mcnemar_vs_anchor"]
             p_txt = "—" if p is None else (f"{p:.3f}" if p >= 0.001 else "&lt;0.001")
             sig = " class=sig" if (p is not None and p < 0.05) else ""
             ru_rows += (
                 f"<tr><td>{v}</td><td>{d['n_scenes']}</td>"
                 f"<td>{100*d['gap_variant']:+.1f}</td>"
-                f"<td><b>{100*d['value']:+.1f}</b><br>"
-                f"<span class=ci>[{100*lo:+.0f};{100*hi:+.0f}]</span></td>"
+                f"<td><b>{100*d['value']:+.1f}</b></td>"
                 f"<td{sig}>{p_txt}</td></tr>"
             )
-        lo, hi = bootstrap_ci([float(x) for x in en.values()])
         lang += (
             f"<h4>{esc(pretty_model(m))} <span class=ci>SR<sub>en_canonical</sub> = "
-            f"{100*sr_en:.0f}% ({sum(en.values())}/{len(en)}) "
-            f"[bootstrap {100*lo:.0f};{100*hi:.0f}]</span></h4>"
+            f"{100*sr_en:.0f}% ({sum(en.values())}/{len(en)})</span></h4>"
             f"<table class=t2><tr><th>вариант</th><th>парных сцен</th>"
-            f"<th>gap, п.п.</th><th>Δlang, п.п. [95% CI]</th>"
+            f"<th>gap, п.п.</th><th>Δlang, п.п.</th>"
             f"<th>p (McNemar)</th></tr>{ru_rows}</table>"
         )
 
@@ -629,9 +623,7 @@ gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
 читалась бы как языковой эффект: например <code>ru_case_swap</code> осмыслен лишь
 на 8 сценах из 20 (у остальных <code>axis_na</code>), и его маргинальный SR
 относится к другому, более узкому набору задач, чем SR<sub>en_canonical</sub>.</p>
-<p>CI по SR — интервал Уилсона (корректен у краёв 0% и 100%); по Δlang —
-парный бутстрап (2000 итераций, ресэмплируются <i>сцены</i>, а не эпизоды, чтобы
-исходы одной сцены двигались вместе). <code>p</code> — точный тест Мак-Немара
+<p><code>p</code> — точный тест Мак-Немара
 против <code>en_canonical</code> по дискордантным парам; прочерк означает, что
 дискордантных пар нет вовсе, то есть данных для суждения нет — это не то же самое,
 что «различий нет».</p>

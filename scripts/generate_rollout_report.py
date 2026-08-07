@@ -21,7 +21,6 @@ from typing import Any, Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from slava_rollout.provenance import partition  # noqa: E402
-from slava_rollout.stats import wilson as wilson_ci  # noqa: E402
 
 DATA_DIR = PROJECT_ROOT / "data"
 ROLLOUTS_DIR = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0"
@@ -670,13 +669,12 @@ def render_html(
     validity_rows = ""
     for model in sorted({r["model"] for r in episodes} | {r["model"] for r in validation}):
         en = [r for r in validation if r["model"] == model and r["variant"] == "en_canonical"]
-        note = " <span class=\"muted\">(отдельный прогон)</span>" if en else ""
+        note = " <span class=\"muted\">(на полном наборе сцен)</span>" if en else ""
         if not en:
             en = [r for r in episodes if r["model"] == model and r["variant"] == "en_canonical"]
         if not en:
             continue
         hits, total = sum(bool(r["success"]) for r in en), len(en)
-        low, high = wilson_ci(hits, total)
         spec = published.get(model) or {}
         reference, treatment = spec.get("sr"), spec.get("report_treatment")
         if reference is None:
@@ -690,7 +688,6 @@ def render_html(
         validity_rows += (
             f"<tr><td>{pretty_model(model)}</td>"
             f"<td>{hits}/{total} = {fmt_pct(hits / total)}{note}</td>"
-            f"<td>[{fmt_pct(low)}; {fmt_pct(high)}]</td>"
             f"<td>{fmt_pct(reference) if reference is not None else '—'}</td>"
             f"<td>{verdict}</td></tr>"
         )
@@ -783,27 +780,27 @@ def render_html(
 <body>
 <header>
   <h1>SLAVA — пилотный прогон v0: технический отчёт</h1>
-  <p>Первые model rollouts на 7 моделях × LIBERO/SimplerEnv, по контракту task.md. {n_annotations} эпизодов размечено на момент генерации отчёта.</p>
+  <p>Первые прогоны 7 моделей в средах LIBERO и SimplerEnv. Размечено {n_annotations} эпизодов.</p>
 </header>
 <main>
 
 <section>
   <h2>1. Обзор данных сбора v0 (20 сцен)</h2>
   <div class="stat-grid">
-    <div class="stat"><b>{data_overview['n_candidate_scenes']}</b><span>сцен-кандидатов (task_inventory.jsonl)</span></div>
-    <div class="stat"><b>{data_overview['n_usable_for_slava']}</b><span>usable_for_slava=true</span></div>
+    <div class="stat"><b>{data_overview['n_candidate_scenes']}</b><span>сцен рассмотрено</span></div>
+    <div class="stat"><b>{data_overview['n_usable_for_slava']}</b><span>из них пригодны для SLAVA</span></div>
     <div class="stat"><b>{data_overview['n_selected']}</b><span>отобрано в набор v0 ({env_counts_str})</span></div>
-    <div class="stat"><b>{data_overview['n_lexicon_entries']}</b><span>записей в object_lexicon.csv</span></div>
-    <div class="stat"><b>{data_overview['n_frames']}</b><span>grounded frames (frames_v0.jsonl)</span></div>
-    <div class="stat"><b>{data_overview['n_native_check_passed']}/{data_overview['n_frames']}</b><span>native_check = passed</span></div>
-    <div class="stat"><b>{fmt_pct(data_overview['visible_agentview_pct']/100)}</b><span>объектов видно на agentview</span></div>
-    <div class="stat"><b>{fmt_pct(data_overview['visible_wrist_pct']/100)}</b><span>объектов видно на wrist</span></div>
+    <div class="stat"><b>{data_overview['n_lexicon_entries']}</b><span>объектов в словаре</span></div>
+    <div class="stat"><b>{data_overview['n_frames']}</b><span>сцен размечено семантически</span></div>
+    <div class="stat"><b>{data_overview['n_native_check_passed']}/{data_overview['n_frames']}</b><span>прошли проверку носителем языка</span></div>
+    <div class="stat"><b>{fmt_pct(data_overview['visible_agentview_pct']/100)}</b><span>объектов видно на обзорной камере</span></div>
+    <div class="stat"><b>{fmt_pct(data_overview['visible_wrist_pct']/100)}</b><span>объектов видно на камере в схвате</span></div>
   </div>
-  <h3>Пример записи словаря объектов (object_lexicon.csv) — все поля</h3>
+  <h3>Пример записи словаря объектов — все поля</h3>
   <table class="data-table"><tbody>{lexicon_row_rows}</tbody></table>
 
   <h3>Пример сцены и всех её вариантов инструкции</h3>
-  <p class="muted">Сцена <code>{examples['prompt_uid']}</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
+  <p class="muted">Сцена <code>{examples['prompt_uid']}</code> — все 7 вариантов инструкции для одной и той же сцены — задача и стартовое положение предметов одни и те же, меняется только формулировка:</p>
   <table class="data-table"><thead><tr><th>Вариант</th><th>Инструкция</th></tr></thead>
   <tbody>{prompt_rows}</tbody></table>
 </section>
@@ -837,7 +834,7 @@ def render_html(
   <p class="muted">Проверка одна: на <code>en_canonical</code> — канонической английской строке
   задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.</p>
   <table class="data-table"><thead><tr>
-    <th>Модель</th><th>Наш SR <span class="muted">(только en_canonical)</span></th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
+    <th>Модель</th><th>Наш SR <span class="muted">(только en_canonical)</span></th><th>Опубликовано</th><th>Вывод</th>
   </tr></thead><tbody>{validity_rows}</tbody></table>
   <p class="muted">Что означают вердикты. <b>Воспроизводится</b> — наш SR на английском
   сходится с опубликованным, числам модели можно верить.
@@ -857,10 +854,10 @@ def render_html(
   вручную по видеозаписям; вердикт человека считается истиной.</p>
 
   <table class="data-table"><thead><tr>
-    <th>Что проверялось</th><th>Согласие с человеком</th><th>95% CI</th>
+    <th>Что проверялось</th><th>Согласие с человеком</th>
   </tr></thead><tbody>
-    <tr><td>Факт успеха (получилось / не получилось)</td><td><b>99 / 100</b></td><td>[95%; 100%]</td></tr>
-    <tr><td>Тип ошибки (какая именно из восьми меток)</td><td><b>80 / 100</b></td><td>[71%; 87%]</td></tr>
+    <tr><td>Факт успеха (получилось / не получилось)</td><td><b>99 / 100</b></td></tr>
+    <tr><td>Тип ошибки (какая именно из восьми меток)</td><td><b>80 / 100</b></td></tr>
   </tbody></table>
 
   <p class="muted">Вывод: <b>факт успеха определяется надёжно, тип ошибки промахивается
@@ -921,7 +918,6 @@ def render_html(
   </tr></thead><tbody>{label_mix_rows}</tbody></table></div>
 
   <h3>Поведенческие метрики</h3>
-  <p class="muted">Не метки исхода, а отдельные величины: на каком шаге рвётся исполнение.</p>
   <div class="f">
   <span class="def"><span class="name">SR</span> = <span class="frac"><span class="num">успешных эпизодов</span><span class="den">всего эпизодов варианта</span></span></span>
   <span class="def"><span class="name">Дотянулся до нужного предмета</span> = <span class="frac"><span class="num">эпизодов, где первый тронутый предмет — целевой</span><span class="den">всего эпизодов варианта</span></span></span>
