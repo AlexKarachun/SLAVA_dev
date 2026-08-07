@@ -5,7 +5,7 @@ episode's raw `steps.jsonl`, using the current `slava_rollout.auto_label`.
 Why this exists: `failure_type_auto` and friends are DERIVED quantities. When
 the labeling rules are corrected (as they were for the environment-dependent
 `no_action_or_timeout`/`unclear` artifact — see auto_label.label_episode), the
-already-collected dataset is stale. Re-running 550 GPU episodes to fix a
+already-collected dataset is stale. Re-running the whole GPU pass to fix a
 labeling bug would be absurd; hand-editing the labels would be indistinguishable
 from fudging results. So we recompute them from the raw per-step record that was
 logged at collection time, and print exactly what changed.

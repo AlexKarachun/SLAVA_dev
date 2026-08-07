@@ -591,7 +591,7 @@ correlation with environment/model/machine before believing it. Termination is
 now passed in explicitly (`ran_to_completion`), not inferred from a step budget.
 
 **3. Derived labels must be recomputable, never hand-edited.** Fixing #2
-invalidated the labels on 550 already-collected episodes. Re-running GPU
+invalidated the labels on the already-collected episodes. Re-running GPU
 episodes to fix a labeling bug is absurd; editing labels by hand is
 indistinguishable from fudging. `scripts/relabel_rollouts.py` recomputes them
 from each episode's raw `steps.jsonl`, prints the transition table, and refuses
