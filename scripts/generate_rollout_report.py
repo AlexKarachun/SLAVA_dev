@@ -556,7 +556,7 @@ def render_html(
             </figcaption>
           </figure>"""
         gallery_cards += f"""
-        <h3>{group['model']} <span class="muted">— SR {group['sr']} (по всем вариантам инструкции)</span></h3>
+        <h3>{pretty_model(group['model'])} <span class="muted">— SR {group['sr']} (по всем вариантам инструкции)</span></h3>
         <div class="gif-grid">{cards}
         </div>"""
 
@@ -892,7 +892,10 @@ def main() -> None:
         model: compute_language_effect(rows) for model, rows in sorted(by_model_rows.items())
     }
     assets_dir = (args.output.parent / "report_assets") if args.for_pages else None
-    gallery = build_camera_gallery(annotations, assets_dir=assets_dir)
+    # Галерея строится по `valid`, а не по всем аннотациям: 36 снятых с учёта
+    # эпизодов ru_case_swap не должны ни показываться, ни попадать в SR под
+    # заголовком модели — иначе цифра расходится с таблицей достоверности.
+    gallery = build_camera_gallery(valid, assets_dir=assets_dir)
 
     html = render_html(
         data_overview, setup, examples, coverage, behavioral, behavioral_by_model,
@@ -902,6 +905,17 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(html, encoding="utf-8")
     print(f"Wrote {args.output} ({len(annotations)} annotations, {len(valid)} used in metrics)")
+    # Галерея пишется только с --for-pages. Молча пропадающий раздел — плохой
+    # режим по умолчанию: так она трижды пропала из docs/rollout_report.html при
+    # обычной перегенерации (08.08.2026), и заметил это пользователь, а не мы.
+    if not args.for_pages:
+        print(
+            "  ВНИМАНИЕ: раздел «Видеозаписи прогонов» пуст — клипы пишутся только\n"
+            "  с флагом --for-pages. Для публикуемого отчёта запускайте:\n"
+            f"    python scripts/generate_rollout_report.py --output {args.output} --for-pages"
+        )
+    else:
+        print(f"  галерея: {sum(len(g['items']) for g in gallery)} эпизодов в {len(gallery)} моделях")
     for rule in rules:
         print(f"  exclusion {rule.get('id','unnamed'):50s} {rule.get('n_matched',0):4d} episodes")
 
