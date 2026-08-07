@@ -37,7 +37,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from slava_rollout.auto_label import label_episode  # noqa: E402
 from slava_rollout.clients import EnvClient, ModelClient, wait_for_health  # noqa: E402
 from slava_rollout.schema import (  # noqa: E402
+    LIBERO_SETTLE_STEPS,
     MAX_EPISODE_STEPS,
+    max_steps_for,
     MODEL_REGISTRY,
     build_run_id,
     checkpoint_for,
@@ -271,7 +273,7 @@ def run_episode(
     has_wrist = environment == "LIBERO"
     ensure_episode_dirs(run_id, has_wrist)
     steps_file = steps_path(run_id)
-    max_steps = MAX_EPISODE_STEPS[environment]
+    max_steps = max_steps_for(environment, prompt["task_uid"])
 
     reset_resp = env_client.reset(build_reset_payload(prompt, model_key))
     # Clear any per-episode state the policy is holding before it sees this
@@ -280,6 +282,13 @@ def run_episode(
     # scripts/model_servers/base_server.py's /reset).
     model_client.reset()
     obs = reset_resp["obs"]
+    if environment == "LIBERO" and LIBERO_SETTLE_STEPS:
+        # Как у авторов: несколько шагов нулевого действия после reset, пока
+        # объекты не улягутся. Гриппер держим открытым (-1), как в их
+        # `get_libero_dummy_action`. В горизонт эпизода и в steps.jsonl эти шаги
+        # не попадают — они относятся к среде, а не к политике.
+        for _ in range(LIBERO_SETTLE_STEPS):
+            obs = env_client.step([0.0] * 6 + [-1.0])["obs"]
     meta = {"task_uid": prompt["task_uid"], "suite": prompt.get("suite"), "environment": environment}
 
     touched_objects: set[str] = set()

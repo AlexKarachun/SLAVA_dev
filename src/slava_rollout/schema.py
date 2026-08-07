@@ -164,10 +164,40 @@ CAMERA_FORMAT = "png_per_step"
 # simpler_env.make(). An episode ending well under 120 steps with done=True
 # is that native horizon firing, not a bug — confirmed against the real
 # registration values, not assumed.
+# Горизонт эпизода берётся у авторов, а не назначается нами: иначе сравнение
+# нашего SR с опубликованным нечестно в обе стороны. Числа вычитаны из
+# `experiments/robot/libero/run_libero_eval.py` в moojink/openvla-oft
+# (`TASK_MAX_STEPS`), сверено 08.08.2026.
+LIBERO_MAX_STEPS_BY_SUITE = {
+    "libero_spatial": 220,
+    "libero_object": 280,
+    "libero_goal": 300,
+    "libero_10": 520,
+    "libero_90": 400,
+}
+
+# Столько шагов нулевого действия авторы дают среде ПЕРЕД тем, как политика
+# начнёт действовать (`num_steps_wait`, там же): объекты после reset ещё падают,
+# и первые наблюдения не соответствуют покоящейся сцене. В счёт горизонта эти
+# шаги не идут.
+LIBERO_SETTLE_STEPS = 10
+
+# Верхняя страховка оркестратора. Для LIBERO реальный лимит берётся по сьюту из
+# таблицы выше; для SimplerEnv среда сама завершает эпизод своим TimeLimit
+# (например 60 шагов у stack_cube), поэтому наш потолок только страхует от
+# зависания и никогда не срабатывает первым.
 MAX_EPISODE_STEPS = {
-    "LIBERO": 300,
+    "LIBERO": 520,
     "SimplerEnv": 120,
 }
+
+
+def max_steps_for(environment: str, task_uid: str = "") -> int:
+    """Горизонт эпизода: авторский, если он для этой пары известен."""
+    if environment == "LIBERO":
+        suite = task_uid.split("__")[0] if task_uid else ""
+        return LIBERO_MAX_STEPS_BY_SUITE.get(suite, MAX_EPISODE_STEPS["LIBERO"])
+    return MAX_EPISODE_STEPS[environment]
 
 
 def models_for_environment(environment: str) -> list[str]:

@@ -148,5 +148,36 @@ class EpisodeDirHygieneTest(unittest.TestCase):
             self.assertFalse(storage.steps_path(run_id).exists())
         importlib.reload(storage)
 
+
+class AuthorHorizonTest(unittest.TestCase):
+    """Горизонт эпизода должен совпадать с авторским, иначе сравнение нечестно.
+
+    Числа из `TASK_MAX_STEPS` в moojink/openvla-oft (сверено 08.08.2026).
+    До 08.08.2026 у нас стоял единый лимит 300 на все сьюты LIBERO: по
+    `libero_spatial` это на 80 шагов щедрее авторского, по `libero_object` на 20.
+    На собранных данных это ничего не завысило (ни один успех не случился после
+    авторского лимита), но на будущих прогонах разошлось бы.
+    """
+
+    def test_per_suite_limits_match_the_authors(self) -> None:
+        from slava_rollout.schema import max_steps_for
+
+        for suite, expected in (
+            ("libero_spatial", 220), ("libero_object", 280),
+            ("libero_goal", 300), ("libero_10", 520), ("libero_90", 400),
+        ):
+            with self.subTest(suite=suite):
+                self.assertEqual(max_steps_for("LIBERO", f"{suite}__task__init000"), expected)
+
+    def test_unknown_suite_falls_back_to_the_outer_cap(self) -> None:
+        from slava_rollout.schema import MAX_EPISODE_STEPS, max_steps_for
+
+        self.assertEqual(max_steps_for("LIBERO", "unknown__x"), MAX_EPISODE_STEPS["LIBERO"])
+
+    def test_simplerenv_keeps_the_outer_cap_because_the_env_terminates_first(self) -> None:
+        from slava_rollout.schema import max_steps_for
+
+        self.assertEqual(max_steps_for("SimplerEnv", "simpler__widowx"), 120)
+
 if __name__ == "__main__":
     unittest.main()
