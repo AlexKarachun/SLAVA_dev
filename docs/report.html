@@ -91,6 +91,11 @@ gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
 native check. Сравнение на общих сценах. Последняя колонка — средняя длина в
 токенах (токенизатор OpenVLA-OFT): заодно контроль на то, что падение не
 объясняется просто более длинным промптом.</p>
+<p class=ci>Грамматические огрехи в <code>mt_russian</code> (например
+«со середины стола» вместо «с середины») — не опечатки, а выход системы
+перевода: правило <code>task.md</code> запрещает его редактировать, иначе
+контроль перестаёт измерять то, ради чего существует. Все остальные русские
+варианты выверены вручную.</p>
 <table><tr><th></th><th>общих сцен</th><th>mt_russian (сырой MT)</th><th>ru_literal (человек)</th><th>p (McNemar)</th><th>токенов: MT vs человек</th></tr><tr><th class=m>GreenVLA-R0</th><td>4</td><td>0/4</td><td>0/4</td><td>нет расхождений<br><span class=ci>0 из 4</span></td><td class=ci>18.0 vs 17.0</td></tr><tr><th class=m>GreenVLA-R1 (bridge)</th><td>4</td><td>0/4</td><td>0/4</td><td>нет расхождений<br><span class=ci>0 из 4</span></td><td class=ci>18.0 vs 17.0</td></tr><tr><th class=m>GreenVLA-R2 (bridge, RL-aligned)</th><td>4</td><td>0/4</td><td>0/4</td><td>нет расхождений<br><span class=ci>0 из 4</span></td><td class=ci>18.0 vs 17.0</td></tr><tr><th class=m>OpenVLA-OFT</th><td>16</td><td>9/16</td><td>9/16</td><td>нет расхождений<br><span class=ci>0 из 16</span></td><td class=ci>18.3 vs 15.0</td></tr><tr><th class=m>SmolVLA</th><td>16</td><td>0/16</td><td>0/16</td><td>нет расхождений<br><span class=ci>0 из 16</span></td><td class=ci>18.3 vs 15.0</td></tr><tr><th class=m>π0</th><td>20</td><td>0/20</td><td>0/20</td><td>нет расхождений<br><span class=ci>0 из 20</span></td><td class=ci>18.2 vs 15.4</td></tr><tr><th class=m>π0.5</th><td>20</td><td>0/20</td><td>0/20</td><td>нет расхождений<br><span class=ci>0 из 20</span></td><td class=ci>18.2 vs 15.4</td></tr></table>
 
 <h2>6. Где именно ломается: первый контакт</h2>
