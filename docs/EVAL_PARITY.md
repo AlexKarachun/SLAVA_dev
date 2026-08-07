@@ -104,26 +104,60 @@ implementation»*. То есть в эпизоде на 300 шагов авто�
 несопоставимо больше 6%, так что вывод «не сходится» держится, но оговорку надо
 нести в Limitations.
 
-### 3. Комментарий в их примере противоречит их же коду
+### 3. Выходная цепочка прочитана целиком: у авторов всё согласовано
 
-`example_inference_bridge.py` дважды утверждает, что `output_transforms` делает
-«denormalize + **delta-to-absolute conversion**» и что `state` передаётся именно
-ради этого преобразования. Если бы это было правдой, наш сервер отдавал бы
-контроллеру абсолютную позу там, где тот ждёт дельту, — то есть объяснял бы всё
-разом.
+**Здесь была ошибка в первой версии этого разбора (исправлено 08.08.2026).**
+Сначала было записано, что комментарий в `example_inference_bridge.py` про
+«denormalize + delta-to-absolute conversion» противоречит их коду, потому что
+`BridgeOutputsTransform.__call__` — это только `actions[:, :7]`, без
+денормализации и без использования `state`. Вывод был сделан по **одному
+классу**, тогда как `output_transforms` — это composed-цепочка. Утверждение
+«у авторов ошибка» слабо обосновано вдвойне: у них код даёт заявленные числа,
+а у нас нет, поэтому расхождение — повод искать дефект у себя.
 
-Проверено по исходнику. `BridgeOutputsTransform.__call__` целиком:
+Цепочка (`get_torch_output_transforms`, порядок фактический):
+
+1. `data_cfg.model_transforms.outputs`
+2. `MapToSingleSpaceTorch` — пропускается, `map_to_unified_space: false`
+   и в `bridge.yaml`, и в `config.json` всех трёх чекпойнтов
+3. **`UnnormalizeTorch`** — денормализация есть, режимом `cfg.normalization_mode`
+   (`quantile` у R0, `mean_std` у R1/R2)
+4. `data_cfg.data_transforms.outputs` = `[BridgeOutputsTransform,
+   InterpolateActions(sample_step=1/action_sample_step, actions_type="delta")]`
+
+Зачем цепочке `state` — видно в `InterpolateActions.__call__`:
 
 ```python
-actions = data["actions"]
-if actions.ndim == 2:
-    return {"actions": actions[:, :7]}
+if self.actions_type == "absolute":
+    zero_action = np.expand_dims(state, axis=-2)   # <- state нужен здесь
+elif self.actions_type == "delta":
+    zero_action = actions[..., :1, :]
 ```
 
-Ни денормализации, ни delta-to-absolute — только срез первых семи каналов;
-`state` принимается и не используется. **Наша трактовка выхода как дельты
-верна.** Записано здесь, чтобы никто потом не «починил» рабочий код по
-неверному комментарию авторов.
+`state` используется для **absolute**-эмбодиментов (calvin, fractal), а bridge
+объявлен `actions_type="delta"` самим их конфигом. То есть докстрока в примере
+описывает общий механизм по всем эмбодиментам, а не поведение bridge.
+**Противоречия нет, ошибки у авторов нет.**
+
+Проверено также, что при `action_sample_step: 1` (значение из `bridge.yaml`)
+`InterpolateActions` — тождественное преобразование: `query_indices` попадают
+ровно в целые узлы, pchip возвращает исходные значения, а приписанный спереди
+`zero_action` снимается срезом `[1:]`. Наш чанк она не меняет.
+
+**Что из этого следует для нас.** Наша трактовка выхода как дельты подтверждена
+их собственным конфигом (а не моим чтением одного класса), денормализация
+происходит у них внутри цепочки, которую мы вызываем целиком, и все параметры
+`bridge.yaml` совпадают с тем, что делает наш сервер: `action_horizon: 10`
+(наш наблюдаемый чанк), `state_dim: 7` (наши 8 измерений минус выброшенный
+`state_mask`-ом индекс 6), `control_mode: cartesian`,
+`map_to_unified_space: false`. **Дефект GreenVLA в этой части пайплайна не
+находится — его надо искать дальше.**
+
+Единственная мелочь, найденная попутно: мы передаём в `output_transforms`
+уже нормализованный `batch["state"]`, и `UnnormalizeTorch` его денормализует
+вместе с действиями. Для bridge это безвредно (`state` в delta-ветке не
+читается), но на absolute-эмбодименте стало бы настоящей ошибкой. Помечено в
+skill, чтобы не выстрелило при переносе на calvin/fractal.
 
 ### 4. Шкала действия: у GreenVLA верная, а вот у π0/π0.5 на WidowX — нет
 

@@ -17,27 +17,41 @@ description: GreenVLA (R0/R1/R2) model-server specifics for SLAVA rollouts — A
 > Стоявшие у нас 33.3% взяты из строки PaliGemma-3B — другого бэкбона.
 > Исправлено 08.08.2026, см. `docs/EVAL_PARITY.md`.
 
-## Три ловушки, проверенные 08.08.2026 (T12.4) — не переоткрывать
+## Проверено 08.08.2026 (T12.4) — не переоткрывать
 
 1. **Авторского eval-скрипта не существует.** В `examples/` только
    `example_inference_{bridge,calvin,fractal}.py` и `example_vqa.ipynb` —
    одношаговый инференс без цикла по эпизодам и подсчёта успеха. Рычага
    «прогнать их eval и сравнить» здесь нет, в отличие от lerobot.
-2. **Их пример врёт про delta-to-absolute.** Комментарии в
-   `example_inference_bridge.py` дважды говорят, что `output_transforms` делает
-   «denormalize + delta-to-absolute conversion» и что `state` нужен именно для
-   этого. В коде `BridgeOutputsTransform.__call__` — только `actions[:, :7]`,
-   `state` не используется. **Выход политики это дельта; не «чинить» это по
-   комментарию авторов.**
+2. **Выходная цепочка прочитана целиком и у авторов согласована.**
+   `output_transforms` = `UnnormalizeTorch` (денормализация ЕСТЬ) →
+   `BridgeOutputsTransform` (срез `actions[:, :7]`) →
+   `InterpolateActions(sample_step=1/action_sample_step, actions_type="delta")`.
+   `state` нужен цепочке только в ветке `actions_type == "absolute"`
+   (calvin/fractal), а bridge объявлен `"delta"`. При `action_sample_step: 1`
+   из `bridge.yaml` интерполяция тождественна. Все параметры `bridge.yaml`
+   (`action_horizon: 10`, `state_dim: 7`, `control_mode: cartesian`,
+   `map_to_unified_space: false`) совпадают с тем, что делает наш сервер.
+   **Дефект GreenVLA в этой части пайплайна не находится.**
+
+   > ⚠ **Осторожно с выводами «у авторов ошибка».** Первая версия этого разбора
+   > утверждала, что комментарий в их примере про «delta-to-absolute» их коду
+   > противоречит — вывод был сделан по одному классу вместо composed-цепочки и
+   > оказался неверным. У авторов код даёт заявленные числа, у нас нет: любое
+   > расхождение — сначала повод искать дефект у себя.
+
 3. **Авторы сами объявляют шум ±6%** (`docs/INFERENCE.md`, «Benchmarking
    Notes») и просят усреднять по нескольким прогонам. Наши сравнения —
    одиночный прогон; для R1/R2 разрыв всё равно много больше 6%, но оговорку
    надо нести в Limitations.
-
-Заодно измерено, что шкала действия у GreenVLA **верная**: контроллер руки
-WidowX объявлен с `normalize_action=False`, то есть ждёт метры, и GreenVLA даёт
-3-8 мм за шаг. Подозрение в недо-денормализации с неё снято (а вот у π0/π0.5 на
-том же роботе 10-33 см за шаг — см. `docs/EVAL_PARITY.md`).
+4. **Шкала действия у GreenVLA верная.** Контроллер руки WidowX объявлен с
+   `normalize_action=False`, то есть ждёт метры, и GreenVLA даёт 3-8 мм за шаг.
+   Подозрение в недо-денормализации снято (а вот у π0/π0.5 на том же роботе
+   10-33 см за шаг — см. `docs/EVAL_PARITY.md`).
+5. **Мелочь на будущее:** мы передаём в `output_transforms` уже нормализованный
+   `batch["state"]`, и `UnnormalizeTorch` денормализует его вместе с
+   действиями. Для bridge безвредно (`state` в delta-ветке не читается), но на
+   absolute-эмбодименте (calvin/fractal) это станет настоящей ошибкой.
 
 # GreenVLA (R0 / R1-bridge / R2-bridge) — model-server notes
 
@@ -366,6 +380,17 @@ SR — asked to check every non-obvious place before accepting that as
    inaccurate wording for "denormalize a delta from token-space into real
    physical units" — not a literal relative→absolute pose conversion. No
    mismatch with WidowX's delta-frame controller.
+
+   **Confirmed 2026-08-08 by reading the whole composed chain** (this note
+   was right the first time; a later pass re-derived it wrongly from the
+   single class and had to be retracted — see the warning box at the top).
+   `get_torch_output_transforms` composes `UnnormalizeTorch` (so
+   denormalization DOES happen, just not in `BridgeOutputsTransform`) →
+   `BridgeOutputsTransform` → `InterpolateActions(actions_type="delta")`.
+   The `state` the chain accepts is read only in the
+   `actions_type == "absolute"` branch, i.e. for calvin/fractal. bridge is
+   declared `"delta"` in `bridge.yaml`, which also pins
+   `action_sample_step: 1` — making the interpolation an identity.
 4. **`evaluate()`'s actual success condition** (`put_on_in_scene.py`):
    standard bbox-overlap (`xy_flag`+`z_flag`, 2cm z-tolerance) plus a
    contact-exclusivity check (source object must not be touching anything
@@ -466,6 +491,16 @@ episodes showing `first_contact_object=null` — i.e. R0 never touched
 anything, while the paper (arXiv:2602.00919, Table 4) reports R0 at
 **91.7% pick / 33.3% success on Cubes**. That gap (91.7% pick → 0% contact)
 is not "a generalist checkpoint underperforms"; it demanded a mechanism.
+
+> **Correction 2026-08-08 (T12.4): that Table 4 row is PaliGemma-3B, not our
+> checkpoint.** Table 4 carries only PaliGemma-3B rows; the Qwen3-VL-4B
+> numbers live in the README and project page and cover R1/R2 only. Verified
+> against four sources — paper Table 4, README, project page, and the HF card
+> for `GreenVLA-5b-base-stride-1` (which reports no numbers at all). **No SR
+> is published anywhere for our R0 checkpoint**, so do not treat R0 as
+> failing harness validation and do not spend GPU re-checking its
+> `en_canonical` reproducibility. The investigation below stays valid as a
+> contrast with R1/R2 on our own scenes.
 
 **Config diff, R0 vs R1** (`config.json` on the Hub, read directly, and the
 only three fields that differ at all):
