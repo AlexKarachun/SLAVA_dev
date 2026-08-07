@@ -366,8 +366,13 @@ def build_contact_profile(rows: list[dict[str, Any]]) -> str:
 
 
 def build_failure_mix(rows: list[dict[str, Any]]) -> str:
-    labels = ["success", "target_grounding_error", "relation_binding_error",
-              "negation_error", "physical_execution_error", "no_action_or_timeout", "unclear"]
+    # Полный набор меток из task.md, в том же порядке и с теми же именами.
+    # `reference_grounding_error` здесь раньше отсутствовал: в собранных данных
+    # он пока ни разу не встретился, но выпадение метки из списка — тихая
+    # потеря колонки, а не экономия места.
+    labels = ["success", "target_grounding_error", "reference_grounding_error",
+              "relation_binding_error", "negation_error", "physical_execution_error",
+              "no_action_or_timeout", "unclear"]
     out = ""
     for m in sorted({r["model"] for r in rows}):
         model_rows = [r for r in rows if r["model"] == m]

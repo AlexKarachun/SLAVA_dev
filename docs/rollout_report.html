@@ -123,7 +123,18 @@
 
 <section>
   <h2>4. Видеозаписи прогонов</h2>
-  <p class="muted">Для каждой модели — записи выполнения одной и той же задачи по разным промптам.</p>
+  <p class="muted">Для каждой модели — записи выполнения одной и той же задачи по разным промптам.
+  На каждой карточке слева стоит метка исхода, проставленная авторазметчиком.</p>
+  <table class="data-table"><thead><tr><th>Метка</th><th>Что произошло</th></tr></thead><tbody>
+    <tr><td><code>success</code></td><td>задача выполнена</td></tr>
+    <tr><td><code>target_grounding_error</code></td><td>робот пошёл не к тому предмету</td></tr>
+    <tr><td><code>reference_grounding_error</code></td><td>целевой предмет верный, но ориентир перепутан</td></tr>
+    <tr><td><code>relation_binding_error</code></td><td>оба предмета верные, но требуемое отношение между ними не выполнено</td></tr>
+    <tr><td><code>negation_error</code></td><td>робот тронул предмет, который инструкция запрещала трогать</td></tr>
+    <tr><td><code>physical_execution_error</code></td><td>понял задачу, но не справился физически — не удержал, не поднял</td></tr>
+    <tr><td><code>no_action_or_timeout</code></td><td>ничего осмысленного не сделал или не уложился в лимит шагов</td></tr>
+    <tr><td><code>unclear</code></td><td>по логам отнести к одной из категорий нельзя</td></tr>
+  </tbody></table>
   
         <h3>OpenVLA-OFT <span class="muted">— SR 70/95 = 73.7% (по всем вариантам инструкции)</span></h3>
         <div class="gif-grid">
