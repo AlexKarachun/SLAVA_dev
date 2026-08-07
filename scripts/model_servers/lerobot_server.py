@@ -156,6 +156,25 @@ class LerobotBackend:
         # checkpoint (it accepts `config=` explicitly for exactly this reason).
         if hasattr(policy_cfg, "compile_model"):
             policy_cfg.compile_model = False
+
+        # Горизонт открытого цикла берём у авторов, а не из конфига чекпойнта.
+        # pi0/pi0.5 объявляют n_action_steps=50, то есть 50 действий подряд
+        # проигрываются без нового взгляда на сцену. Авторский eval lerobot
+        # запускается с `--policy.n_action_steps=10` и отдельно поясняет: «matching
+        # the original OpenPI implementation» (docs/source/libero, сверено
+        # 08.08.2026). Разница пятикратная: за эпизод в 300 шагов мы
+        # перепланировали 6 раз там, где авторы — 30. Именно так выглядит почерк
+        # π0 в ручной валидации: «плавно перевернулся», «улетел за пределы» —
+        # робот уезжает по устаревшему плану и не корректируется.
+        # SmolVLA не трогаем: её чекпойнт и так объявляет n_action_steps=1.
+        authors_horizon = int(os.environ.get("SLAVA_N_ACTION_STEPS", "10"))
+        if getattr(policy_cfg, "n_action_steps", None) not in (None, 1):
+            if policy_cfg.n_action_steps != authors_horizon:
+                print(
+                    f"[lerobot_server] n_action_steps {policy_cfg.n_action_steps} "
+                    f"-> {authors_horizon} (как в авторском eval)", flush=True
+                )
+                policy_cfg.n_action_steps = authors_horizon
         # dtype=float32 override (found 2026-08-05 debugging pi0.5): default
         # is "bfloat16" (see lerobot.policies.pi05.modeling_pi05's
         # `precision: Literal["bfloat16","float32"] = "bfloat16"`, read from

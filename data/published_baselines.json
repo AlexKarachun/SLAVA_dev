@@ -67,12 +67,12 @@
       "report_treatment": "excluded"
     },
     "pi0.5": {
-      "sr": 0.7733,
-      "label": "77.3% (Spatial 77 / Object 66 / Goal 89)",
-      "scope": "среднее по Spatial/Object/Goal для нашего чекпойнта lerobot/pi05_libero_finetuned, 10 эпизодов на задачу, seed 3000; Long (55%) в наш набор не входит",
-      "source": "huggingface/lerobot issue #2114 (https://github.com/huggingface/lerobot/issues/2114) — воспроизведение сообществом",
-      "comparable": "community-reproduction",
-      "note": "Официальные 97.5% (Spatial 97 / Object 99 / Goal 98 / Long 96) из docs/source/pi05.mdx относятся к lerobot/pi05_libero_finetuned_v044 — дообученному ещё на 6k шагов, то есть не к нашему чекпойнту. Отдельно: в lerobot есть открытый тикет #2533 про НУЛЕВОЙ success rate у pi05_libero_base, при том что fine-tuned вариант у того же автора даёт 96-100% — то есть нулевой SR у семейства pi0.5 в этом стеке уже наблюдался не только у нас.",
+      "sr": 0.975,
+      "label": "97.5% (Spatial 97 / Object 99 / Goal 98 / Long 96)",
+      "scope": "среднее по четырём сьютам LIBERO для ЭТОГО чекпойнта: страница lerobot про LIBERO приводит команду `lerobot-eval --policy.path=pi05_libero_finetuned --policy.n_action_steps=10` и эти числа рядом с ней",
+      "source": "huggingface/lerobot, docs/source/libero (https://huggingface.co/docs/lerobot/en/libero), сверено 08.08.2026",
+      "comparable": "indicative",
+      "note": "Ранее здесь стояло 77.3% — воспроизведение сообществом (lerobot#2114), потому что авторского числа под этот чекпойнт мы не нашли. Нашли 08.08.2026: 97.5% относятся именно к `lerobot/pi05_libero_finetuned`. Воспроизведение сообществом (71.75% по четырём сьютам) сохраняем как оговорку: даже с авторским кодом у людей выходит заметно меньше заявленного. Важное условие протокола: `n_action_steps=10` — у нас до 08.08.2026 исполнялось 50 из конфига чекпойнта, см. docs/EVAL_PARITY.md.",
       "our_result_note": "НЕ ВОСПРОИЗВЕЛОСЬ: 0/20 на en_canonical (Wilson [0%; 16.1%]) и 0 успехов на всех 127 эпизодах. При этом в 72 эпизодах из 127 зафиксирован контакт с целевым объектом — см. docs/OPEN_ISSUES.md.",
       "report_treatment": "excluded"
     },
