@@ -3,6 +3,13 @@ name: slava-greenvla
 description: GreenVLA (R0/R1/R2) model-server specifics for SLAVA rollouts — API, chunk-shape bug, embodiment/norm_stats check, the gripper-range-mismatch fix that took SR from 0% to real numbers. Read slava-model-rollouts first for shared architecture.
 ---
 
+> **⚠ Валидация стенда не пройдена (07.08.2026).** На полном bridge-наборе
+> (22 сцены, все четыре задачи, только `en_canonical`): R0 0/22 против
+> заявленных 33.3%, R1 5/22 против 72.9%, R2 5/22 против 80.5%. При этом стенд
+> жив — R1 берёт 2 из 3 эпизодов `eggplant`, — значит дефект не в среде.
+> **Цифры этих моделей нельзя читать как поведение модели.** Разбор —
+> `docs/HARNESS_VALIDATION.md`, гипотезы — `docs/HYPOTHESES.md`.
+
 # GreenVLA (R0 / R1-bridge / R2-bridge) — model-server notes
 
 Split out of `slava-model-rollouts` 2026-08-05 (that skill now holds only

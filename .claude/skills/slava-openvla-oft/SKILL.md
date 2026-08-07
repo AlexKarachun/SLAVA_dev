@@ -3,6 +3,12 @@ name: slava-openvla-oft
 description: OpenVLA-OFT model-server specifics for SLAVA rollouts — API, gripper-action bug, chunk-replay/orientation/settle-step bugs found fixing SR=0%. Read slava-model-rollouts first for shared architecture.
 ---
 
+> **✓ Единственная модель, прошедшая валидацию стенда (07.08.2026):** 15/16 на
+> `en_canonical` против заявленных ~97%. Поэтому она — **опорная**: если
+> нужно отличить дефект пайплайна от свойства модели, сравнивать надо с ней,
+> на тех же сценах и том же env-воркере. У остальных шести моделей
+> воспроизведения нет (`docs/HYPOTHESES.md`).
+
 # OpenVLA-OFT — model-server notes
 
 Split out of `slava-model-rollouts` 2026-08-05 (that skill now holds only

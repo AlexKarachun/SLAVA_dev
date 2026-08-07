@@ -3,6 +3,16 @@ name: slava-lerobot-policies
 description: pi0/pi0.5/SmolVLA model-server specifics for SLAVA rollouts (shared lerobot_server.py) — API, the transformers-pin bug that loads pi0/pi0.5 with no vision tower, camera-slot and proprio layouts, fresh-machine environment traps (gated PaliGemma, HF token invisible to non-interactive shells), VRAM-per-shard throughput numbers, open items. Read slava-model-rollouts first for shared architecture.
 ---
 
+> **⚠ Валидация стенда не пройдена (07.08.2026).** Ни одна из трёх моделей
+> этого файла не воспроизводит опубликованное о ней число на `en_canonical`:
+> SmolVLA 2/16 против заявленных 92.7%, π0 4/20 против 74.7%, π0.5 0/20 против
+> 77.3% (числа авторов — воспроизведение сообществом, lerobot#2114).
+> **Любые цифры этих моделей в отчёте и в этом файле нельзя читать как
+> поведение модели** — они описывают связку «модель × наш пайплайн», в которой
+> есть неустранённый дефект. Гипотезы и порядок проверки —
+> `docs/HYPOTHESES.md`. Единственная модель, проходящая валидацию, —
+> OpenVLA-OFT, и у неё отдельный сервер.
+
 # pi0 / pi0.5 / SmolVLA — model-server notes
 
 Split out of `slava-model-rollouts` 2026-08-05 (that skill now holds only
