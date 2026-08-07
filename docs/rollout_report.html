@@ -83,10 +83,10 @@
   <div class="stat-grid">
     <div class="stat"><b>20</b><span>сцен (task_uid)</span></div>
     <div class="stat"><b>127</b><span>промптов (task_uid × variant), LIBERO: 99, SimplerEnv: 28</span></div>
-    <div class="stat"><b>1</b><span>повторов на (сцена × вариант × модель)</span></div>
+    <div class="stat"><b>1</b><span>повтор на (сцена × вариант × модель)</span></div>
     <div class="stat"><b>536</b><span>запланировано эпизодов (7 моделей)</span></div>
     <div class="stat"><b>536</b><span>фактически размечено эпизодов</span></div>
-    <div class="stat"><b>LIBERO: 520, SimplerEnv: 120</b><span>лимит шагов на эпизод</span></div>
+    <div class="stat"><b>LIBERO: 300, SimplerEnv: 60</b><span>шагов в самом длинном эпизоде</span></div>
   </div>
   <div class="warn"><b>Лимит шагов был выставлен нами, а не взят у авторов — это наша ошибка,
   на числа она не повлияла.</b> Авторы LIBERO-эвала обрывают эпизод по сьюту: spatial 220,
@@ -142,7 +142,7 @@
   выборке после каждого:</p>
 
   <table class="data-table"><thead><tr>
-    <th>Исправление</th><th>Что было не так</th><th>Затронуто эпизодов</th><th>Согласие по метке</th>
+    <th>Исправление</th><th>Что было не так</th><th>Меток изменилось</th><th>Согласие по метке</th>
   </tr></thead><tbody>
     <tr><td colspan="3"><i>исходное состояние</i></td><td>76 / 100</td></tr>
     <tr><td><code>negation_error</code> только на оси отрицания</td>
@@ -153,7 +153,7 @@
         <td>56</td><td>81 / 100</td></tr>
     <tr><td>успех <code>ru_case_swap</code> по перевёрнутой инструкции</td>
         <td>засчитывалось выполнение исходной задачи — зонд измерял обратное задуманному</td>
-        <td>36</td><td>80 / 100</td></tr>
+        <td>7</td><td>80 / 100</td></tr>
   </tbody></table>
 
   <p class="muted">Последнее исправление стоит одного пункта по метке и даёт два по факту

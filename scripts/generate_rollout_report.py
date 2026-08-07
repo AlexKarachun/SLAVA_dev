@@ -697,7 +697,20 @@ def render_html(
 
     env_counts_str = ", ".join(f"{k}: {v}" for k, v in data_overview["env_counts"].items())
     prompts_by_env_str = ", ".join(f"{k}: {v}" for k, v in setup["prompts_by_env"].items())
-    max_steps_str = ", ".join(f"{k}: {v}" for k, v in setup["max_steps"].items())
+    # Показываем горизонт, с которым данные РЕАЛЬНО собраны, а не константу из
+    # кода: `MAX_EPISODE_STEPS` — это нынешний потолок (520 = сьют libero_10,
+    # которого в наборе нет), и он противоречил тексту рядом, где сказано про
+    # единый лимит 300. Берём фактический максимум длины эпизода по логам.
+    observed_steps: dict[str, int] = {}
+    for row in episodes:
+        env = "LIBERO" if row["task_uid"].startswith("libero") else "SimplerEnv"
+        path = ROLLOUTS_DIR / "episodes" / row["run_id"] / "steps.jsonl"
+        if not path.exists():
+            continue
+        with open(path, encoding="utf-8") as handle:
+            n = sum(1 for line in handle if line.strip())
+        observed_steps[env] = max(observed_steps.get(env, 0), n)
+    max_steps_str = ", ".join(f"{k}: {v}" for k, v in sorted(observed_steps.items())) or "—"
 
     return f"""<!doctype html>
 <html lang="ru">
@@ -784,10 +797,10 @@ def render_html(
   <div class="stat-grid">
     <div class="stat"><b>{setup['n_task_uids']}</b><span>сцен (task_uid)</span></div>
     <div class="stat"><b>{setup['n_prompts_total']}</b><span>промптов (task_uid × variant), {prompts_by_env_str}</span></div>
-    <div class="stat"><b>{setup['n_repeats']}</b><span>повторов на (сцена × вариант × модель)</span></div>
+    <div class="stat"><b>{setup['n_repeats']}</b><span>повтор на (сцена × вариант × модель)</span></div>
     <div class="stat"><b>{setup['planned_episodes']}</b><span>запланировано эпизодов (7 моделей)</span></div>
     <div class="stat"><b>{n_annotations}</b><span>фактически размечено эпизодов</span></div>
-    <div class="stat"><b>{max_steps_str}</b><span>лимит шагов на эпизод</span></div>
+    <div class="stat"><b>{max_steps_str}</b><span>шагов в самом длинном эпизоде</span></div>
   </div>
   <div class="warn"><b>Лимит шагов был выставлен нами, а не взят у авторов — это наша ошибка,
   на числа она не повлияла.</b> Авторы LIBERO-эвала обрывают эпизод по сьюту: spatial 220,
@@ -843,7 +856,7 @@ def render_html(
   выборке после каждого:</p>
 
   <table class="data-table"><thead><tr>
-    <th>Исправление</th><th>Что было не так</th><th>Затронуто эпизодов</th><th>Согласие по метке</th>
+    <th>Исправление</th><th>Что было не так</th><th>Меток изменилось</th><th>Согласие по метке</th>
   </tr></thead><tbody>
     <tr><td colspan="3"><i>исходное состояние</i></td><td>76 / 100</td></tr>
     <tr><td><code>negation_error</code> только на оси отрицания</td>
@@ -854,7 +867,7 @@ def render_html(
         <td>56</td><td>81 / 100</td></tr>
     <tr><td>успех <code>ru_case_swap</code> по перевёрнутой инструкции</td>
         <td>засчитывалось выполнение исходной задачи — зонд измерял обратное задуманному</td>
-        <td>36</td><td>80 / 100</td></tr>
+        <td>7</td><td>80 / 100</td></tr>
   </tbody></table>
 
   <p class="muted">Последнее исправление стоит одного пункта по метке и даёт два по факту
