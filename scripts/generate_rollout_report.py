@@ -771,6 +771,13 @@ def render_html(
     text-align:center; margin:0 .25em; font-size:.82em; line-height:1.25; }}
   .frac .num {{ padding:0 .45em .1em; border-bottom:1.3px solid currentColor; white-space:nowrap; }}
   .frac .den {{ padding:.1em .45em 0; white-space:nowrap; }}
+  .tscroll {{ overflow-x:auto; margin:10px 0; }}
+  .tscroll table.data-table {{ margin:0; }}
+  table.data-table.compact th, table.data-table.compact td {{ padding:6px 7px; text-align:center; }}
+  table.data-table.compact th:first-child, table.data-table.compact td:first-child {{ text-align:left; }}
+  table.data-table.compact th {{ text-transform:none; letter-spacing:0; font-size:10.5px; }}
+  table.data-table.compact th code {{ background:none; padding:0; font-size:10.5px;
+    overflow-wrap:anywhere; display:inline-block; max-width:8.5em; }}
 </style>
 </head>
 <body>
@@ -880,17 +887,17 @@ def render_html(
   </tbody></table>
 
   <p class="muted">Последнее исправление стоит одного пункта по метке и даёт два по факту
-  успеха (97 → 99). Все три пересчитаны из сохранённых логов, без повторных запусков на GPU.</p>
+  успеха (97 → 99).</p>
 
-  <p class="muted">Две оговорки: вердикты снимались до исправлений, и 43 карточки из 100
-  проверяющий оставил без изменений — это засчитано как согласие. По строгому счёту, только
-  на 57 явно разобранных, согласие по метке 37 / 57.</p>
+  <p class="muted">Вердикты снимались до исправлений. 43 эпизода из 100 оставлены без
+  правок и засчитаны как согласие; по строгому счёту, только на 57 явно разобранных, согласие
+  по метке 37 / 57.</p>
 </section>
 
 <section>
   <h2>5. Видеозаписи прогонов</h2>
-  <p class="muted">Для каждой модели — записи выполнения одной и той же задачи по разным промптам.
-  На каждой карточке слева стоит метка исхода, проставленная авторазметчиком.</p>
+  <p class="muted">Для каждой модели — одна и та же задача по разным промптам. На карточке
+  слева стоит метка исхода.</p>
   <table class="data-table"><thead><tr><th>Метка</th><th>Что произошло</th></tr></thead><tbody>
     <tr><td><code>success</code></td><td>задача выполнена</td></tr>
     <tr><td><code>target_grounding_error</code></td><td>робот пошёл не к тому предмету</td></tr>
@@ -908,15 +915,13 @@ def render_html(
   <h2>6. Что происходит на сцене: поведение по вариантам инструкции</h2>
 
   <h3>Исходы по меткам</h3>
-  <p class="muted">Сколько эпизодов каждого варианта получило каждую метку. Набор меток —
-  из task.md, названия сохранены как есть.</p>
-  <table class="data-table"><thead><tr>
+  <p class="muted">Сколько эпизодов каждого варианта получило каждую метку.</p>
+  <div class="tscroll"><table class="data-table compact"><thead><tr>
     <th>Вариант инструкции</th><th>Эпизодов</th>{label_mix_header}
-  </tr></thead><tbody>{label_mix_rows}</tbody></table>
+  </tr></thead><tbody>{label_mix_rows}</tbody></table></div>
 
   <h3>Поведенческие метрики</h3>
-  <p class="muted">Набор колонок задан task.md («Table — behavioral pilot»): это не метки
-  исхода, а отдельные величины, показывающие, на каком шаге рвётся исполнение.</p>
+  <p class="muted">Не метки исхода, а отдельные величины: на каком шаге рвётся исполнение.</p>
   <div class="f">
   <span class="def"><span class="name">SR</span> = <span class="frac"><span class="num">успешных эпизодов</span><span class="den">всего эпизодов варианта</span></span></span>
   <span class="def"><span class="name">Дотянулся до нужного предмета</span> = <span class="frac"><span class="num">эпизодов, где первый тронутый предмет — целевой</span><span class="den">всего эпизодов варианта</span></span></span>
