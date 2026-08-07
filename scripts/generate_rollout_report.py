@@ -280,7 +280,7 @@ def compute_language_effect(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
         out.append(
             {
-                "effect": f"Δlang_{variant}",
+                "effect": variant,
                 "formula": f"gap_{variant} − gap_en_paraphrase",
                 "value": d["value"],
                 "n_scenes": d["n_scenes"],
@@ -462,7 +462,7 @@ def fmt_delta(value: Optional[float]) -> str:
     if value is None:
         return "—"
     sign = "+" if value > 0 else ""
-    return f"{sign}{value * 100:.1f} pp"
+    return f"{sign}{value * 100:.1f} п.п."
 
 
 def render_html(
@@ -528,8 +528,8 @@ def render_html(
         if rows:
             per_model_sections += (
                 f"<h3>{pretty_model(model)}</h3><table class=\"data-table\"><thead><tr>"
-                "<th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>"
-                "<th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>"
+                "<th>Вариант инструкции</th><th>Эпизодов</th><th>SR</th><th>Дотянулся до нужного предмета</th>"
+                "<th>Тронул не тот предмет</th><th>Отношение выполнено</th><th>Тронул запрещённый предмет</th>"
                 f"</tr></thead><tbody>{rows}</tbody></table>"
             )
 
@@ -586,7 +586,7 @@ def render_html(
         return "".join(parts)
 
     language_effect_by_model_sections = "".join(
-        f"<h3>{pretty_model(model)}</h3><table class=\"data-table\"><thead><tr><th>Effect</th>"
+        f"<h3>{pretty_model(model)}</h3><table class=\"data-table\"><thead><tr><th>Вариант инструкции</th>"
         f"<th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead>"
         f"<tbody>{_lang_effect_rows_html(rows)}</tbody></table>"
         for model, rows in language_effect_by_model.items()
@@ -645,7 +645,7 @@ def render_html(
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>SLAVA pilot v0 — rollout technical report</title>
+<title>SLAVA — пилотный прогон v0: технический отчёт</title>
 <style>
   :root {{ --ink:#1a1a1a; --muted:#5c5c5c; --line:#ddd; --paper:#fff;
     --canvas:#fbfbf9; --accent:#3157d5; --good:#166534; --bad:#991b1b; }}
@@ -695,7 +695,7 @@ def render_html(
 </head>
 <body>
 <header>
-  <h1>SLAVA — pilot v0 rollout technical report</h1>
+  <h1>SLAVA — пилотный прогон v0: технический отчёт</h1>
   <p>Первые model rollouts на 7 моделях × LIBERO/SimplerEnv, по контракту task.md. {n_annotations} эпизодов размечено на момент генерации отчёта.</p>
 </header>
 <main>
@@ -712,17 +712,17 @@ def render_html(
     <div class="stat"><b>{fmt_pct(data_overview['visible_agentview_pct']/100)}</b><span>объектов видно на agentview</span></div>
     <div class="stat"><b>{fmt_pct(data_overview['visible_wrist_pct']/100)}</b><span>объектов видно на wrist</span></div>
   </div>
-  <h3>Пример записи object_lexicon.csv — все поля</h3>
+  <h3>Пример записи словаря объектов (object_lexicon.csv) — все поля</h3>
   <table class="data-table"><tbody>{lexicon_row_rows}</tbody></table>
 
-  <h3>Пример сцены и её вариантов инструкции</h3>
+  <h3>Пример сцены и всех её вариантов инструкции</h3>
   <p class="muted">Сцена <code>{examples['prompt_uid']}</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
-  <table class="data-table"><thead><tr><th>variant</th><th>instruction</th></tr></thead>
+  <table class="data-table"><thead><tr><th>Вариант</th><th>Инструкция</th></tr></thead>
   <tbody>{prompt_rows}</tbody></table>
 </section>
 
 <section>
-  <h2>2. Обзор сетапа роллаутов</h2>
+  <h2>2. Как собирались прогоны</h2>
   <div class="stat-grid">
     <div class="stat"><b>{setup['n_task_uids']}</b><span>сцен (task_uid)</span></div>
     <div class="stat"><b>{setup['n_prompts_total']}</b><span>промптов (task_uid × variant), {prompts_by_env_str}</span></div>
@@ -738,9 +738,9 @@ def render_html(
   396 LIBERO-эпизодов: <b>ни один успех не наступил позже авторского лимита</b>, поэтому
   собранные SR совпадают с теми, что получились бы при правильных лимитах, и сравнимы с
   опубликованными. Лимиты по сьютам уже проставлены в коде для последующих сборов.</div>
-  <table class="data-table"><thead><tr><th>Модель</th><th>Backbone</th><th>Среда(ы) и чекпойнт(ы)</th><th>Промптов</th></tr></thead>
+  <table class="data-table"><thead><tr><th>Модель</th><th>Базовая модель</th><th>Среда и чекпойнт</th><th>Промптов</th></tr></thead>
   <tbody>{models_rows}</tbody></table>
-  <h3>Собрано эпизодов</h3>
+  <h3>Сколько эпизодов собрано</h3>
   <table class="data-table"><thead><tr><th>Модель</th><th>Источник данных</th><th>Эпизодов</th></tr></thead>
   <tbody>{coverage_rows}</tbody></table>
 </section>
@@ -765,7 +765,7 @@ def render_html(
 </section>
 
 <section>
-  <h2>4. Камерные записи роллаутов</h2>
+  <h2>4. Видеозаписи прогонов</h2>
   <p class="muted">Для каждой модели — записи выполнения одной и той же задачи по разным промптам.</p>
   {gallery_cards or '<p class="muted">Камерные записи пока не сгенерированы для загруженных эпизодов.</p>'}
 </section>
@@ -777,23 +777,19 @@ def render_html(
   отношение. Все значения — по всем эпизодам соответствующего варианта.</p>
   <div class="f">
   SR = успешных эпизодов / всего эпизодов варианта<br>
-  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего эпизодов варианта<br>
-  Wrong-object rate = эпизодов, где первый тронутый объект — <b>не</b> целевой / всего эпизодов варианта<br>
-  Relation success = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
-  Forbidden touch = эпизодов, где запрещённый объект тронут хотя бы раз за эпизод / всего эпизодов варианта
+  Дотянулся до нужного предмета = эпизодов, где первый тронутый предмет — целевой / всего эпизодов варианта<br>
+  Тронул не тот предмет = эпизодов, где первый тронутый предмет — <b>не</b> целевой / всего эпизодов варианта<br>
+  Отношение выполнено = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
+  Тронул запрещённый предмет = эпизодов, где запрещённый предмет тронут хотя бы раз / всего эпизодов варианта
   </div>
-  <p class="muted">Relation success в этом наборе совпадает с SR во всех 536 эпизодах: обе
-  величины берутся из одного и того же success-предиката среды, поэтому независимой информации
-  колонка не несёт. Отдельным измерением она станет только с собственным геометрическим
-  критерием отношения.</p>
-  <p class="muted">Wrong-object rate — это <b>не</b> «единица минус first-contact acc»: эпизод, в
-  котором робот не тронул вообще ничего, не попадает ни в одну из двух колонок, поэтому они не
-  дополняют друг друга до 100%. Forbidden touch считается по всем вариантам, а не только по
-  <code>ru_negation</code>: слот запрещённого объекта заполнен у всех вариантов сцены, и
-  прикосновение к нему вне оси отрицания — тоже осмысленный сигнал, просто не ошибка.</p>
+  <p class="muted">Две оговорки к чтению таблицы. Первая: «дотянулся» и «тронул не тот» не
+  дополняют друг друга до 100% — эпизод, в котором робот не тронул вообще ничего, не попадает
+  ни в одну из колонок. Вторая: «отношение выполнено» здесь совпадает с SR во всех 536 эпизодах,
+  потому что обе величины читаются из одного и того же критерия успеха среды; отдельным
+  измерением колонка станет только со своим геометрическим критерием.</p>
   <table class="data-table"><thead><tr>
-    <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
-    <th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>
+    <th>Вариант инструкции</th><th>Эпизодов</th><th>SR</th><th>Дотянулся до нужного предмета</th>
+    <th>Тронул не тот предмет</th><th>Отношение выполнено</th><th>Тронул запрещённый предмет</th>
   </tr></thead><tbody>{behavioral_rows}</tbody></table>
 
   <p class="muted">Двух вариантов из восьми в таблице нет.
@@ -823,7 +819,7 @@ def render_html(
 </section>
 
 <section>
-  <h2>7. Статус по research questions</h2>
+  <h2>7. Что из исследовательских вопросов закрыто</h2>
   <table class="data-table"><thead><tr><th>Вопрос</th><th>Статус</th><th>Чем отвечаем</th></tr></thead>
   <tbody>
     <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>

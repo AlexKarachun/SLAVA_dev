@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>SLAVA pilot v0 — rollout technical report</title>
+<title>SLAVA — пилотный прогон v0: технический отчёт</title>
 <style>
   :root { --ink:#1a1a1a; --muted:#5c5c5c; --line:#ddd; --paper:#fff;
     --canvas:#fbfbf9; --accent:#3157d5; --good:#166534; --bad:#991b1b; }
@@ -52,7 +52,7 @@
 </head>
 <body>
 <header>
-  <h1>SLAVA — pilot v0 rollout technical report</h1>
+  <h1>SLAVA — пилотный прогон v0: технический отчёт</h1>
   <p>Первые model rollouts на 7 моделях × LIBERO/SimplerEnv, по контракту task.md. 536 эпизодов размечено на момент генерации отчёта.</p>
 </header>
 <main>
@@ -69,17 +69,17 @@
     <div class="stat"><b>98.6%</b><span>объектов видно на agentview</span></div>
     <div class="stat"><b>32.4%</b><span>объектов видно на wrist</span></div>
   </div>
-  <h3>Пример записи object_lexicon.csv — все поля</h3>
+  <h3>Пример записи словаря объектов (object_lexicon.csv) — все поля</h3>
   <table class="data-table"><tbody><tr><td class="k">raw_name</td><td>akita_black_bowl</td></tr><tr><td class="k">category_en</td><td>bowl</td></tr><tr><td class="k">category_ru</td><td>миска</td></tr><tr><td class="k">semantic_subtype_en</td><td>ceramic bowl</td></tr><tr><td class="k">semantic_subtype_ru</td><td>керамическая миска</td></tr><tr><td class="k">canonical_name_en</td><td>black bowl</td></tr><tr><td class="k">canonical_name_ru</td><td>черная миска</td></tr><tr><td class="k">visual_attributes_en</td><td>black round bowl</td></tr><tr><td class="k">visual_attributes_ru</td><td>черная круглая миска</td></tr><tr><td class="k">semantic_identity_visually_recoverable</td><td>yes</td></tr><tr><td class="k">color_en</td><td>black</td></tr><tr><td class="k">color_ru</td><td>черная</td></tr><tr><td class="k">allowed_synonyms_ru</td><td>пиала</td></tr><tr><td class="k">usable_v0</td><td>yes</td></tr><tr><td class="k">notes</td><td><span class="muted">—</span></td></tr></tbody></table>
 
-  <h3>Пример сцены и её вариантов инструкции</h3>
+  <h3>Пример сцены и всех её вариантов инструкции</h3>
   <p class="muted">Сцена <code>libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
-  <table class="data-table"><thead><tr><th>variant</th><th>instruction</th></tr></thead>
+  <table class="data-table"><thead><tr><th>Вариант</th><th>Инструкция</th></tr></thead>
   <tbody><tr><td>en_canonical</td><td>&laquo;pick up the black bowl from table center and place it on the plate&raquo;</td></tr><tr><td>en_paraphrase</td><td>&laquo;grab the black bowl at the center of the table and set it on the plate&raquo;</td></tr><tr><td>mt_russian</td><td>&laquo;возьмите чёрную миску со средины стола и поставьте её на тарелку&raquo;</td></tr><tr><td>ru_literal</td><td>&laquo;подними черную миску по центру стола и поставь ее на тарелку&raquo;</td></tr><tr><td>ru_case_swap</td><td>&laquo;поставь тарелку на черную миску по центру стола&raquo;</td></tr><tr><td>ru_negation</td><td>&laquo;подними не ту миску, что рядом с формочкой, а ту, что по центру стола, и поставь на тарелку&raquo;</td></tr><tr><td>code_switch</td><td>&laquo;подними black bowl по центру стола и поставь на plate&raquo;</td></tr></tbody></table>
 </section>
 
 <section>
-  <h2>2. Обзор сетапа роллаутов</h2>
+  <h2>2. Как собирались прогоны</h2>
   <div class="stat-grid">
     <div class="stat"><b>20</b><span>сцен (task_uid)</span></div>
     <div class="stat"><b>127</b><span>промптов (task_uid × variant), LIBERO: 99, SimplerEnv: 28</span></div>
@@ -95,9 +95,9 @@
   396 LIBERO-эпизодов: <b>ни один успех не наступил позже авторского лимита</b>, поэтому
   собранные SR совпадают с теми, что получились бы при правильных лимитах, и сравнимы с
   опубликованными. Лимиты по сьютам уже проставлены в коде для последующих сборов.</div>
-  <table class="data-table"><thead><tr><th>Модель</th><th>Backbone</th><th>Среда(ы) и чекпойнт(ы)</th><th>Промптов</th></tr></thead>
+  <table class="data-table"><thead><tr><th>Модель</th><th>Базовая модель</th><th>Среда и чекпойнт</th><th>Промптов</th></tr></thead>
   <tbody><tr><td>GreenVLA-R0</td><td><code>Qwen3-VL-4B-Instruct</code></td><td>SimplerEnv: <code>SberRoboticsCenter/GreenVLA-5b-base-stride-1</code></td><td>28</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td><code>Qwen3-VL-4B-Instruct</code></td><td>SimplerEnv: <code>SberRoboticsCenter/GreenVLA-5b-stride-1-R1-bridge</code></td><td>28</td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td><code>Qwen3-VL-4B-Instruct</code></td><td>SimplerEnv: <code>SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge</code></td><td>28</td></tr><tr><td>OpenVLA-OFT</td><td><code>Prismatic (openvla-7b)</code></td><td>LIBERO: <code>moojink/openvla-7b-oft-finetuned-libero-spatial-object-goal-10</code></td><td>99</td></tr><tr><td>π0</td><td><code>PaliGemma</code></td><td>LIBERO: <code>lerobot/pi0_libero_finetuned</code><br>SimplerEnv: <code>lerobot/pi0_base</code> <em>(zero-shot)</em></td><td>127</td></tr><tr><td>π0.5</td><td><code>PaliGemma</code></td><td>LIBERO: <code>lerobot/pi05_libero_finetuned</code><br>SimplerEnv: <code>lerobot/pi05_base</code> <em>(zero-shot)</em></td><td>127</td></tr><tr><td>SmolVLA</td><td><code>HuggingFaceTB/SmolVLM2-500M-Video-Instruct</code></td><td>LIBERO: <code>HuggingFaceVLA/smolvla_libero</code></td><td>99</td></tr></tbody></table>
-  <h3>Собрано эпизодов</h3>
+  <h3>Сколько эпизодов собрано</h3>
   <table class="data-table"><thead><tr><th>Модель</th><th>Источник данных</th><th>Эпизодов</th></tr></thead>
   <tbody><tr><td>GreenVLA-R0</td><td>SimplerEnv</td><td>28</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>SimplerEnv</td><td>28</td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>SimplerEnv</td><td>28</td></tr><tr><td>OpenVLA-OFT</td><td>LIBERO</td><td>99</td></tr><tr><td>π0</td><td>LIBERO, SimplerEnv</td><td>127</td></tr><tr><td>π0.5</td><td>LIBERO, SimplerEnv</td><td>127</td></tr><tr><td>SmolVLA</td><td>LIBERO</td><td>99</td></tr></tbody></table>
 </section>
@@ -122,7 +122,7 @@
 </section>
 
 <section>
-  <h2>4. Камерные записи роллаутов</h2>
+  <h2>4. Видеозаписи прогонов</h2>
   <p class="muted">Для каждой модели — записи выполнения одной и той же задачи по разным промптам.</p>
   <p class="muted">Камерные записи пока не сгенерированы для загруженных эпизодов.</p>
 </section>
@@ -134,23 +134,19 @@
   отношение. Все значения — по всем эпизодам соответствующего варианта.</p>
   <div class="f">
   SR = успешных эпизодов / всего эпизодов варианта<br>
-  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего эпизодов варианта<br>
-  Wrong-object rate = эпизодов, где первый тронутый объект — <b>не</b> целевой / всего эпизодов варианта<br>
-  Relation success = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
-  Forbidden touch = эпизодов, где запрещённый объект тронут хотя бы раз за эпизод / всего эпизодов варианта
+  Дотянулся до нужного предмета = эпизодов, где первый тронутый предмет — целевой / всего эпизодов варианта<br>
+  Тронул не тот предмет = эпизодов, где первый тронутый предмет — <b>не</b> целевой / всего эпизодов варианта<br>
+  Отношение выполнено = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
+  Тронул запрещённый предмет = эпизодов, где запрещённый предмет тронут хотя бы раз / всего эпизодов варианта
   </div>
-  <p class="muted">Relation success в этом наборе совпадает с SR во всех 536 эпизодах: обе
-  величины берутся из одного и того же success-предиката среды, поэтому независимой информации
-  колонка не несёт. Отдельным измерением она станет только с собственным геометрическим
-  критерием отношения.</p>
-  <p class="muted">Wrong-object rate — это <b>не</b> «единица минус first-contact acc»: эпизод, в
-  котором робот не тронул вообще ничего, не попадает ни в одну из двух колонок, поэтому они не
-  дополняют друг друга до 100%. Forbidden touch считается по всем вариантам, а не только по
-  <code>ru_negation</code>: слот запрещённого объекта заполнен у всех вариантов сцены, и
-  прикосновение к нему вне оси отрицания — тоже осмысленный сигнал, просто не ошибка.</p>
+  <p class="muted">Две оговорки к чтению таблицы. Первая: «дотянулся» и «тронул не тот» не
+  дополняют друг друга до 100% — эпизод, в котором робот не тронул вообще ничего, не попадает
+  ни в одну из колонок. Вторая: «отношение выполнено» здесь совпадает с SR во всех 536 эпизодах,
+  потому что обе величины читаются из одного и того же критерия успеха среды; отдельным
+  измерением колонка станет только со своим геометрическим критерием.</p>
   <table class="data-table"><thead><tr>
-    <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
-    <th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>
+    <th>Вариант инструкции</th><th>Эпизодов</th><th>SR</th><th>Дотянулся до нужного предмета</th>
+    <th>Тронул не тот предмет</th><th>Отношение выполнено</th><th>Тронул запрещённый предмет</th>
   </tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>93.8%</td><td>81.2%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>16</td><td>93.8%</td><td>75.0%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>16</td><td>56.2%</td><td>50.0%</td><td>0.0%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>16</td><td>56.2%</td><td>50.0%</td><td>12.5%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_free_order</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_case_swap</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_negation</td><td>15</td><td>53.3%</td><td>53.3%</td><td>0.0%</td><td>53.3%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>16</td><td>87.5%</td><td>68.8%</td><td>6.2%</td><td>87.5%</td><td>6.2%</td></tr></tbody></table>
 
   <p class="muted">Двух вариантов из восьми в таблице нет.
@@ -176,11 +172,11 @@
   <code>en_canonical</code> и <code>en_paraphrase</code> только на общих для всех трёх сценах —
   это колонка «парных сцен». CI — парный бутстрап по сценам, p — точный тест Мак-Немара против
   <code>en_canonical</code>; прочерк в p означает отсутствие дискордантных пар.</p>
-  <h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Effect</th><th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead><tbody><tr><td>Δlang_mt_russian</td><td>16</td><td class="pos">+37.5 pp</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>Δlang_ru_literal</td><td>16</td><td class="pos">+37.5 pp</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>Δlang_ru_negation</td><td>15</td><td class="pos">+40.0 pp</td><td>[+13; +67]</td><td>0.031</td></tr><tr><td>Δlang_code_switch</td><td>16</td><td class="pos">+6.2 pp</td><td>[+0; +19]</td><td>1.000</td></tr></tbody></table>
+  <h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Вариант инструкции</th><th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead><tbody><tr><td>mt_russian</td><td>16</td><td class="pos">+37.5 п.п.</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>ru_literal</td><td>16</td><td class="pos">+37.5 п.п.</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>ru_negation</td><td>15</td><td class="pos">+40.0 п.п.</td><td>[+13; +67]</td><td>0.031</td></tr><tr><td>code_switch</td><td>16</td><td class="pos">+6.2 п.п.</td><td>[+0; +19]</td><td>1.000</td></tr></tbody></table>
 </section>
 
 <section>
-  <h2>7. Статус по research questions</h2>
+  <h2>7. Что из исследовательских вопросов закрыто</h2>
   <table class="data-table"><thead><tr><th>Вопрос</th><th>Статус</th><th>Чем отвечаем</th></tr></thead>
   <tbody>
     <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>
