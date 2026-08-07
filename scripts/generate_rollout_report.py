@@ -556,15 +556,15 @@ def render_html(
             </figcaption>
           </figure>"""
         gallery_cards += f"""
-        <h3>{group['model']} <span class="muted">— SR {group['sr']}</span></h3>
+        <h3>{group['model']} <span class="muted">— SR {group['sr']} (по всем вариантам инструкции)</span></h3>
         <div class="gif-grid">{cards}
         </div>"""
 
-    lexicon_cat_rows = "".join(
-        f"<tr><td>{cat}</td><td>{count}</td></tr>" for cat, count in data_overview["lexicon_categories"]
-    )
-
     lex = examples["lexicon_row"]
+    lexicon_row_rows = "".join(
+        f"<tr><td class=\"k\">{field}</td><td>{value if value != '' else '<span class=\"muted\">—</span>'}</td></tr>"
+        for field, value in lex.items()
+    )
     prompt_rows = "".join(
         f"<tr><td>{p['variant']}</td><td>&laquo;{p['instruction']}&raquo;</td></tr>"
         for p in examples["prompt_variants"]
@@ -701,7 +701,7 @@ def render_html(
 <main>
 
 <section>
-  <h2>1. Обзор данных</h2>
+  <h2>1. Обзор данных сбора v0 (20 сцен)</h2>
   <div class="stat-grid">
     <div class="stat"><b>{data_overview['n_candidate_scenes']}</b><span>сцен-кандидатов (task_inventory.jsonl)</span></div>
     <div class="stat"><b>{data_overview['n_usable_for_slava']}</b><span>usable_for_slava=true</span></div>
@@ -712,17 +712,8 @@ def render_html(
     <div class="stat"><b>{fmt_pct(data_overview['visible_agentview_pct']/100)}</b><span>объектов видно на agentview</span></div>
     <div class="stat"><b>{fmt_pct(data_overview['visible_wrist_pct']/100)}</b><span>объектов видно на wrist</span></div>
   </div>
-  <h3>Object lexicon — категории</h3>
-  <table class="data-table"><thead><tr><th>category_en</th><th>count</th></tr></thead>
-  <tbody>{lexicon_cat_rows}</tbody></table>
-
-  <h3>Пример записи object_lexicon.csv</h3>
-  <table class="data-table"><tbody>
-    <tr><td class="k">raw_name</td><td><code>{lex.get('raw_name','')}</code></td></tr>
-    <tr><td class="k">canonical_name_en / ru</td><td>{lex.get('canonical_name_en','')} / {lex.get('canonical_name_ru','')}</td></tr>
-    <tr><td class="k">visual_attributes_en</td><td>{lex.get('visual_attributes_en','')}</td></tr>
-    <tr><td class="k">allowed_synonyms_ru</td><td>{lex.get('allowed_synonyms_ru','')}</td></tr>
-  </tbody></table>
+  <h3>Пример записи object_lexicon.csv — все поля</h3>
+  <table class="data-table"><tbody>{lexicon_row_rows}</tbody></table>
 
   <h3>Пример сцены и её вариантов инструкции</h3>
   <p class="muted">Сцена <code>{examples['prompt_uid']}</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
@@ -740,6 +731,13 @@ def render_html(
     <div class="stat"><b>{n_annotations}</b><span>фактически размечено эпизодов</span></div>
     <div class="stat"><b>{max_steps_str}</b><span>лимит шагов на эпизод</span></div>
   </div>
+  <div class="warn"><b>Лимит шагов был выставлен нами, а не взят у авторов — это наша ошибка,
+  на числа она не повлияла.</b> Авторы LIBERO-эвала обрывают эпизод по сьюту: spatial 220,
+  object 280, goal 300 шагов. Мы собирали все три сьюта с единым лимитом 300, то есть в
+  spatial и object давали модели больше времени, чем полагалось. Проверено по логам всех
+  396 LIBERO-эпизодов: <b>ни один успех не наступил позже авторского лимита</b>, поэтому
+  собранные SR совпадают с теми, что получились бы при правильных лимитах, и сравнимы с
+  опубликованными. Лимиты по сьютам уже проставлены в коде для последующих сборов.</div>
   <table class="data-table"><thead><tr><th>Модель</th><th>Backbone</th><th>Среда(ы) и чекпойнт(ы)</th><th>Промптов</th></tr></thead>
   <tbody>{models_rows}</tbody></table>
   <h3>Собрано эпизодов</h3>
@@ -750,15 +748,20 @@ def render_html(
 <section>
   <h2>3. Достоверность результатов</h2>
   <p class="muted">Проверка одна: на <code>en_canonical</code> — канонической английской строке
-  задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.
-  Если не показывает, её числа описывают не модель, а связку «модель + наш прогон».</p>
+  задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.</p>
   <table class="data-table"><thead><tr>
-    <th>Модель</th><th>Наш SR на en_canonical</th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
+    <th>Модель</th><th>Наш SR <span class="muted">(только en_canonical)</span></th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
   </tr></thead><tbody>{validity_rows}</tbody></table>
-  <div class="warn"><b>Шесть моделей из семи не воспроизводят опубликованное число.</b>
-  Их результаты в этом отчёте не приводятся: пока расхождение на английском не объяснено,
-  кросс-язычные выводы по ним были бы выводами о дефекте, а не о языке. Ниже — только
-  модели, прошедшие проверку или показавшие ненулевую английскую базу.</div>
+  <p class="muted">Что означают вердикты. <b>Воспроизводится</b> — наш SR на английском
+  сходится с опубликованным, числам модели можно верить.
+  <b>Не воспроизводится</b> — не сходится.
+  <b>Предварительно, база ненулевая</b> — тоже не сходится, но модель хотя бы иногда решает
+  задачу на английском (не ноль), поэтому её провалы на русском в принципе могли бы быть
+  языковым эффектом; у моделей с нулём на английском отличить язык от поломки нельзя вообще.
+  <b>Нет опубликованного числа</b> — авторы не публиковали SR для этого конкретного чекпойнта,
+  сравнивать не с чем.</p>
+  <div class="warn"><b>Опубликованное число воспроизводит одна модель из семи.</b>
+  Ниже анализируем метрики только на достоверной OpenVLA-OFT.</div>
 </section>
 
 <section>
@@ -768,47 +771,54 @@ def render_html(
 </section>
 
 <section>
-  <h2>5. Метрики — Table: behavioral pilot</h2>
+  <h2>5. Что происходит на сцене: поведение по вариантам инструкции</h2>
+  <p class="muted">SR говорит только «получилось или нет». Остальные колонки говорят, на каком
+  шаге рвётся исполнение: дотянулся ли робот до нужного предмета и выполнил ли требуемое
+  отношение. Все значения — по всем эпизодам соответствующего варианта.</p>
   <div class="f">
   SR = успешных эпизодов / всего эпизодов варианта<br>
-  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего<br>
-  Wrong-object rate = 1 − first-contact target acc<br>
-  Relation success = эпизодов, где финальное пространственное отношение выполнено / всего<br>
-  Forbidden touch = эпизодов, где тронут запрещённый объект / всего (только ru_negation)
+  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего эпизодов варианта<br>
+  Wrong-object rate = эпизодов, где первый тронутый объект — <b>не</b> целевой / всего эпизодов варианта<br>
+  Relation success = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
+  Forbidden touch = эпизодов, где запрещённый объект тронут хотя бы раз за эпизод / всего эпизодов варианта
   </div>
+  <p class="muted">Relation success в этом наборе совпадает с SR во всех 536 эпизодах: обе
+  величины берутся из одного и того же success-предиката среды, поэтому независимой информации
+  колонка не несёт. Отдельным измерением она станет только с собственным геометрическим
+  критерием отношения.</p>
+  <p class="muted">Wrong-object rate — это <b>не</b> «единица минус first-contact acc»: эпизод, в
+  котором робот не тронул вообще ничего, не попадает ни в одну из двух колонок, поэтому они не
+  дополняют друг друга до 100%. Forbidden touch считается по всем вариантам, а не только по
+  <code>ru_negation</code>: слот запрещённого объекта заполнен у всех вариантов сцены, и
+  прикосновение к нему вне оси отрицания — тоже осмысленный сигнал, просто не ошибка.</p>
   <table class="data-table"><thead><tr>
     <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
     <th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>
   </tr></thead><tbody>{behavioral_rows}</tbody></table>
 
-  <div class="warn"><b>Важная оговорка:</b> модель→среда матрица асимметрична (task.md), поэтому пуллинг по
-  вариантам смешивает разные подмножества моделей/сцен для разных строк (например, en_canonical для
-  GreenVLA — только 4 SimplerEnv-сцены, для OpenVLA-OFT — 16 LIBERO-сцен). Разбивка по моделям ниже —
-  более честный источник для интерпретации отдельной модели.</div>
-
-  <h3>Разбивка по моделям</h3>
-  {per_model_sections or '<p class="muted">Недостаточно данных для разбивки по моделям.</p>'}
+  <p class="muted">Двух вариантов из восьми в таблице нет.
+  <code>ru_free_order</code> написан для всех 20 сцен, но в пилотный прогон не входил:
+  <code>export_prompts.py</code> выгружает семь вариантов — шесть «primary» из task.md плюс
+  <code>mt_russian</code>, — и свободный порядок слов в этот список не попал. Эпизодов по нему
+  не собрано ни одного.
+  <code>ru_case_swap</code> применим только к 8 сценам из 20 (на остальных менять падеж не у
+  чего), и собранные по нему 36 эпизодов сняты по прежнему критерию успеха: он засчитывал
+  выполнение исходной задачи, тогда как смысл варианта — проверить, пойдёт ли робот за
+  перевёрнутой инструкцией. Критерий исправлен, эпизоды помечены устаревшими и в метрики не
+  идут; пересобрать их можно на следующем прогоне.</p>
 </section>
 
 <section>
-  <h2>6. Метрики — Table: cleaned language effect (Δlang)</h2>
+  <h2>6. Языковой эффект (Δlang)</h2>
   <div class="f">
   gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
   <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
   </div>
-  <div class="warn"><b>Единой таблицы «по всем моделям» здесь нет намеренно.</b>
-  Пуллинг моделей в один Δlang даёт величину, которая ничего не измеряет: покрытие
-  по вариантам у моделей разное, поэтому пулинговые SR разных вариантов взвешены
-  по-разному, а модели с SR≈0 во всех языках механически дают Δlang≈0 и размывают
-  тех, у кого эффект есть (пулинговый Δlang<sub>ru_literal</sub> = +11.4 п.п. против
-  разброса 0…+50 п.п. по моделям). Ниже — только разбивка по моделям.</p></div>
-
-  <h3>Δlang по моделям (парное сравнение)</h3>
-  <p class="muted">Каждый вариант сравнивается с <code>en_canonical</code> и
-  <code>en_paraphrase</code> только на общих для всех трёх сценах — колонка «парных сцен».
-  CI — парный бутстрап по сценам, p — точный тест Мак-Немара против
-  <code>en_canonical</code>; прочерк в p означает отсутствие дискордантных пар,
-  то есть данных для суждения нет.</p>
+  <p class="muted">Вычитание gap<sub>en_paraphrase</sub> снимает эффект «инструкция просто
+  сформулирована иначе»: остаток относится к языковой оси. Каждый вариант сравнивается с
+  <code>en_canonical</code> и <code>en_paraphrase</code> только на общих для всех трёх сценах —
+  это колонка «парных сцен». CI — парный бутстрап по сценам, p — точный тест Мак-Немара против
+  <code>en_canonical</code>; прочерк в p означает отсутствие дискордантных пар.</p>
   {language_effect_by_model_sections or '<p class="muted">Недостаточно данных.</p>'}
 </section>
 
@@ -818,16 +828,16 @@ def render_html(
   <tbody>
     <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>
         <td><b>сырой ответ есть</b></td>
-        <td>Δlang по модели (раздел 6): перефразирование на английском вычтено, остаток относится к языковой оси. Ответ предварительный — одна модель прошла проверку достоверности, эпизод на клетку один.</td></tr>
+        <td>Δlang по вариантам, раздел 6.</td></tr>
     <tr><td class="k">RQ2. Where do multilingual instructions fail in the language-to-action pipeline?</td>
-        <td>частично</td>
-        <td>Поведенческий слой: первый контакт, доля неверного объекта, выполнение отношения (раздел 5) показывают, на каком шаге рвётся исполнение. Разделить «не понял» и «понял, но не связал с действием» этими данными нельзя.</td></tr>
+        <td><b>ответа нет</b></td>
+        <td>Нужен послойный разбор; поведенческие колонки места сбоя не дают.</td></tr>
     <tr><td class="k">RQ3. Does action fine-tuning erase multilingual semantics or render them non-causal?</td>
         <td><b>ответа нет</b></td>
-        <td>Нужны slot-probes по слоям и каузальный patching между base и action-tuned чекпойнтами. В пилоте не делалось.</td></tr>
+        <td>Нужны slot-probes и каузальный patching. В пилоте не делалось.</td></tr>
     <tr><td class="k">RQ4. Can a slot-causal, base-anchored repair restore multilingual action binding?</td>
         <td><b>ответа нет</b></td>
-        <td>Repair строится по результатам RQ3, то есть следующий этап.</td></tr>
+        <td>Строится по результатам RQ3.</td></tr>
   </tbody></table>
 </section>
 
@@ -866,13 +876,15 @@ def main() -> None:
 
     # Метрики считаются только по моделям, чьи числа вообще что-то означают.
     # `report_treatment` в data/published_baselines.json — явное решение
-    # пользователя (07.08.2026), а не порог: "excluded" стоит там, где
-    # английская база слишком низка, чтобы отличить языковой эффект от дефекта
-    # пайплайна. Показывать для таких моделей Δlang значило бы выдавать за
-    # результат следствие поломки.
+    # пользователя, а не порог. Решение 08.08.2026: в разделах 5 и 6 остаётся
+    # только "primary", то есть модель, воспроизводящая опубликованное число
+    # (OpenVLA-OFT). У "preliminary" (GreenVLA-R1/R2) английская база 5/22 —
+    # приводить по ним Δlang значило бы выдавать за языковой эффект следствие
+    # неразобранного расхождения. Все семь моделей по-прежнему видны в разделе
+    # 3 (достоверность) и в разделе 4 (камерные записи).
     published = json.loads((DATA_DIR / "published_baselines.json").read_text(encoding="utf-8"))["baselines"]
-    excluded_models = {m for m, spec in published.items() if spec.get("report_treatment") == "excluded"}
-    reportable = [r for r in valid if r["model"] not in excluded_models]
+    reportable_models = {m for m, spec in published.items() if spec.get("report_treatment") == "primary"}
+    reportable = [r for r in valid if r["model"] in reportable_models]
 
     behavioral = compute_behavioral_pilot(reportable)
     behavioral_by_model = compute_behavioral_pilot_by_model(reportable)

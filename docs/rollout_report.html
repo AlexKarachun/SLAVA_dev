@@ -58,7 +58,7 @@
 <main>
 
 <section>
-  <h2>1. Обзор данных</h2>
+  <h2>1. Обзор данных сбора v0 (20 сцен)</h2>
   <div class="stat-grid">
     <div class="stat"><b>117</b><span>сцен-кандидатов (task_inventory.jsonl)</span></div>
     <div class="stat"><b>41</b><span>usable_for_slava=true</span></div>
@@ -69,17 +69,8 @@
     <div class="stat"><b>98.6%</b><span>объектов видно на agentview</span></div>
     <div class="stat"><b>32.4%</b><span>объектов видно на wrist</span></div>
   </div>
-  <h3>Object lexicon — категории</h3>
-  <table class="data-table"><thead><tr><th>category_en</th><th>count</th></tr></thead>
-  <tbody><tr><td>bottle</td><td>4</td></tr><tr><td>brick pack</td><td>3</td></tr><tr><td>can</td><td>2</td></tr><tr><td>cube</td><td>2</td></tr><tr><td>vegetable</td><td>2</td></tr><tr><td>plate</td><td>2</td></tr><tr><td>carton</td><td>2</td></tr><tr><td>bowl</td><td>1</td></tr><tr><td>basket</td><td>1</td></tr><tr><td>cutlery</td><td>1</td></tr><tr><td>box</td><td>1</td></tr><tr><td>appliance</td><td>1</td></tr><tr><td>dish</td><td>1</td></tr><tr><td>sink</td><td>1</td></tr><tr><td>towel</td><td>1</td></tr><tr><td>rack</td><td>1</td></tr><tr><td>cabinet</td><td>1</td></tr></tbody></table>
-
-  <h3>Пример записи object_lexicon.csv</h3>
-  <table class="data-table"><tbody>
-    <tr><td class="k">raw_name</td><td><code>akita_black_bowl</code></td></tr>
-    <tr><td class="k">canonical_name_en / ru</td><td>black bowl / черная миска</td></tr>
-    <tr><td class="k">visual_attributes_en</td><td>black round bowl</td></tr>
-    <tr><td class="k">allowed_synonyms_ru</td><td>пиала</td></tr>
-  </tbody></table>
+  <h3>Пример записи object_lexicon.csv — все поля</h3>
+  <table class="data-table"><tbody><tr><td class="k">raw_name</td><td>akita_black_bowl</td></tr><tr><td class="k">category_en</td><td>bowl</td></tr><tr><td class="k">category_ru</td><td>миска</td></tr><tr><td class="k">semantic_subtype_en</td><td>ceramic bowl</td></tr><tr><td class="k">semantic_subtype_ru</td><td>керамическая миска</td></tr><tr><td class="k">canonical_name_en</td><td>black bowl</td></tr><tr><td class="k">canonical_name_ru</td><td>черная миска</td></tr><tr><td class="k">visual_attributes_en</td><td>black round bowl</td></tr><tr><td class="k">visual_attributes_ru</td><td>черная круглая миска</td></tr><tr><td class="k">semantic_identity_visually_recoverable</td><td>yes</td></tr><tr><td class="k">color_en</td><td>black</td></tr><tr><td class="k">color_ru</td><td>черная</td></tr><tr><td class="k">allowed_synonyms_ru</td><td>пиала</td></tr><tr><td class="k">usable_v0</td><td>yes</td></tr><tr><td class="k">notes</td><td><span class="muted">—</span></td></tr></tbody></table>
 
   <h3>Пример сцены и её вариантов инструкции</h3>
   <p class="muted">Сцена <code>libero_spatial__pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate__init001</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
@@ -97,6 +88,13 @@
     <div class="stat"><b>536</b><span>фактически размечено эпизодов</span></div>
     <div class="stat"><b>LIBERO: 520, SimplerEnv: 120</b><span>лимит шагов на эпизод</span></div>
   </div>
+  <div class="warn"><b>Лимит шагов был выставлен нами, а не взят у авторов — это наша ошибка,
+  на числа она не повлияла.</b> Авторы LIBERO-эвала обрывают эпизод по сьюту: spatial 220,
+  object 280, goal 300 шагов. Мы собирали все три сьюта с единым лимитом 300, то есть в
+  spatial и object давали модели больше времени, чем полагалось. Проверено по логам всех
+  396 LIBERO-эпизодов: <b>ни один успех не наступил позже авторского лимита</b>, поэтому
+  собранные SR совпадают с теми, что получились бы при правильных лимитах, и сравнимы с
+  опубликованными. Лимиты по сьютам уже проставлены в коде для последующих сборов.</div>
   <table class="data-table"><thead><tr><th>Модель</th><th>Backbone</th><th>Среда(ы) и чекпойнт(ы)</th><th>Промптов</th></tr></thead>
   <tbody><tr><td>GreenVLA-R0</td><td><code>Qwen3-VL-4B-Instruct</code></td><td>SimplerEnv: <code>SberRoboticsCenter/GreenVLA-5b-base-stride-1</code></td><td>28</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td><code>Qwen3-VL-4B-Instruct</code></td><td>SimplerEnv: <code>SberRoboticsCenter/GreenVLA-5b-stride-1-R1-bridge</code></td><td>28</td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td><code>Qwen3-VL-4B-Instruct</code></td><td>SimplerEnv: <code>SberRoboticsCenter/GreenVLA-5b-stride-1-R2-bridge</code></td><td>28</td></tr><tr><td>OpenVLA-OFT</td><td><code>Prismatic (openvla-7b)</code></td><td>LIBERO: <code>moojink/openvla-7b-oft-finetuned-libero-spatial-object-goal-10</code></td><td>99</td></tr><tr><td>π0</td><td><code>PaliGemma</code></td><td>LIBERO: <code>lerobot/pi0_libero_finetuned</code><br>SimplerEnv: <code>lerobot/pi0_base</code> <em>(zero-shot)</em></td><td>127</td></tr><tr><td>π0.5</td><td><code>PaliGemma</code></td><td>LIBERO: <code>lerobot/pi05_libero_finetuned</code><br>SimplerEnv: <code>lerobot/pi05_base</code> <em>(zero-shot)</em></td><td>127</td></tr><tr><td>SmolVLA</td><td><code>HuggingFaceTB/SmolVLM2-500M-Video-Instruct</code></td><td>LIBERO: <code>HuggingFaceVLA/smolvla_libero</code></td><td>99</td></tr></tbody></table>
   <h3>Собрано эпизодов</h3>
@@ -107,15 +105,20 @@
 <section>
   <h2>3. Достоверность результатов</h2>
   <p class="muted">Проверка одна: на <code>en_canonical</code> — канонической английской строке
-  задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.
-  Если не показывает, её числа описывают не модель, а связку «модель + наш прогон».</p>
+  задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.</p>
   <table class="data-table"><thead><tr>
-    <th>Модель</th><th>Наш SR на en_canonical</th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
+    <th>Модель</th><th>Наш SR <span class="muted">(только en_canonical)</span></th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
   </tr></thead><tbody><tr><td>GreenVLA-R0</td><td>0/22 = 0.0% <span class="muted">(отдельный прогон)</span></td><td>[0.0%; 14.9%]</td><td>—</td><td>опубликованного числа нет</td></tr><tr><td>GreenVLA-R1 (bridge)</td><td>5/22 = 22.7% <span class="muted">(отдельный прогон)</span></td><td>[10.1%; 43.4%]</td><td>72.9%</td><td><span class="badge">предварительно, база ненулевая</span></td></tr><tr><td>GreenVLA-R2 (bridge, RL-aligned)</td><td>5/22 = 22.7% <span class="muted">(отдельный прогон)</span></td><td>[10.1%; 43.4%]</td><td>80.5%</td><td><span class="badge">предварительно, база ненулевая</span></td></tr><tr><td>OpenVLA-OFT</td><td>15/16 = 93.8%</td><td>[71.7%; 98.9%]</td><td>97.0%</td><td><span class="badge success">воспроизводится</span></td></tr><tr><td>SmolVLA</td><td>2/16 = 12.5%</td><td>[3.5%; 36.0%]</td><td>92.7%</td><td><span class="badge fail">не воспроизводится</span></td></tr><tr><td>π0</td><td>4/20 = 20.0%</td><td>[8.1%; 41.6%]</td><td>74.7%</td><td><span class="badge fail">не воспроизводится</span></td></tr><tr><td>π0.5</td><td>0/20 = 0.0%</td><td>[0.0%; 16.1%]</td><td>97.5%</td><td><span class="badge fail">не воспроизводится</span></td></tr></tbody></table>
-  <div class="warn"><b>Шесть моделей из семи не воспроизводят опубликованное число.</b>
-  Их результаты в этом отчёте не приводятся: пока расхождение на английском не объяснено,
-  кросс-язычные выводы по ним были бы выводами о дефекте, а не о языке. Ниже — только
-  модели, прошедшие проверку или показавшие ненулевую английскую базу.</div>
+  <p class="muted">Что означают вердикты. <b>Воспроизводится</b> — наш SR на английском
+  сходится с опубликованным, числам модели можно верить.
+  <b>Не воспроизводится</b> — не сходится.
+  <b>Предварительно, база ненулевая</b> — тоже не сходится, но модель хотя бы иногда решает
+  задачу на английском (не ноль), поэтому её провалы на русском в принципе могли бы быть
+  языковым эффектом; у моделей с нулём на английском отличить язык от поломки нельзя вообще.
+  <b>Нет опубликованного числа</b> — авторы не публиковали SR для этого конкретного чекпойнта,
+  сравнивать не с чем.</p>
+  <div class="warn"><b>Опубликованное число воспроизводит одна модель из семи.</b>
+  Ниже анализируем метрики только на достоверной OpenVLA-OFT.</div>
 </section>
 
 <section>
@@ -125,48 +128,55 @@
 </section>
 
 <section>
-  <h2>5. Метрики — Table: behavioral pilot</h2>
+  <h2>5. Что происходит на сцене: поведение по вариантам инструкции</h2>
+  <p class="muted">SR говорит только «получилось или нет». Остальные колонки говорят, на каком
+  шаге рвётся исполнение: дотянулся ли робот до нужного предмета и выполнил ли требуемое
+  отношение. Все значения — по всем эпизодам соответствующего варианта.</p>
   <div class="f">
   SR = успешных эпизодов / всего эпизодов варианта<br>
-  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего<br>
-  Wrong-object rate = 1 − first-contact target acc<br>
-  Relation success = эпизодов, где финальное пространственное отношение выполнено / всего<br>
-  Forbidden touch = эпизодов, где тронут запрещённый объект / всего (только ru_negation)
+  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего эпизодов варианта<br>
+  Wrong-object rate = эпизодов, где первый тронутый объект — <b>не</b> целевой / всего эпизодов варианта<br>
+  Relation success = эпизодов с выполненным финальным отношением / эпизодов, где отношение определено<br>
+  Forbidden touch = эпизодов, где запрещённый объект тронут хотя бы раз за эпизод / всего эпизодов варианта
   </div>
+  <p class="muted">Relation success в этом наборе совпадает с SR во всех 536 эпизодах: обе
+  величины берутся из одного и того же success-предиката среды, поэтому независимой информации
+  колонка не несёт. Отдельным измерением она станет только с собственным геометрическим
+  критерием отношения.</p>
+  <p class="muted">Wrong-object rate — это <b>не</b> «единица минус first-contact acc»: эпизод, в
+  котором робот не тронул вообще ничего, не попадает ни в одну из двух колонок, поэтому они не
+  дополняют друг друга до 100%. Forbidden touch считается по всем вариантам, а не только по
+  <code>ru_negation</code>: слот запрещённого объекта заполнен у всех вариантов сцены, и
+  прикосновение к нему вне оси отрицания — тоже осмысленный сигнал, просто не ошибка.</p>
   <table class="data-table"><thead><tr>
     <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
     <th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>
-  </tr></thead><tbody><tr><td>en_canonical</td><td>24</td><td>70.8%</td><td>87.5%</td><td>0.0%</td><td>70.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>24</td><td>75.0%</td><td>83.3%</td><td>0.0%</td><td>75.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>24</td><td>37.5%</td><td>37.5%</td><td>4.2%</td><td>37.5%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>24</td><td>37.5%</td><td>41.7%</td><td>8.3%</td><td>37.5%</td><td>0.0%</td></tr><tr><td>ru_free_order</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_case_swap</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_negation</td><td>23</td><td>34.8%</td><td>39.1%</td><td>4.3%</td><td>34.8%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>24</td><td>66.7%</td><td>79.2%</td><td>4.2%</td><td>66.7%</td><td>4.2%</td></tr></tbody></table>
+  </tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>93.8%</td><td>81.2%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>16</td><td>93.8%</td><td>75.0%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>16</td><td>56.2%</td><td>50.0%</td><td>0.0%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>16</td><td>56.2%</td><td>50.0%</td><td>12.5%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_free_order</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_case_swap</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td>ru_negation</td><td>15</td><td>53.3%</td><td>53.3%</td><td>0.0%</td><td>53.3%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>16</td><td>87.5%</td><td>68.8%</td><td>6.2%</td><td>87.5%</td><td>6.2%</td></tr></tbody></table>
 
-  <div class="warn"><b>Важная оговорка:</b> модель→среда матрица асимметрична (task.md), поэтому пуллинг по
-  вариантам смешивает разные подмножества моделей/сцен для разных строк (например, en_canonical для
-  GreenVLA — только 4 SimplerEnv-сцены, для OpenVLA-OFT — 16 LIBERO-сцен). Разбивка по моделям ниже —
-  более честный источник для интерпретации отдельной модели.</div>
-
-  <h3>Разбивка по моделям</h3>
-  <h3>GreenVLA-R1 (bridge)</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>4</td><td>25.0%</td><td>100.0%</td><td>0.0%</td><td>25.0%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>4</td><td>50.0%</td><td>100.0%</td><td>0.0%</td><td>50.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>4</td><td>0.0%</td><td>25.0%</td><td>25.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>4</td><td>0.0%</td><td>25.0%</td><td>25.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>4</td><td>50.0%</td><td>100.0%</td><td>0.0%</td><td>50.0%</td><td>0.0%</td></tr></tbody></table><h3>GreenVLA-R2 (bridge, RL-aligned)</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>4</td><td>25.0%</td><td>100.0%</td><td>0.0%</td><td>25.0%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>4</td><td>25.0%</td><td>100.0%</td><td>0.0%</td><td>25.0%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>4</td><td>0.0%</td><td>50.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>4</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>4</td><td>0.0%</td><td>100.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td></tr></tbody></table><h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th><th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th></tr></thead><tbody><tr><td>en_canonical</td><td>16</td><td>93.8%</td><td>81.2%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>en_paraphrase</td><td>16</td><td>93.8%</td><td>75.0%</td><td>0.0%</td><td>93.8%</td><td>0.0%</td></tr><tr><td>mt_russian</td><td>16</td><td>56.2%</td><td>50.0%</td><td>0.0%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_literal</td><td>16</td><td>56.2%</td><td>50.0%</td><td>12.5%</td><td>56.2%</td><td>0.0%</td></tr><tr><td>ru_negation</td><td>15</td><td>53.3%</td><td>53.3%</td><td>0.0%</td><td>53.3%</td><td>0.0%</td></tr><tr><td>code_switch</td><td>16</td><td>87.5%</td><td>68.8%</td><td>6.2%</td><td>87.5%</td><td>6.2%</td></tr></tbody></table>
+  <p class="muted">Двух вариантов из восьми в таблице нет.
+  <code>ru_free_order</code> написан для всех 20 сцен, но в пилотный прогон не входил:
+  <code>export_prompts.py</code> выгружает семь вариантов — шесть «primary» из task.md плюс
+  <code>mt_russian</code>, — и свободный порядок слов в этот список не попал. Эпизодов по нему
+  не собрано ни одного.
+  <code>ru_case_swap</code> применим только к 8 сценам из 20 (на остальных менять падеж не у
+  чего), и собранные по нему 36 эпизодов сняты по прежнему критерию успеха: он засчитывал
+  выполнение исходной задачи, тогда как смысл варианта — проверить, пойдёт ли робот за
+  перевёрнутой инструкцией. Критерий исправлен, эпизоды помечены устаревшими и в метрики не
+  идут; пересобрать их можно на следующем прогоне.</p>
 </section>
 
 <section>
-  <h2>6. Метрики — Table: cleaned language effect (Δlang)</h2>
+  <h2>6. Языковой эффект (Δlang)</h2>
   <div class="f">
   gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
   <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
   </div>
-  <div class="warn"><b>Единой таблицы «по всем моделям» здесь нет намеренно.</b>
-  Пуллинг моделей в один Δlang даёт величину, которая ничего не измеряет: покрытие
-  по вариантам у моделей разное, поэтому пулинговые SR разных вариантов взвешены
-  по-разному, а модели с SR≈0 во всех языках механически дают Δlang≈0 и размывают
-  тех, у кого эффект есть (пулинговый Δlang<sub>ru_literal</sub> = +11.4 п.п. против
-  разброса 0…+50 п.п. по моделям). Ниже — только разбивка по моделям.</p></div>
-
-  <h3>Δlang по моделям (парное сравнение)</h3>
-  <p class="muted">Каждый вариант сравнивается с <code>en_canonical</code> и
-  <code>en_paraphrase</code> только на общих для всех трёх сценах — колонка «парных сцен».
-  CI — парный бутстрап по сценам, p — точный тест Мак-Немара против
-  <code>en_canonical</code>; прочерк в p означает отсутствие дискордантных пар,
-  то есть данных для суждения нет.</p>
-  <h3>GreenVLA-R1 (bridge)</h3><table class="data-table"><thead><tr><th>Effect</th><th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead><tbody><tr><td>Δlang_mt_russian</td><td>4</td><td class="pos">+50.0 pp</td><td>[+0; +100]</td><td>1.000</td></tr><tr><td>Δlang_ru_literal</td><td>4</td><td class="pos">+50.0 pp</td><td>[+0; +100]</td><td>1.000</td></tr><tr><td>Δlang_ru_negation</td><td>4</td><td class="pos">+50.0 pp</td><td>[+0; +100]</td><td>1.000</td></tr><tr><td>Δlang_code_switch</td><td>4</td><td class="">0.0 pp</td><td>[-75; +75]</td><td>1.000</td></tr></tbody></table><h3>GreenVLA-R2 (bridge, RL-aligned)</h3><table class="data-table"><thead><tr><th>Effect</th><th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead><tbody><tr><td>Δlang_mt_russian</td><td>4</td><td class="pos">+25.0 pp</td><td>[+0; +75]</td><td>1.000</td></tr><tr><td>Δlang_ru_literal</td><td>4</td><td class="pos">+25.0 pp</td><td>[+0; +75]</td><td>1.000</td></tr><tr><td>Δlang_ru_negation</td><td>4</td><td class="pos">+25.0 pp</td><td>[+0; +75]</td><td>1.000</td></tr><tr><td>Δlang_code_switch</td><td>4</td><td class="pos">+25.0 pp</td><td>[+0; +75]</td><td>1.000</td></tr></tbody></table><h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Effect</th><th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead><tbody><tr><td>Δlang_mt_russian</td><td>16</td><td class="pos">+37.5 pp</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>Δlang_ru_literal</td><td>16</td><td class="pos">+37.5 pp</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>Δlang_ru_negation</td><td>15</td><td class="pos">+40.0 pp</td><td>[+13; +67]</td><td>0.031</td></tr><tr><td>Δlang_code_switch</td><td>16</td><td class="pos">+6.2 pp</td><td>[+0; +19]</td><td>1.000</td></tr></tbody></table>
+  <p class="muted">Вычитание gap<sub>en_paraphrase</sub> снимает эффект «инструкция просто
+  сформулирована иначе»: остаток относится к языковой оси. Каждый вариант сравнивается с
+  <code>en_canonical</code> и <code>en_paraphrase</code> только на общих для всех трёх сценах —
+  это колонка «парных сцен». CI — парный бутстрап по сценам, p — точный тест Мак-Немара против
+  <code>en_canonical</code>; прочерк в p означает отсутствие дискордантных пар.</p>
+  <h3>OpenVLA-OFT</h3><table class="data-table"><thead><tr><th>Effect</th><th>Парных сцен</th><th>Δlang</th><th>95% CI</th><th>p (McNemar)</th></tr></thead><tbody><tr><td>Δlang_mt_russian</td><td>16</td><td class="pos">+37.5 pp</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>Δlang_ru_literal</td><td>16</td><td class="pos">+37.5 pp</td><td>[+12; +62]</td><td>0.031</td></tr><tr><td>Δlang_ru_negation</td><td>15</td><td class="pos">+40.0 pp</td><td>[+13; +67]</td><td>0.031</td></tr><tr><td>Δlang_code_switch</td><td>16</td><td class="pos">+6.2 pp</td><td>[+0; +19]</td><td>1.000</td></tr></tbody></table>
 </section>
 
 <section>
@@ -175,16 +185,16 @@
   <tbody>
     <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>
         <td><b>сырой ответ есть</b></td>
-        <td>Δlang по модели (раздел 6): перефразирование на английском вычтено, остаток относится к языковой оси. Ответ предварительный — одна модель прошла проверку достоверности, эпизод на клетку один.</td></tr>
+        <td>Δlang по вариантам, раздел 6.</td></tr>
     <tr><td class="k">RQ2. Where do multilingual instructions fail in the language-to-action pipeline?</td>
-        <td>частично</td>
-        <td>Поведенческий слой: первый контакт, доля неверного объекта, выполнение отношения (раздел 5) показывают, на каком шаге рвётся исполнение. Разделить «не понял» и «понял, но не связал с действием» этими данными нельзя.</td></tr>
+        <td><b>ответа нет</b></td>
+        <td>Нужен послойный разбор; поведенческие колонки места сбоя не дают.</td></tr>
     <tr><td class="k">RQ3. Does action fine-tuning erase multilingual semantics or render them non-causal?</td>
         <td><b>ответа нет</b></td>
-        <td>Нужны slot-probes по слоям и каузальный patching между base и action-tuned чекпойнтами. В пилоте не делалось.</td></tr>
+        <td>Нужны slot-probes и каузальный patching. В пилоте не делалось.</td></tr>
     <tr><td class="k">RQ4. Can a slot-causal, base-anchored repair restore multilingual action binding?</td>
         <td><b>ответа нет</b></td>
-        <td>Repair строится по результатам RQ3, то есть следующий этап.</td></tr>
+        <td>Строится по результатам RQ3.</td></tr>
   </tbody></table>
 </section>
 
