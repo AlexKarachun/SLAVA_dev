@@ -259,3 +259,6 @@ __marimo__/
 
 # Служебное состояние счётчика бюджета (scripts/budget_log.py)
 docs/.budget_log_state.json
+
+# Логи автономных смен (регенерируются, не данные)
+rollouts/night_shift/
