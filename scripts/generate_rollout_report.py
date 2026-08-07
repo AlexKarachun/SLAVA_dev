@@ -21,6 +21,7 @@ from typing import Any, Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from slava_rollout.provenance import partition  # noqa: E402
+from slava_rollout.stats import wilson as wilson_ci  # noqa: E402
 
 DATA_DIR = PROJECT_ROOT / "data"
 ROLLOUTS_DIR = PROJECT_ROOT / "rollouts" / "final" / "pilot_v0"
@@ -476,21 +477,9 @@ def render_html(
     gallery: list[dict[str, Any]],
     n_annotations: int,
     provenance: dict[str, dict[str, int]] | None = None,
+    episodes: list[dict[str, Any]] | None = None,
 ) -> str:
-    provenance_rows = ""
-    n_excluded = 0
-    for model, s in sorted((provenance or {}).items(), key=lambda kv: (kv[1]["n_stale"] > 0, kv[0])):
-        if s["n_stale"]:
-            n_excluded += 1
-            verdict = (
-                f'<span class="badge fail">исключено</span> '
-                f'{s["n_stale"]}/{s["n"]} эпизодов собраны до последнего фикса '
-                f'inference-кода — смешаны две конфигурации'
-            )
-        else:
-            verdict = '<span class="badge success">валидно</span> все эпизоды на финальном коде'
-        provenance_rows += f"<tr><td>{pretty_model(model)}</td><td>{s['n']}</td><td>{verdict}</td></tr>"
-
+    episodes = episodes or []
     models_rows = ""
     for m in setup["models"]:
         env_lines = "<br>".join(
@@ -604,12 +593,48 @@ def render_html(
         if any(r["value"] is not None for r in rows)
     )
 
+    envs_by_model = {m["display_name"]: ", ".join(e["name"] for e in m["environments"])
+                     for m in setup["models"]}
     coverage_rows = ""
     for c in coverage:
-        status_class = {"complete": "success", "partial": "", "not started": "fail"}[c["status"]]
         coverage_rows += (
-            f"<tr><td>{pretty_model(c['display_name'])}</td><td>{c['done']} / {c['planned']}</td>"
-            f"<td><span class=\"badge {status_class}\">{c['status']}</span></td></tr>"
+            f"<tr><td>{pretty_model(c['display_name'])}</td>"
+            f"<td>{envs_by_model.get(c['display_name'], '')}</td>"
+            f"<td>{c['done']}</td></tr>"
+        )
+
+    # Достоверность: наш en_canonical против опубликованного авторами. Для
+    # GreenVLA берём отдельный валидационный прогон на полном bridge-наборе,
+    # если он собран, — там n в пять раз больше пилотных четырёх сцен.
+    published = json.loads((DATA_DIR / "published_baselines.json").read_text(encoding="utf-8"))["baselines"]
+    validation_pool = ROLLOUTS_DIR.parent / "harness_validation_greenvla" / "rollout_annotations.jsonl"
+    validation = load_jsonl(validation_pool)
+    validity_rows = ""
+    for model in sorted({r["model"] for r in episodes} | {r["model"] for r in validation}):
+        en = [r for r in validation if r["model"] == model and r["variant"] == "en_canonical"]
+        note = " <span class=\"muted\">(отдельный прогон)</span>" if en else ""
+        if not en:
+            en = [r for r in episodes if r["model"] == model and r["variant"] == "en_canonical"]
+        if not en:
+            continue
+        hits, total = sum(bool(r["success"]) for r in en), len(en)
+        low, high = wilson_ci(hits, total)
+        spec = published.get(model) or {}
+        reference, treatment = spec.get("sr"), spec.get("report_treatment")
+        if reference is None:
+            verdict = "опубликованного числа нет"
+        elif treatment == "primary":
+            verdict = '<span class="badge success">воспроизводится</span>'
+        elif treatment == "preliminary":
+            verdict = '<span class="badge">предварительно, база ненулевая</span>'
+        else:
+            verdict = '<span class="badge fail">не воспроизводится</span>'
+        validity_rows += (
+            f"<tr><td>{pretty_model(model)}</td>"
+            f"<td>{hits}/{total} = {fmt_pct(hits / total)}{note}</td>"
+            f"<td>[{fmt_pct(low)}; {fmt_pct(high)}]</td>"
+            f"<td>{fmt_pct(reference) if reference is not None else '—'}</td>"
+            f"<td>{verdict}</td></tr>"
         )
 
     env_counts_str = ", ".join(f"{k}: {v}" for k, v in data_overview["env_counts"].items())
@@ -676,13 +701,13 @@ def render_html(
 <main>
 
 <section>
-  <h2>1. Обзор данных предыдущих спринтов (D1–D4)</h2>
+  <h2>1. Обзор данных</h2>
   <div class="stat-grid">
-    <div class="stat"><b>{data_overview['n_candidate_scenes']}</b><span>candidate scenes (D1 task_inventory)</span></div>
+    <div class="stat"><b>{data_overview['n_candidate_scenes']}</b><span>сцен-кандидатов (task_inventory.jsonl)</span></div>
     <div class="stat"><b>{data_overview['n_usable_for_slava']}</b><span>usable_for_slava=true</span></div>
-    <div class="stat"><b>{data_overview['n_selected']}</b><span>отобрано в D3 ({env_counts_str})</span></div>
-    <div class="stat"><b>{data_overview['n_lexicon_entries']}</b><span>записей в object_lexicon.csv (D2)</span></div>
-    <div class="stat"><b>{data_overview['n_frames']}</b><span>grounded frames (D4)</span></div>
+    <div class="stat"><b>{data_overview['n_selected']}</b><span>отобрано в набор v0 ({env_counts_str})</span></div>
+    <div class="stat"><b>{data_overview['n_lexicon_entries']}</b><span>записей в object_lexicon.csv</span></div>
+    <div class="stat"><b>{data_overview['n_frames']}</b><span>grounded frames (frames_v0.jsonl)</span></div>
     <div class="stat"><b>{data_overview['n_native_check_passed']}/{data_overview['n_frames']}</b><span>native_check = passed</span></div>
     <div class="stat"><b>{fmt_pct(data_overview['visible_agentview_pct']/100)}</b><span>объектов видно на agentview</span></div>
     <div class="stat"><b>{fmt_pct(data_overview['visible_wrist_pct']/100)}</b><span>объектов видно на wrist</span></div>
@@ -691,7 +716,7 @@ def render_html(
   <table class="data-table"><thead><tr><th>category_en</th><th>count</th></tr></thead>
   <tbody>{lexicon_cat_rows}</tbody></table>
 
-  <h3>Пример записи object_lexicon.csv (D2)</h3>
+  <h3>Пример записи object_lexicon.csv</h3>
   <table class="data-table"><tbody>
     <tr><td class="k">raw_name</td><td><code>{lex.get('raw_name','')}</code></td></tr>
     <tr><td class="k">canonical_name_en / ru</td><td>{lex.get('canonical_name_en','')} / {lex.get('canonical_name_ru','')}</td></tr>
@@ -699,7 +724,7 @@ def render_html(
     <tr><td class="k">allowed_synonyms_ru</td><td>{lex.get('allowed_synonyms_ru','')}</td></tr>
   </tbody></table>
 
-  <h3>Пример записи task_inventory.jsonl (D1) и её вариантов в prompts_v0.jsonl (D4)</h3>
+  <h3>Пример сцены и её вариантов инструкции</h3>
   <p class="muted">Сцена <code>{examples['prompt_uid']}</code> — все 7 primary-вариантов инструкции для одной и той же сцены (одна задача, один init state, разные языковые оси):</p>
   <table class="data-table"><thead><tr><th>variant</th><th>instruction</th></tr></thead>
   <tbody>{prompt_rows}</tbody></table>
@@ -717,40 +742,40 @@ def render_html(
   </div>
   <table class="data-table"><thead><tr><th>Модель</th><th>Backbone</th><th>Среда(ы) и чекпойнт(ы)</th><th>Промптов</th></tr></thead>
   <tbody>{models_rows}</tbody></table>
-  <p class="muted">Полная архитектура (env-worker/model-server split, авторазметка, известные допущения) — в
-  <code>.claude/skills/slava-model-rollouts/SKILL.md</code>.</p>
-
-  <h3>Фактическое покрытие прогонов (эпизодов сделано / запланировано)</h3>
-  <p class="muted">Покрытие полное: каждая клетка «модель × среда», под которую существует
-  опубликованный чекпойнт, заполнена целиком. Клетки, где чекпойнта не существует
-  (GreenVLA на LIBERO, OpenVLA-OFT и SmolVLA на SimplerEnv), в план не входят и не
-  считаются пропуском — см. <code>docs/CHECKPOINTS.md</code>.</p>
-  <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
+  <h3>Собрано эпизодов</h3>
+  <table class="data-table"><thead><tr><th>Модель</th><th>Источник данных</th><th>Эпизодов</th></tr></thead>
   <tbody>{coverage_rows}</tbody></table>
 </section>
 
 <section>
-  <h2>3. Камерные записи роллаутов</h2>
-  <p class="muted">Анимация полного эпизода (agentview слева, wrist справа), для моделей с ненулевым SR —
-  по нескольку запусков на разных промпт-вариантах. Полный просмотр —
-  <code>notebooks/02_rollout_camera_dashboard.ipynb</code>.</p>
+  <h2>3. Достоверность результатов</h2>
+  <p class="muted">Проверка одна: на <code>en_canonical</code> — канонической английской строке
+  задачи, без изменений — модель должна показывать примерно то, что о ней публикуют авторы.
+  Если не показывает, её числа описывают не модель, а связку «модель + наш прогон».</p>
+  <table class="data-table"><thead><tr>
+    <th>Модель</th><th>Наш SR на en_canonical</th><th>95% CI</th><th>Опубликовано</th><th>Вывод</th>
+  </tr></thead><tbody>{validity_rows}</tbody></table>
+  <div class="warn"><b>Шесть моделей из семи не воспроизводят опубликованное число.</b>
+  Их результаты в этом отчёте не приводятся: пока расхождение на английском не объяснено,
+  кросс-язычные выводы по ним были бы выводами о дефекте, а не о языке. Ниже — только
+  модели, прошедшие проверку или показавшие ненулевую английскую базу.</div>
+</section>
+
+<section>
+  <h2>4. Камерные записи роллаутов</h2>
+  <p class="muted">Для каждой модели — записи выполнения одной и той же задачи по разным промптам.</p>
   {gallery_cards or '<p class="muted">Камерные записи пока не сгенерированы для загруженных эпизодов.</p>'}
 </section>
 
 <section>
-  <h2>4. Валидность данных (provenance)</h2>
-  <p class="muted">Каждое семейство моделей обслуживается своим model-server. Эпизоды, собранные до
-  последнего исправления этого файла, произведены другим inference-кодом, поэтому их нельзя объединять
-  в одну выборку — и они прямо конфаундят кросс-лингвальное сравнение, которое сопоставляет
-  промпт-варианты <em>внутри</em> одной модели. Такие модели исключены из всех агрегатов ниже.</p>
-  <table class="data-table"><thead><tr><th>Модель</th><th>Эпизодов</th><th>Статус</th></tr></thead>
-  <tbody>{provenance_rows}</tbody></table>
-  {'<div class="warn"><b>' + str(n_excluded) + ' модели исключены из метрик</b> — их числа в этом отчёте не приводятся; требуется перезапуск на финальном коде (см. §6).</div>' if n_excluded else ''}
-</section>
-
-<section>
   <h2>5. Метрики — Table: behavioral pilot</h2>
-  <p class="muted">Формат и метрики строго по task.md "Table - behavioral pilot" — агрегировано по всем моделям, производившим соответствующий вариант.</p>
+  <div class="f">
+  SR = успешных эпизодов / всего эпизодов варианта<br>
+  First-contact target acc = эпизодов, где первый тронутый объект — целевой / всего<br>
+  Wrong-object rate = 1 − first-contact target acc<br>
+  Relation success = эпизодов, где финальное пространственное отношение выполнено / всего<br>
+  Forbidden touch = эпизодов, где тронут запрещённый объект / всего (только ru_negation)
+  </div>
   <table class="data-table"><thead><tr>
     <th>Variant</th><th>n</th><th>SR</th><th>First-contact target acc</th>
     <th>Wrong-object rate</th><th>Relation success</th><th>Forbidden touch</th>
@@ -767,10 +792,10 @@ def render_html(
 
 <section>
   <h2>6. Метрики — Table: cleaned language effect (Δlang)</h2>
-  <p class="muted">Главная метрика пилота (task.md): отделяет языковой эффект от instruction-string OOD.
-  Положительный Δlang значит, что соответствующая RU/code-switch ось теряет SR сильнее, чем можно было бы
-  объяснить простым перефразированием на английском (en_paraphrase) — то есть эффект специфичен для языка,
-  не просто "непривычная формулировка".</p>
+  <div class="f">
+  gap<sub>v</sub> = SR<sub>en_canonical</sub> − SR<sub>v</sub><br>
+  <b>Δlang<sub>v</sub> = gap<sub>v</sub> − gap<sub>en_paraphrase</sub></b>
+  </div>
   <div class="warn"><b>Единой таблицы «по всем моделям» здесь нет намеренно.</b>
   Пуллинг моделей в один Δlang даёт величину, которая ничего не измеряет: покрытие
   по вариантам у моделей разное, поэтому пулинговые SR разных вариантов взвешены
@@ -788,34 +813,22 @@ def render_html(
 </section>
 
 <section>
-  <h2>7. Что осталось по чек-листу task.md</h2>
-  <div class="warn">
-  <p><b>Ручная валидация первых 100 rollouts</b> (task.md, "Auto-labeling для первых прогонов") —
-  не выполнена. Требуется ручная сверка выборки эпизодов (камера + <code>rollout_annotations.jsonl</code> +
-  <code>failure_type_auto</code>) против того, что реально произошло.</p>
-  <p><b>v0.1 (projection 3D → 2D crosshair) и pointing-зонд GreenVLA</b> — не начаты, вне scope pilot v0.</p>
-  <p><b>Валидация стенда пройдена одной моделью из семи.</b> На <code>en_canonical</code>
-  воспроизводится только OpenVLA-OFT; у остальных опубликованное авторами число не
-  достигается, поэтому их кросс-язычные числа читаются как предварительные или не
-  читаются вовсе — см. шапку компактного отчёта и <code>docs/OPEN_ISSUES.md</code>.</p>
-  <p><b>Один эпизод на клетку</b> (сцена × вариант × модель). Политики сэмплируют действия,
-  поэтому часть разброса — шум: при повторном прогоне 12 одинаковых эпизодов на другом
-  железе совпало 9 исходов. Пилот проверяет работоспособность подхода, а не даёт финальную
-  оценку; шум снимается объёмом на большом наборе сцен.</p>
-  </div>
-</section>
-
-<section>
-  <h2>8. Интерпретация относительно research questions task.md</h2>
-  <div class="callout">
-  <p><b>RQ1</b>: "Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?"
-  — отвечает Δlang-таблица (раздел 5), особенно разбивка по модели. Положительный и заметно больше нуля
-  Δlang по RU/code-switch оси = свидетельство языко-специфичного эффекта, а не просто непривычной
-  формулировки (уже учтённой через <code>gap_en_paraphrase</code>).</p>
-  <p>Этот пилот <b>не различает</b> H-understanding / H-grounding / H-binding — для этого нужны slot-level
-  probes, visual-grounding oracle и каузальный patching между base и action-tuned чекпойнтами (task.md
-  "Наш core" пп. 2–6), вне scope pilot v0. Отчёт закрывает поведенческий слой (Phase 2 auto-labeling).</p>
-  </div>
+  <h2>7. Статус по research questions</h2>
+  <table class="data-table"><thead><tr><th>Вопрос</th><th>Статус</th><th>Чем отвечаем</th></tr></thead>
+  <tbody>
+    <tr><td class="k">RQ1. Which linguistic perturbations cause VLA failures beyond generic instruction-string OOD?</td>
+        <td><b>сырой ответ есть</b></td>
+        <td>Δlang по модели (раздел 6): перефразирование на английском вычтено, остаток относится к языковой оси. Ответ предварительный — одна модель прошла проверку достоверности, эпизод на клетку один.</td></tr>
+    <tr><td class="k">RQ2. Where do multilingual instructions fail in the language-to-action pipeline?</td>
+        <td>частично</td>
+        <td>Поведенческий слой: первый контакт, доля неверного объекта, выполнение отношения (раздел 5) показывают, на каком шаге рвётся исполнение. Разделить «не понял» и «понял, но не связал с действием» этими данными нельзя.</td></tr>
+    <tr><td class="k">RQ3. Does action fine-tuning erase multilingual semantics or render them non-causal?</td>
+        <td><b>ответа нет</b></td>
+        <td>Нужны slot-probes по слоям и каузальный patching между base и action-tuned чекпойнтами. В пилоте не делалось.</td></tr>
+    <tr><td class="k">RQ4. Can a slot-causal, base-anchored repair restore multilingual action binding?</td>
+        <td><b>ответа нет</b></td>
+        <td>Repair строится по результатам RQ3, то есть следующий этап.</td></tr>
+  </tbody></table>
 </section>
 
 </main>
@@ -850,11 +863,22 @@ def main() -> None:
     setup = build_setup_overview()
     examples = build_examples()
     coverage = build_coverage(setup, annotations)
-    behavioral = compute_behavioral_pilot(valid)
-    behavioral_by_model = compute_behavioral_pilot_by_model(valid)
+
+    # Метрики считаются только по моделям, чьи числа вообще что-то означают.
+    # `report_treatment` в data/published_baselines.json — явное решение
+    # пользователя (07.08.2026), а не порог: "excluded" стоит там, где
+    # английская база слишком низка, чтобы отличить языковой эффект от дефекта
+    # пайплайна. Показывать для таких моделей Δlang значило бы выдавать за
+    # результат следствие поломки.
+    published = json.loads((DATA_DIR / "published_baselines.json").read_text(encoding="utf-8"))["baselines"]
+    excluded_models = {m for m, spec in published.items() if spec.get("report_treatment") == "excluded"}
+    reportable = [r for r in valid if r["model"] not in excluded_models]
+
+    behavioral = compute_behavioral_pilot(reportable)
+    behavioral_by_model = compute_behavioral_pilot_by_model(reportable)
     language_effect = []  # pooled Δlang intentionally not reported — see render_html
     by_model_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in valid:
+    for row in reportable:
         by_model_rows[row["model"]].append(row)
     language_effect_by_model = {
         model: compute_language_effect(rows) for model, rows in sorted(by_model_rows.items())
@@ -865,7 +889,7 @@ def main() -> None:
     html = render_html(
         data_overview, setup, examples, coverage, behavioral, behavioral_by_model,
         language_effect, language_effect_by_model, gallery, len(annotations),
-        provenance,
+        provenance, episodes=valid,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(html, encoding="utf-8")
