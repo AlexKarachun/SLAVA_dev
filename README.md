@@ -265,6 +265,9 @@ python scripts/generate_label_review.py          # -> data/label_review.html
 python scripts/apply_label_review.py path/to/label_review_verdicts.json
 ```
 
+Как запускать долгие и автономные смены (tmux, сон ноутбука, сервер,
+разрешения, чек-лист) — [`docs/UNATTENDED_RUNS.md`](docs/UNATTENDED_RUNS.md).
+
 Валидация на полном bridge-наборе SimplerEnv (шире, чем 4 сцены пилота) —
 [`docs/HARNESS_VALIDATION.md`](docs/HARNESS_VALIDATION.md). Что не сошлось и
 какие есть гипотезы — [`docs/OPEN_ISSUES.md`](docs/OPEN_ISSUES.md).
