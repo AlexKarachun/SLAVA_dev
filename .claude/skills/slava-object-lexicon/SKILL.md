@@ -3,6 +3,19 @@ name: slava-object-lexicon
 description: Add or edit rows in data/object_lexicon.csv (category, semantic subtype, canonical EN/RU name, visual attributes, color, recoverability, synonyms, usable_v0). Use when a new raw_name/asset needs a lexicon entry, or when scaling scene collection past the 20-scene pilot to 120–180-task full-sets.
 ---
 
+> ## ⚠ Какой файл размечать (актуально с 08.08.2026)
+>
+> В репозитории теперь ДВА набора, и перепутать их легко:
+>
+> - `data/task_inventory.jsonl` + `data/pilot_v0_release/frames_v0.jsonl` —
+>   **замороженный пилот** (20 сцен, tag `slava-pilot-v0`). Не редактировать.
+> - `data/full_set/task_inventory.jsonl` — **пул полномасштабного набора**,
+>   896 сцен, 5312 объектов. Вся текущая работа здесь.
+>
+> Дашборды для полного набора генерируйте с `--input data/full_set/task_inventory.jsonl`
+> и `--output` внутрь `data/full_set/`, иначе скрипт по умолчанию возьмёт пилот.
+> Обзор пула — `data/full_set/README.md`.
+
 # SLAVA object lexicon authoring
 
 Source of truth for the *contract*: `AGENTS.md`'s "Object lexicon" section

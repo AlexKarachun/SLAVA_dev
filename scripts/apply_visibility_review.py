@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("corrections", type=Path, help="visibility_corrections.json from the dashboard")
     parser.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
+    parser.add_argument("--allow-pilot", action="store_true",
+                        help="разрешить запись в замороженный пилотный инвентарь")
     return parser.parse_args()
 
 
@@ -66,6 +68,18 @@ def main() -> None:
 
     records = [normalize_inventory_record(r) for r in inventory]
     validate_inventory(records)
+    # Пилот заморожен (tag slava-pilot-v0), а КАЖДЫЙ скрипт конвейера по
+    # умолчанию смотрит именно на него — включая этот. С 08.08.2026 работа идёт
+    # над data/full_set/task_inventory.jsonl, и запуск без --inventory тихо
+    # правил бы замороженные данные. Дешевле упасть, чем это чинить потом.
+    if args.inventory.resolve() == (PROJECT_ROOT / "data" / "task_inventory.jsonl").resolve() \
+            and not args.allow_pilot:
+        raise SystemExit(
+            "ОТКАЗ: это инвентарь замороженного пилота (data/task_inventory.jsonl).\n"
+            "Для полномасштабного набора укажите явно:\n"
+            "  --inventory data/full_set/task_inventory.jsonl\n"
+            "Если правка пилота действительно нужна — добавьте --allow-pilot."
+        )
     save_jsonl(records, args.inventory)
     print(f"Applied {applied}/{len(corrections)} corrections to {args.inventory}")
 

@@ -67,6 +67,33 @@ bridge воспроизводится по `source.gym_env_name` + `source.episo
 Порядок шагов задан `task.md` и переставлять его нельзя: видимость → lexicon →
 роли и слоты → отбор → инструкции → native check → freeze.
 
+## Как запускать инструменты по этому набору
+
+**Все скрипты конвейера по умолчанию смотрят на замороженный пилот**, а не
+сюда. Это не оплошность, а следствие того, что пилот был единственным набором,
+когда их писали. Флаги обязательны:
+
+```bash
+# дашборд видимости (уже сгенерирован, пересоздать при изменении инвентаря)
+python3 scripts/generate_visibility_review.py \
+  --input  data/full_set/task_inventory.jsonl \
+  --output data/full_set/visibility_review.html
+
+# применить выгруженные из дашборда правки
+python3 scripts/apply_visibility_review.py <corrections.json> \
+  --inventory data/full_set/task_inventory.jsonl
+```
+
+`apply_visibility_review.py` **откажется** писать в пилотный инвентарь без
+явного `--allow-pilot` — защита поставлена 08.08.2026 именно потому, что
+дефолт ведёт на замороженные данные.
+
+Остальные скрипты (`generate_selected_scenes.py`,
+`sync_selected_tasks_visibility.py`, `build_frames_v0.py`, `export_prompts.py`,
+`validate_frames.py`) такой защиты пока не имеют — **проверяйте пути перед
+запуском**. У `sync_selected_tasks_visibility.py` пути вообще захардкожены,
+без аргументов.
+
 ## Проверено при приёмке
 
 896 уникальных `task_uid` без единого дубликата, `settle_steps: 40` у всех,

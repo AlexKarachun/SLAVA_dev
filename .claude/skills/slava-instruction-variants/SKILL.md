@@ -3,6 +3,19 @@ name: slava-instruction-variants
 description: Author Tier-1 instruction variants (en_paraphrase, ru_literal, ru_free_order, ru_case_swap, ru_negation, code_switch) for a SLAVA grounded_frame. Use when writing or reviewing variants.* in data/pilot_v0_release/frames_v0.jsonl, or when scaling frame authoring from the 20-scene pilot to the full set (120-180 tasks x 12-13 variants per task.md). Records two pilot defects that must not repeat: axes authored but never exported, and ru_case_swap being a probe whose success predicate must NOT be swapped.
 ---
 
+> ## ⚠ Какой файл размечать (актуально с 08.08.2026)
+>
+> В репозитории теперь ДВА набора, и перепутать их легко:
+>
+> - `data/task_inventory.jsonl` + `data/pilot_v0_release/frames_v0.jsonl` —
+>   **замороженный пилот** (20 сцен, tag `slava-pilot-v0`). Не редактировать.
+> - `data/full_set/task_inventory.jsonl` — **пул полномасштабного набора**,
+>   896 сцен, 5312 объектов. Вся текущая работа здесь.
+>
+> Дашборды для полного набора генерируйте с `--input data/full_set/task_inventory.jsonl`
+> и `--output` внутрь `data/full_set/`, иначе скрипт по умолчанию возьмёт пилот.
+> Обзор пула — `data/full_set/README.md`.
+
 # SLAVA instruction-variant authoring
 
 Source of truth: `task.md` sections "Instruction variants для v0" and

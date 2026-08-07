@@ -3,6 +3,19 @@ name: slava-quota-eligibility
 description: Mark quota_eligibility flags in task_inventory.jsonl (spatial_relation, pick_with_distractors, container, surface, has_distractor, same_category_distractor, same_color_distractor, ru_case_swap, ru_negation) and select a manifest that meets task.md's v0 quotas. Use when labeling scenes for quota fit or selecting a task set, especially past the 20-scene pilot.
 ---
 
+> ## ⚠ Какой файл размечать (актуально с 08.08.2026)
+>
+> В репозитории теперь ДВА набора, и перепутать их легко:
+>
+> - `data/task_inventory.jsonl` + `data/pilot_v0_release/frames_v0.jsonl` —
+>   **замороженный пилот** (20 сцен, tag `slava-pilot-v0`). Не редактировать.
+> - `data/full_set/task_inventory.jsonl` — **пул полномасштабного набора**,
+>   896 сцен, 5312 объектов. Вся текущая работа здесь.
+>
+> Дашборды для полного набора генерируйте с `--input data/full_set/task_inventory.jsonl`
+> и `--output` внутрь `data/full_set/`, иначе скрипт по умолчанию возьмёт пилот.
+> Обзор пула — `data/full_set/README.md`.
+
 # SLAVA quota-eligibility labeling
 
 Source of truth: `AGENTS.md`'s "Мнемонические правила разметки квот" section

@@ -3,6 +3,19 @@ name: slava-visibility-review
 description: Judge and record visible_agentview/visible_wrist for scene objects in task_inventory.jsonl (via data/visibility_review.html), including known pitfalls around composite/addressable objects and partial visibility. Use when doing or reviewing visibility labeling, especially when scaling from the 20-scene pilot to 120–180-task full-sets.
 ---
 
+> ## ⚠ Какой файл размечать (актуально с 08.08.2026)
+>
+> В репозитории теперь ДВА набора, и перепутать их легко:
+>
+> - `data/task_inventory.jsonl` + `data/pilot_v0_release/frames_v0.jsonl` —
+>   **замороженный пилот** (20 сцен, tag `slava-pilot-v0`). Не редактировать.
+> - `data/full_set/task_inventory.jsonl` — **пул полномасштабного набора**,
+>   896 сцен, 5312 объектов. Вся текущая работа здесь.
+>
+> Дашборды для полного набора генерируйте с `--input data/full_set/task_inventory.jsonl`
+> и `--output` внутрь `data/full_set/`, иначе скрипт по умолчанию возьмёт пилот.
+> Обзор пула — `data/full_set/README.md`.
+
 > **В свежем клоне `data/visibility_review.html` нет** — файл gitignore'ится.
 > Сгенерировать соответствующим скриптом из `scripts/` перед разметкой.
 

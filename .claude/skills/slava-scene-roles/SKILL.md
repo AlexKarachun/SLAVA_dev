@@ -3,6 +3,19 @@ name: slava-scene-roles
 description: Assign scene.objects roles (target/reference/distractor/background) and slots (target/reference/relation/forbidden/success_predicates) when authoring a SLAVA grounded_frame in data/pilot_v0_release/frames_v0.jsonl, including composite/addressable objects (e.g. a cabinet's individual drawers). Use when building or reviewing frames, especially when scaling past the 20-scene pilot.
 ---
 
+> ## ⚠ Какой файл размечать (актуально с 08.08.2026)
+>
+> В репозитории теперь ДВА набора, и перепутать их легко:
+>
+> - `data/task_inventory.jsonl` + `data/pilot_v0_release/frames_v0.jsonl` —
+>   **замороженный пилот** (20 сцен, tag `slava-pilot-v0`). Не редактировать.
+> - `data/full_set/task_inventory.jsonl` — **пул полномасштабного набора**,
+>   896 сцен, 5312 объектов. Вся текущая работа здесь.
+>
+> Дашборды для полного набора генерируйте с `--input data/full_set/task_inventory.jsonl`
+> и `--output` внутрь `data/full_set/`, иначе скрипт по умолчанию возьмёт пилот.
+> Обзор пула — `data/full_set/README.md`.
+
 # SLAVA scene grounding: roles, slots, composite objects
 
 Source of truth: `AGENTS.md`'s "grounded semantic frames v0.2" entry and its

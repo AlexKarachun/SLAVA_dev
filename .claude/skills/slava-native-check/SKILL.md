@@ -3,6 +3,19 @@ name: slava-native-check
 description: Run or interpret the native-check pass on SLAVA RU instruction variants (data/frames_review.html) — naturalness/equivalence/ambiguity scoring, thresholds, native_check status, and what counts as done. Use when doing native check, reviewing scores, or scaling the review process past the 20-scene pilot.
 ---
 
+> ## ⚠ Какой файл размечать (актуально с 08.08.2026)
+>
+> В репозитории теперь ДВА набора, и перепутать их легко:
+>
+> - `data/task_inventory.jsonl` + `data/pilot_v0_release/frames_v0.jsonl` —
+>   **замороженный пилот** (20 сцен, tag `slava-pilot-v0`). Не редактировать.
+> - `data/full_set/task_inventory.jsonl` — **пул полномасштабного набора**,
+>   896 сцен, 5312 объектов. Вся текущая работа здесь.
+>
+> Дашборды для полного набора генерируйте с `--input data/full_set/task_inventory.jsonl`
+> и `--output` внутрь `data/full_set/`, иначе скрипт по умолчанию возьмёт пилот.
+> Обзор пула — `data/full_set/README.md`.
+
 > **В свежем клоне `data/frames_review.html` нет** — файл gitignore'ится.
 > Сгенерировать: `python3 scripts/generate_frames_review.py`.
 
